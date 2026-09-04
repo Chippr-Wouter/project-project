@@ -17,7 +17,7 @@ import {
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext"
 import { useLexicalNodeSelection } from "@lexical/react/useLexicalNodeSelection"
 import { mergeRegister } from "@lexical/utils"
-import { Maximize2, Minimize2, Trash2 } from "lucide-react"
+import { ExternalLink, Maximize2, Minimize2, Trash2 } from "lucide-react"
 import {
   useCallback,
   useEffect,
@@ -68,6 +68,8 @@ const isInteractiveTarget = (target: EventTarget | null): boolean =>
 
 const OVERLAY_REVEAL =
   "opacity-0 transition-opacity group-hover/hitbox:opacity-100 group-focus-within/hitbox:opacity-100"
+
+const OVERLAY_SLOT = "absolute flex h-8 items-center"
 
 const CONTENT_MORPH = { ...transitions.morph, opacity: transitions.fade }
 
@@ -320,7 +322,7 @@ function FigmaSelectable({
   const compact = density === "compact"
   const morphId = `figma-${nodeKey}`
   const overlaySlot = cn(
-    "absolute flex h-8 items-center",
+    OVERLAY_SLOT,
     compact
       ? "-top-1 before:absolute before:inset-y-0 before:-inset-x-3 before:content-['']"
       : "-top-2"
@@ -375,6 +377,17 @@ function FigmaSelectable({
           >
             <Trash2 strokeWidth={1.75} />
           </OverlayAction>
+          {reference === null || compact ? null : (
+            <OverlayAction
+              morphId={`${morphId}-open`}
+              slot={cn(OVERLAY_SLOT, "-right-2 -bottom-2")}
+              label={m.figma_embed_open_in_figma()}
+              variant="overlay"
+              href={url}
+            >
+              <ExternalLink strokeWidth={1.75} />
+            </OverlayAction>
+          )}
           {reference === null ? null : (
             <OverlayAction
               morphId={`${morphId}-density`}
@@ -404,13 +417,15 @@ function OverlayAction({
   label,
   variant,
   onClick,
+  href,
   children
 }: {
   morphId: string
   slot: string
   label: string
   variant: "overlay" | "overlay-destructive"
-  onClick: () => void
+  onClick?: () => void
+  href?: string
   children: ReactNode
 }) {
   return (
@@ -428,6 +443,16 @@ function OverlayAction({
         onMouseDown={(event) => event.preventDefault()}
         onClick={onClick}
         className={OVERLAY_REVEAL}
+        render={
+          href === undefined ? undefined : (
+            <a
+              href={href}
+              target="_blank"
+              rel="noreferrer noopener"
+              data-figma-action="open"
+            />
+          )
+        }
       >
         {children}
       </Button>
