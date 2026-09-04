@@ -6,11 +6,16 @@ import * as Schema from "effect/Schema"
 import { expect } from "vitest"
 import {
   DEFAULT_TICKET_SORT,
+  matchesTicketQuery,
   NotFound,
+  padNumericIdSort,
+  paginateSorted,
   ProjectKey,
   TICKET_LIST_LIMIT,
   TicketId,
   TicketStatus,
+  tryDecodeCursor,
+  type TicketCountQuery,
   type TicketListQuery
 } from "@projectproject/shared"
 import { TicketsLive } from "../Layers/Tickets"
@@ -267,6 +272,44 @@ const entryFromDocument = (document: TicketDocument) => {
   }
 }
 
+const priorityOrdinal = { high: 3, med: 2, low: 1 } as const
+
+const ticketSortValue = (
+  document: TicketDocument,
+  query: TicketListQuery
+): string => {
+  switch (query.sort.key) {
+    case "id":
+      return padNumericIdSort(document.id) ?? document.id
+    case "created":
+      return document.createdAt.toISOString()
+    case "updated":
+      return document.updatedAt.toISOString()
+    case "title":
+      return document.title.toLowerCase()
+    case "priority":
+      return String(priorityOrdinal[document.priority]).padStart(2, "0")
+  }
+  throw new Error("unsupported ticket sort key")
+}
+
+const matchingDocuments = (
+  documents: Map<string, TicketDocument>,
+  query: Pick<TicketListQuery, "filter" | "q">,
+  viewerId: string,
+  ticketIds?: ReadonlyArray<string>,
+  excludeTicketIds?: ReadonlyArray<string>
+) => {
+  const included = ticketIds === undefined ? null : new Set(ticketIds)
+  const excluded = new Set(excludeTicketIds)
+  return [...documents.values()].filter(
+    (document) =>
+      (included === null || included.has(document.id)) &&
+      !excluded.has(document.id) &&
+      matchesTicketQuery(document, query, viewerId)
+  )
+}
+
 const makeFakeTicketIndex = (
   documents: Map<string, TicketDocument>,
   overrides: Partial<TicketIndexShape> = {}
@@ -286,6 +329,47 @@ const makeFakeTicketIndex = (
         return [...documents.values()]
           .filter((document) => wanted === null || wanted.has(document.id))
           .map(entryFromDocument)
+      }),
+    query: (_project, query, options) =>
+      Effect.sync(() => {
+        const sign = query.sort.dir === "asc" ? 1 : -1
+        const sorted = matchingDocuments(
+          documents,
+          query,
+          options.viewerId,
+          options.ticketIds,
+          options.excludeTicketIds
+        ).toSorted((left, right) => {
+          const leftValue = ticketSortValue(left, query)
+          const rightValue = ticketSortValue(right, query)
+          if (leftValue < rightValue) return -1 * sign
+          if (leftValue > rightValue) return sign
+          return left.id.localeCompare(right.id)
+        })
+        return paginateSorted(sorted, {
+          cursor: tryDecodeCursor(query.cursor),
+          limit: options.limit,
+          sortKey: (document) => ticketSortValue(document, query),
+          id: (document) => document.id,
+          dir: query.sort.dir
+        }).items.map((document) => ({
+          entry: entryFromDocument(document),
+          sortValue: ticketSortValue(document, query)
+        }))
+      }),
+    count: (_project, query: TicketCountQuery, options) =>
+      Effect.sync(() => {
+        const byStatus: Record<string, number> = {}
+        const matching = matchingDocuments(
+          documents,
+          query,
+          options.viewerId,
+          options.ticketIds
+        )
+        for (const document of matching) {
+          byStatus[document.status] = (byStatus[document.status] ?? 0) + 1
+        }
+        return { total: matching.length, byStatus }
       }),
     listIds: () => Effect.sync(() => [...documents.keys()]),
     existingIds: (_project, ticketIds) =>

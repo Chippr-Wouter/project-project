@@ -1,23 +1,38 @@
+import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import * as SqlClient from "@effect/sql/SqlClient"
 import {
   and,
+  arrayOverlaps,
+  asc,
+  count as drizzleCount,
+  desc,
   eq,
+  getTableColumns,
+  gt,
+  ilike,
   inArray,
+  isNotNull,
   isNull,
   lt,
   or,
-  sql as drizzleSql
+  sql as drizzleSql,
+  type SQL
 } from "drizzle-orm"
 import {
   NotFound,
   TagName,
   TicketId,
+  tryDecodeCursor,
   type ChecksStatus,
   type PullRequestState,
+  type TicketCountQuery,
+  type TicketListQuery,
   type TicketPriority,
+  type TicketSort,
   type TicketStatus,
   type TicketType
 } from "@projectproject/shared"
@@ -28,7 +43,11 @@ import {
   TicketIndex,
   type TicketIndexDrift,
   type TicketIndexEntry,
+  type TicketIndexCountOptions,
+  type TicketIndexCounts,
   type TicketIndexProject,
+  type TicketIndexQueryEntry,
+  type TicketIndexQueryOptions,
   type TicketIndexReconcileOptions,
   type TicketIndexReconcileProjectSummary,
   type TicketIndexReconcileSummary
@@ -37,6 +56,171 @@ import { TicketDocs, type TicketDocument } from "../Services/TicketDocs"
 
 const makeTicketId = Schema.decodeUnknownSync(TicketId)
 const makeTagName = Schema.decodeUnknownSync(TagName)
+
+const ticketIdSortExpression = drizzleSql<string>`case
+  when ${ticketIndex.ticketId} ~ '-[0-9]+$' then
+    case
+      when length(substring(${ticketIndex.ticketId} from '[0-9]+$')) < 10
+        then lpad(substring(${ticketIndex.ticketId} from '[0-9]+$'), 10, '0')
+      else substring(${ticketIndex.ticketId} from '[0-9]+$')
+    end
+  else ${ticketIndex.ticketId}
+end`
+
+const ticketPrioritySortExpression = drizzleSql<string>`case ${ticketIndex.priority}
+  when 'high' then '03'
+  when 'med' then '02'
+  else '01'
+end`
+
+const ticketSortExpression = (sort: TicketSort): SQL => {
+  switch (sort.key) {
+    case "id":
+      return ticketIdSortExpression
+    case "created":
+      return drizzleSql`${ticketIndex.createdAt}`
+    case "updated":
+      return drizzleSql`${ticketIndex.updatedAt}`
+    case "title":
+      return drizzleSql`lower(${ticketIndex.title})`
+    case "priority":
+      return ticketPrioritySortExpression
+  }
+  throw new Error("unsupported ticket sort key")
+}
+
+const cursorSortValue = (
+  sort: TicketSort,
+  value: string
+): string | Date | undefined => {
+  if (sort.key !== "created" && sort.key !== "updated") return value
+  const date = DateTime.make(value)
+  return Option.isSome(date) ? DateTime.toDate(date.value) : undefined
+}
+
+const cursorCondition = (
+  query: TicketListQuery,
+  expression: SQL
+): SQL | undefined => {
+  const cursor = tryDecodeCursor(query.cursor)
+  if (!cursor) return undefined
+  const value = cursorSortValue(query.sort, cursor.sort)
+  if (value === undefined) return undefined
+  const afterPrimary =
+    query.sort.dir === "asc"
+      ? drizzleSql`${expression} > ${value}`
+      : drizzleSql`${expression} < ${value}`
+  return or(
+    afterPrimary,
+    and(
+      drizzleSql`${expression} = ${value}`,
+      gt(ticketIndex.ticketId, cursor.id)
+    )
+  )
+}
+
+const escapedLikePattern = (value: string): string =>
+  `%${value.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_")}%`
+
+interface TicketWhereOptions {
+  readonly viewerId: string
+  readonly ticketIds?: ReadonlyArray<string>
+  readonly excludeTicketIds?: ReadonlyArray<string>
+}
+
+const ticketWhereConditions = (
+  project: TicketIndexProject,
+  query: Pick<TicketListQuery, "filter" | "q">,
+  options: TicketWhereOptions
+): ReadonlyArray<SQL> => {
+  const filter = query.filter
+  const conditions: Array<SQL> = [
+    eq(ticketIndex.projectId, project.projectId),
+    filter?.archived === true
+      ? isNotNull(ticketIndex.archivedAt)
+      : isNull(ticketIndex.archivedAt)
+  ]
+  if (options.ticketIds !== undefined) {
+    conditions.push(
+      drizzleSql`${ticketIndex.ticketId} = any(${drizzleSql.param([
+        ...options.ticketIds
+      ])}::text[])`
+    )
+  }
+  if (options.excludeTicketIds && options.excludeTicketIds.length > 0) {
+    conditions.push(
+      drizzleSql`${ticketIndex.ticketId} <> all(${drizzleSql.param([
+        ...options.excludeTicketIds
+      ])}::text[])`
+    )
+  }
+  if (filter?.status !== undefined) {
+    conditions.push(
+      filter.status.length === 0
+        ? drizzleSql`false`
+        : inArray(ticketIndex.status, [...filter.status])
+    )
+  }
+  if (filter?.type !== undefined) {
+    conditions.push(
+      filter.type.length === 0
+        ? drizzleSql`false`
+        : inArray(ticketIndex.type, [...filter.type])
+    )
+  }
+  if (filter?.assignee !== undefined) {
+    const assignees = filter.assignee.map((assignee) =>
+      assignee === "mine" ? options.viewerId : assignee
+    )
+    const requestedIds = assignees.filter(
+      (assignee): assignee is string => assignee !== null
+    )
+    const assigneeConditions: Array<SQL> = []
+    if (assignees.includes(null)) {
+      assigneeConditions.push(
+        drizzleSql`cardinality(${ticketIndex.assignees}) = 0`
+      )
+    }
+    if (requestedIds.length > 0) {
+      assigneeConditions.push(
+        arrayOverlaps(ticketIndex.assignees, requestedIds)
+      )
+    }
+    conditions.push(or(...assigneeConditions) ?? drizzleSql`false`)
+  }
+  if (filter?.tags !== undefined) {
+    conditions.push(
+      filter.tags.length === 0
+        ? drizzleSql`false`
+        : arrayOverlaps(ticketIndex.tags, [...filter.tags])
+    )
+  }
+  if (filter?.hasBranch !== undefined) {
+    conditions.push(
+      filter.hasBranch
+        ? isNotNull(ticketIndex.branch)
+        : isNull(ticketIndex.branch)
+    )
+  }
+  if (filter?.hasPr !== undefined) {
+    conditions.push(
+      filter.hasPr ? isNotNull(ticketIndex.pr) : isNull(ticketIndex.pr)
+    )
+  }
+  if (filter?.updatedAfter !== undefined) {
+    conditions.push(gt(ticketIndex.updatedAt, filter.updatedAfter))
+  }
+  const needle = query.q?.trim()
+  if (needle) {
+    const pattern = escapedLikePattern(needle)
+    const search = or(
+      ilike(ticketIndex.title, pattern),
+      ilike(ticketIndex.ticketId, pattern)
+    )
+    if (search) conditions.push(search)
+  }
+  return conditions
+}
 
 const nextTicketNumberFor = (
   documents: ReadonlyArray<TicketDocument>
@@ -271,6 +455,73 @@ export const TicketIndexLive = Layer.effect(
         .where(where)
         .pipe(
           Effect.map((rows) => rows.map(toEntry)),
+          Effect.orDie
+        )
+    }
+
+    const query = (
+      project: TicketIndexProject,
+      ticketQuery: TicketListQuery,
+      options: TicketIndexQueryOptions
+    ): Effect.Effect<ReadonlyArray<TicketIndexQueryEntry>> => {
+      if (options.ticketIds?.length === 0) return Effect.succeed([])
+      const expression = ticketSortExpression(ticketQuery.sort)
+      const conditions = [
+        ...ticketWhereConditions(project, ticketQuery, options),
+        cursorCondition(ticketQuery, expression)
+      ].filter((condition): condition is SQL => condition !== undefined)
+      return db
+        .select({
+          ...getTableColumns(ticketIndex),
+          sortValue: expression
+        })
+        .from(ticketIndex)
+        .where(and(...conditions))
+        .orderBy(
+          ticketQuery.sort.dir === "asc" ? asc(expression) : desc(expression),
+          asc(ticketIndex.ticketId)
+        )
+        .limit(Math.max(1, options.limit))
+        .pipe(
+          Effect.map((rows) =>
+            rows.map(({ sortValue, ...row }) => ({
+              entry: toEntry(row),
+              sortValue:
+                sortValue instanceof Date
+                  ? sortValue.toISOString()
+                  : String(sortValue)
+            }))
+          ),
+          Effect.orDie
+        )
+    }
+
+    const count = (
+      project: TicketIndexProject,
+      ticketQuery: TicketCountQuery,
+      options: TicketIndexCountOptions
+    ): Effect.Effect<TicketIndexCounts> => {
+      if (options.ticketIds?.length === 0) {
+        return Effect.succeed({ total: 0, byStatus: {} })
+      }
+      return db
+        .select({
+          status: ticketIndex.status,
+          total: drizzleCount()
+        })
+        .from(ticketIndex)
+        .where(and(...ticketWhereConditions(project, ticketQuery, options)))
+        .groupBy(ticketIndex.status)
+        .pipe(
+          Effect.map((rows) => {
+            const byStatus: Record<string, number> = {}
+            let total = 0
+            for (const row of rows) {
+              byStatus[row.status] = row.total
+              total += row.total
+            }
+            return { total, byStatus }
+          }),
           Effect.orDie
         )
     }
@@ -626,6 +877,8 @@ export const TicketIndexLive = Layer.effect(
     return {
       projectFor,
       list,
+      query,
+      count,
       listIds,
       existingIds,
       reserveTicketNumber,

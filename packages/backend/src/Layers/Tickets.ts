@@ -19,7 +19,6 @@ import {
   NotFound,
   OpenPrInput,
   OpenPrResult,
-  padNumericIdSort,
   paginateSorted,
   QuickCreateTicketInput,
   RateLimited,
@@ -30,7 +29,6 @@ import {
   TicketDetail,
   extractAttachmentRefs,
   TicketId,
-  tryDecodeCursor,
   UpdateTicketInput,
   Validation,
   type ProjectKey,
@@ -39,11 +37,8 @@ import {
   type TicketFilter,
   type TicketListPage,
   type TicketListQuery,
-  type TicketPriority,
-  type TicketSort,
   type TicketStatus
 } from "@projectproject/shared"
-import { matchesTicketQuery } from "@projectproject/shared"
 import { Attachments } from "../Services/Attachments"
 import { validateBodyMentionsWithLookups } from "../Services/BodyMentions"
 import { Comments, type InvalidCommentBody } from "../Services/Comments"
@@ -153,41 +148,6 @@ function documentToDetail(
   }
 }
 
-const PRIORITY_ORDINAL: Record<TicketPriority, number> = {
-  high: 3,
-  med: 2,
-  low: 1
-}
-
-const sortKeyValue = (t: Ticket, sort: TicketSort): string => {
-  switch (sort.key) {
-    case "id":
-      return padNumericIdSort(t.id) ?? t.id
-    case "created":
-      return t.createdAt.toISOString()
-    case "updated":
-      return t.updatedAt.toISOString()
-    case "title":
-      return t.title.toLowerCase()
-    case "priority":
-      return String(PRIORITY_ORDINAL[t.priority]).padStart(2, "0")
-  }
-}
-
-const sortTickets = (
-  tickets: ReadonlyArray<Ticket>,
-  sort: TicketSort
-): ReadonlyArray<Ticket> => {
-  const sign = sort.dir === "asc" ? 1 : -1
-  return [...tickets].sort((a, b) => {
-    const ka = sortKeyValue(a, sort)
-    const kb = sortKeyValue(b, sort)
-    if (ka < kb) return -1 * sign
-    if (ka > kb) return 1 * sign
-    return a.id.localeCompare(b.id)
-  })
-}
-
 export const TicketsLive = Layer.effect(
   Tickets,
   Effect.gen(function* () {
@@ -274,28 +234,32 @@ export const TicketsLive = Layer.effect(
           slug,
           query.filter?.groupId
         )
-        const entries = yield* ticketIndex.list(
-          project,
-          groupMemberSet === null ? undefined : [...groupMemberSet]
-        )
+        const pageLimit = limit ?? TICKET_LIST_LIMIT
+        const queryEntries = yield* ticketIndex.query(project, query, {
+          viewerId: userId,
+          ticketIds: groupMemberSet === null ? undefined : [...groupMemberSet],
+          limit: pageLimit + 1
+        })
         const projectGithub = yield* projects.getGithubIntegration(
           orgSlug,
           userId,
           slug
         )
-
-        const filtered = entries
-          .map((entry) => indexEntryToTicket(entry, projectGithub))
-          .filter((t) => matchesTicketQuery(t, query, userId))
-        const sorted = sortTickets(filtered, query.sort)
-        const cursor = tryDecodeCursor(query.cursor)
-        return paginateSorted(sorted, {
-          cursor,
-          limit: limit ?? TICKET_LIST_LIMIT,
-          sortKey: (t) => sortKeyValue(t, query.sort),
-          id: (t) => t.id,
+        const indexedTickets = queryEntries.map(({ entry, sortValue }) => ({
+          ticket: indexEntryToTicket(entry, projectGithub),
+          sortValue
+        }))
+        const page = paginateSorted(indexedTickets, {
+          cursor: undefined,
+          limit: pageLimit,
+          sortKey: (row) => row.sortValue,
+          id: (row) => row.ticket.id,
           dir: query.sort.dir
         })
+        return {
+          items: page.items.map((row) => row.ticket),
+          nextCursor: page.nextCursor
+        }
       })
 
     const listInGroup = (
@@ -338,37 +302,36 @@ export const TicketsLive = Layer.effect(
       Effect.gen(function* () {
         yield* ensureAccess(orgSlug, userId, slug)
         const project = yield* ticketIndex.projectFor(orgSlug, slug)
-        const excluded = options.excludeGroupId
-          ? new Set(
-              (yield* groups
+        const excludedTicketIds = options.excludeGroupId
+          ? (yield* groups
                 .get(orgSlug, userId, slug, options.excludeGroupId)
                 .pipe(
                   Effect.catchTag("NotFound", () =>
                     Effect.succeed({ tickets: [] as ReadonlyArray<string> })
                   )
                 )).tickets
-            )
-          : null
-        const entries = yield* ticketIndex.list(project)
+          : undefined
+        const limit = Math.min(
+          Math.max(1, options.limit ?? SEARCH_DEFAULT_LIMIT),
+          SEARCH_MAX_LIMIT
+        )
+        const queryEntries = yield* ticketIndex.query(
+          project,
+          { q: options.q, sort: DEFAULT_TICKET_SORT },
+          {
+            viewerId: userId,
+            excludeTicketIds: excludedTicketIds,
+            limit
+          }
+        )
         const projectGithub = yield* projects.getGithubIntegration(
           orgSlug,
           userId,
           slug
         )
-        const queryForMatch: Pick<TicketListQuery, "q"> = {
-          q: options.q
-        }
-        const matched = entries
-          .map((entry) => indexEntryToTicket(entry, projectGithub))
-          .filter((t) => {
-            if (excluded !== null && excluded.has(t.id)) return false
-            return matchesTicketQuery(t, queryForMatch, userId)
-          })
-        const limit = Math.min(
-          Math.max(1, options.limit ?? SEARCH_DEFAULT_LIMIT),
-          SEARCH_MAX_LIMIT
+        return queryEntries.map(({ entry }) =>
+          indexEntryToTicket(entry, projectGithub)
         )
-        return sortTickets(matched, DEFAULT_TICKET_SORT).slice(0, limit)
       })
 
     const tagUsageCounts = (
@@ -401,35 +364,20 @@ export const TicketsLive = Layer.effect(
           slug,
           query.filter?.groupId
         )
-        const entries = yield* ticketIndex.list(
-          project,
-          groupMemberSet === null ? undefined : [...groupMemberSet]
-        )
-        const projectGithub = yield* projects.getGithubIntegration(
-          orgSlug,
-          userId,
-          slug
-        )
-
         const filterWithoutStatus: TicketFilter | undefined = query.filter
           ? { ...query.filter, status: undefined }
           : undefined
-        const queryForCount: Pick<TicketListQuery, "filter" | "q"> = {
+        const queryForCount: TicketCountQuery = {
           filter: filterWithoutStatus,
           q: query.q
         }
-
-        const matching = entries
-          .map((entry) => indexEntryToTicket(entry, projectGithub))
-          .filter((t) => matchesTicketQuery(t, queryForCount, userId))
-
-        const byStatus: Record<string, number> = {}
-        for (const t of matching)
-          byStatus[t.status] = (byStatus[t.status] ?? 0) + 1
-
+        const counts = yield* ticketIndex.count(project, queryForCount, {
+          viewerId: userId,
+          ticketIds: groupMemberSet === null ? undefined : [...groupMemberSet]
+        })
         return {
-          total: matching.length,
-          byStatus: byStatus as TicketCounts["byStatus"]
+          total: counts.total,
+          byStatus: counts.byStatus as TicketCounts["byStatus"]
         }
       })
 

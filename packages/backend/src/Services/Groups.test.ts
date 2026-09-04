@@ -190,6 +190,8 @@ function makeFakeDocs(initial?: {
           .filter((ticket) => requested === null || requested.has(ticket.id))
           .map(ticketIndexEntryFromDocument)
       }),
+    query: () => Effect.die(new Error("unexpected TicketIndex.query")),
+    count: () => Effect.die(new Error("unexpected TicketIndex.count")),
     listIds: () => Effect.succeed([...ticketsById.keys()]),
     existingIds: (_project, ticketIds) =>
       Effect.succeed(
