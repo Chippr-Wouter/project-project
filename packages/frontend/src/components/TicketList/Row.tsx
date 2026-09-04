@@ -1,13 +1,19 @@
 import {
   memo,
+  useRef,
+  useState,
   type KeyboardEvent,
   type MouseEvent,
+  type PointerEvent,
   type ReactNode
 } from "react"
 import { AnimatePresence, motion } from "motion/react"
 import { useNavigate } from "@tanstack/react-router"
 import { TicketGitChip } from "@/components/TicketGit"
-import { TicketHoverCard } from "@/components/TicketHoverCard"
+import {
+  TicketHoverCard,
+  type TicketHoverCardSide
+} from "@/components/TicketHoverCard"
 import { Popover, PopoverTrigger } from "@/components/ui/popover"
 import { transitions } from "@/lib/springs"
 import { cn } from "@/lib/utils"
@@ -22,6 +28,8 @@ import { PriorityButton } from "./PriorityField"
 import { SprintField } from "./SprintField"
 import { StatusButton } from "./StatusField"
 import { TypeButton } from "./TypeField"
+
+const DIRECTION_CHANGE_THRESHOLD = 8
 
 function RowImpl({
   orgSlug,
@@ -49,6 +57,9 @@ function RowImpl({
   const dashIdx = ticket.id.lastIndexOf("-")
   const idPrefix = dashIdx >= 0 ? ticket.id.slice(0, dashIdx) : ticket.id
   const idTail = dashIdx >= 0 ? ticket.id.slice(dashIdx + 1) : ""
+  const [hoverCardSide, setHoverCardSide] =
+    useState<TicketHoverCardSide>("bottom")
+  const pointerY = useRef<number | null>(null)
   const navigate = useNavigate()
   const open = () => {
     void navigate({
@@ -66,6 +77,21 @@ function RowImpl({
     e.preventDefault()
     open()
   }
+  const handlePointerEnter = (event: PointerEvent<HTMLDivElement>) => {
+    pointerY.current = event.clientY
+  }
+  const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== "mouse") return
+    const previousY = pointerY.current
+    if (previousY === null) {
+      pointerY.current = event.clientY
+      return
+    }
+    const delta = event.clientY - previousY
+    if (Math.abs(delta) < DIRECTION_CHANGE_THRESHOLD) return
+    pointerY.current = event.clientY
+    setHoverCardSide(delta > 0 ? "top" : "bottom")
+  }
 
   return (
     <div className="group/list-row col-span-full grid grid-cols-subgrid">
@@ -79,6 +105,8 @@ function RowImpl({
               tabIndex={0}
               onClick={handleClick}
               onKeyDown={handleKeyDown}
+              onPointerEnter={handlePointerEnter}
+              onPointerMove={handlePointerMove}
               className={cn(
                 "col-span-full grid cursor-pointer grid-cols-subgrid items-center gap-3 rounded-lg px-3 py-2.5 text-left outline-none transition-colors hover:bg-muted/60 focus-visible:ring-1 focus-visible:ring-ring"
               )}
@@ -159,6 +187,7 @@ function RowImpl({
         <TicketHoverCard
           ticketId={ticket.id}
           scope={{ orgSlug, slug, members }}
+          side={hoverCardSide}
         />
       </Popover>
     </div>

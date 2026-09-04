@@ -36,6 +36,8 @@ interface TicketHoverCardScope {
   members?: ReadonlyArray<Member>
 }
 
+export type TicketHoverCardSide = "top" | "bottom"
+
 const TicketHoverCardError = () => (
   <div className="text-xs text-muted-foreground">
     {m.tickets_mention_card_not_available()}
@@ -44,10 +46,12 @@ const TicketHoverCardError = () => (
 
 export function TicketHoverCard({
   ticketId,
-  scope
+  scope,
+  side
 }: {
   ticketId: TicketId
   scope: TicketHoverCardScope
+  side?: TicketHoverCardSide
 }) {
   const result = useAtomValue(
     ticketAtom(ticketKey(scope.orgSlug, scope.slug, ticketId))
@@ -62,7 +66,7 @@ export function TicketHoverCard({
     : EMPTY_STATUSES
 
   return (
-    <PopoverContent className="w-80" align="start">
+    <PopoverContent className="w-80" align="start" side={side}>
       {Result.matchWithError(result, {
         onInitial: () => <CardSkeleton />,
         onError: () => <TicketHoverCardError />,
