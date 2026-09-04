@@ -12,6 +12,7 @@ import { EverhourIntegrationsLive } from "./Layers/EverhourIntegrations"
 import { EverhourTimeTrackingLive } from "./Layers/EverhourTimeTracking"
 import { FigmaLive } from "./Layers/Figma"
 import { FigmaIntegrationsLive } from "./Layers/FigmaIntegrations"
+import { FigmaLinksLive } from "./Layers/FigmaLinks"
 import { GitHubLive } from "./Layers/GitHub"
 import { GitHubIntegrationsLive } from "./Layers/GitHubIntegrations"
 import { GroupDocsLive } from "./Layers/GroupDocs"
@@ -43,6 +44,7 @@ export const BackendServicesLive = TagsLive.pipe(
   Layer.provideMerge(ProjectStatusesLive),
   Layer.provideMerge(TicketsLive),
   Layer.provideMerge(AttachmentsLive),
+  Layer.provideMerge(FigmaLinksLive),
   Layer.provideMerge(CommentsLive),
   Layer.provideMerge(GroupsLive),
   Layer.provideMerge(ProjectsLive),

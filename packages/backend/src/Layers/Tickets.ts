@@ -45,6 +45,7 @@ import {
 } from "@projectproject/shared"
 import { matchesTicketQuery } from "@projectproject/shared"
 import { Attachments } from "../Services/Attachments"
+import { FigmaLinks } from "../Services/FigmaLinks"
 import { validateBodyMentions } from "../Services/BodyMentions"
 import { Comments, type InvalidCommentBody } from "../Services/Comments"
 import { GitHub } from "../Services/GitHub"
@@ -209,6 +210,7 @@ export const TicketsLive = Layer.effect(
     const comments = yield* Comments
     const db = yield* Db
     const attachments = yield* Attachments
+    const figmaLinks = yield* FigmaLinks
 
     const ensureAccess = (
       orgSlug: string,
@@ -658,6 +660,12 @@ export const TicketsLive = Layer.effect(
           document.id,
           document.body
         )
+        yield* figmaLinks.reconcileTicket(
+          orgSlug,
+          slug,
+          document.id,
+          document.body
+        )
         yield* ticketIndex.upsertTicket(indexProject, document)
         const projectGithub = yield* projects.getGithubIntegration(
           orgSlug,
@@ -715,6 +723,12 @@ export const TicketsLive = Layer.effect(
           })
         )
         yield* attachments.reconcileTicket(
+          orgSlug,
+          slug,
+          document.id,
+          document.body
+        )
+        yield* figmaLinks.reconcileTicket(
           orgSlug,
           slug,
           document.id,
@@ -786,6 +800,7 @@ export const TicketsLive = Layer.effect(
 
         yield* ticketDocs.write(orgSlug, slug, id, next)
         yield* attachments.reconcileTicket(orgSlug, slug, id, next.body)
+        yield* figmaLinks.reconcileTicket(orgSlug, slug, id, next.body)
         yield* ticketIndex.upsertTicket(indexProject, next)
 
         const projectGithub = yield* projects.getGithubIntegration(
@@ -810,6 +825,7 @@ export const TicketsLive = Layer.effect(
         const indexProject = yield* ticketIndex.projectFor(orgSlug, slug)
         yield* groups.removeTicketFromAllGroups(orgSlug, slug, id)
         yield* attachments.reconcileTicket(orgSlug, slug, id, "")
+        yield* figmaLinks.reconcileTicket(orgSlug, slug, id, "")
         yield* ticketDocs.remove(orgSlug, slug, id)
         yield* ticketIndex.deleteTicket(indexProject, id)
       })

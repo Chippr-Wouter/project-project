@@ -88,6 +88,7 @@ import {
 } from "./schemas/TimeTracking"
 import {
   ConnectFigmaProjectInput,
+  FigmaLinkMetadata,
   FigmaProjectIntegrationStatus,
   PersonalFigma
 } from "./schemas/Figma"
@@ -727,6 +728,17 @@ const FigmaGroup = HttpApiGroup.make("figma")
     )
       .setPath(ProjectPath)
       .addSuccess(FigmaProjectIntegrationStatus)
+      .addError(Unauthorized)
+      .addError(NotFound)
+      .addError(Forbidden)
+  )
+  .add(
+    HttpApiEndpoint.get(
+      "ticketLinks",
+      "/orgs/:orgSlug/projects/:slug/tickets/:id/figma/links"
+    )
+      .setPath(TicketPath)
+      .addSuccess(Schema.Array(FigmaLinkMetadata))
       .addError(Unauthorized)
       .addError(NotFound)
       .addError(Forbidden)

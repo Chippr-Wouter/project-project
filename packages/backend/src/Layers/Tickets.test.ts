@@ -10,6 +10,7 @@ import * as Schema from "effect/Schema"
 import { expect } from "vite-plus/test"
 import { ProjectKey, type TicketStatus } from "@projectproject/shared"
 import { Attachments, type AttachmentsShape } from "../Services/Attachments"
+import { FigmaLinks, type FigmaLinksShape } from "../Services/FigmaLinks"
 import { Db } from "../Services/Db"
 import { Comments, type CommentsShape } from "../Services/Comments"
 import { GitHub, type GitHubShape } from "../Services/GitHub"
@@ -141,6 +142,11 @@ const FakeAttachments = Layer.succeed(Attachments, {
   dedupeOnce: () => unexpected("Attachments.dedupeOnce")
 } satisfies AttachmentsShape)
 
+const FakeFigmaLinks = Layer.succeed(FigmaLinks, {
+  reconcileTicket: () => Effect.void,
+  listForTicket: () => unexpected("FigmaLinks.listForTicket")
+} satisfies FigmaLinksShape)
+
 const FakeDb = Layer.succeed(Db, {
   query: {
     projectIndex: {
@@ -166,6 +172,7 @@ const TestLayer = Layer.unwrap(
     return TicketsLive.pipe(
       Layer.provide(TicketDocsLive),
       Layer.provide(FakeAttachments),
+      Layer.provide(FakeFigmaLinks),
       Layer.provide(FakeProjects),
       Layer.provide(FakeGroups),
       Layer.provide(FakeComments),

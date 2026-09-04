@@ -3,6 +3,7 @@ import { AppApi, CurrentUser } from "@projectproject/shared"
 import * as Effect from "effect/Effect"
 import { CurrentOrg } from "../Services/CurrentOrg"
 import { FigmaIntegrations } from "../Services/FigmaIntegrations"
+import { FigmaLinks } from "../Services/FigmaLinks"
 
 export const FigmaHandlerLive = HttpApiBuilder.group(
   AppApi,
@@ -60,6 +61,20 @@ export const FigmaHandlerLive = HttpApiBuilder.group(
             org.orgSlug,
             user.id,
             path.slug
+          )
+        })
+      )
+      .handle("ticketLinks", ({ path }) =>
+        Effect.gen(function* () {
+          const user = yield* CurrentUser
+          const currentOrg = yield* CurrentOrg
+          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const figmaLinks = yield* FigmaLinks
+          return yield* figmaLinks.listForTicket(
+            org.orgSlug,
+            user.id,
+            path.slug,
+            path.id
           )
         })
       )
