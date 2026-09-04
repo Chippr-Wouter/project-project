@@ -36,11 +36,6 @@ const errorMessage = (payload: unknown): string => {
   return typeof message === "string" ? message : "Figma error"
 }
 
-const isDevResourceNoop = (message: string): boolean =>
-  /already exists/i.test(message) ||
-  /already has \d+ dev resources/i.test(message) ||
-  /maximum number of dev resources/i.test(message)
-
 const parseRetryAfterSeconds = (response: Response): number => {
   const header = response.headers.get("Retry-After")
   const parsed = header === null ? Number.NaN : Number(header)
@@ -228,10 +223,9 @@ export const FigmaLive = Layer.succeed(Figma, {
     }).pipe(
       Effect.flatMap(({ response, payload }) => {
         if (!response.ok) {
-          const message = errorMessage(payload)
-          return isDevResourceNoop(message)
-            ? Effect.succeed(null)
-            : Effect.fail(errorForStatus(response, null, message))
+          return Effect.fail(
+            errorForStatus(response, null, errorMessage(payload))
+          )
         }
         const record = isRecord(payload) ? payload : {}
         const errors = Array.isArray(record.errors) ? record.errors : []
@@ -241,9 +235,12 @@ export const FigmaLive = Layer.succeed(Figma, {
             ? firstError.error
             : null
         if (errorText !== null) {
-          return isDevResourceNoop(errorText)
-            ? Effect.succeed(null)
-            : Effect.fail(new FigmaError({ reason: errorText }))
+          return Effect.logDebug(
+            "Figma dev resource create skipped by the API"
+          ).pipe(
+            Effect.annotateLogs({ reason: errorText }),
+            Effect.as(null)
+          )
         }
         const linksCreated = Array.isArray(record.links_created)
           ? record.links_created

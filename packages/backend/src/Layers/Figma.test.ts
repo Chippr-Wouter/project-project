@@ -190,7 +190,7 @@ describe("FigmaLive subtle behaviours", () => {
   })
 
   it.effect(
-    "treats a duplicate dev resource URL as success returning null",
+    "treats any per-item dev resource error as success returning null, regardless of wording",
     () =>
       Effect.gen(function* () {
         vi.stubGlobal(
@@ -201,36 +201,7 @@ describe("FigmaLive subtle behaviours", () => {
                 {
                   file_key: "abc123",
                   node_id: "1:2",
-                  error: "A dev resource with this URL already exists on this node"
-                }
-              ]
-            })
-          )
-        )
-        const figma = yield* Figma
-        const result = yield* figma.createDevResource(credential, {
-          fileKey: "abc123",
-          nodeId: "1:2",
-          name: "Spec",
-          url: "https://example.com/spec"
-        })
-        expect(result).toBeNull()
-      }).pipe(Effect.provide(FigmaLive))
-  )
-
-  it.effect(
-    "treats the 10 dev resource cap as success returning null",
-    () =>
-      Effect.gen(function* () {
-        vi.stubGlobal(
-          "fetch",
-          vi.fn(async () =>
-            jsonResponse(200, {
-              errors: [
-                {
-                  file_key: "abc123",
-                  node_id: "1:2",
-                  error: "Node already has 10 dev resources, the maximum allowed"
+                  error: "some future figma wording"
                 }
               ]
             })
@@ -267,6 +238,27 @@ describe("FigmaLive subtle behaviours", () => {
       })
       expect(result).toBe("dev-resource-1")
     }).pipe(Effect.provide(FigmaLive))
+  )
+
+  it.effect(
+    "still fails createDevResource on an HTTP-level error, unlike a per-item error",
+    () =>
+      Effect.gen(function* () {
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(async () => jsonResponse(429, { message: "slow down" }))
+        )
+        const figma = yield* Figma
+        const error = yield* Effect.flip(
+          figma.createDevResource(credential, {
+            fileKey: "abc123",
+            nodeId: "1:2",
+            name: "Spec",
+            url: "https://example.com/spec"
+          })
+        )
+        expect(Schema.is(FigmaRateLimited)(error)).toBe(true)
+      }).pipe(Effect.provide(FigmaLive))
   )
 
   it.effect("treats deleting an already-gone dev resource as success", () =>
