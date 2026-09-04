@@ -24,7 +24,7 @@
 - **Tagged errors surface through `packages/frontend/src/lib/errorMessage.ts`.** Extend it for every new error that reaches the UI.
 - **Dev resource writes are best-effort.** A Figma outage, rate limit, or revoked token must never fail a ticket save.
 - **Scopes used:** `file_content:read`, `file_metadata:read`, `file_dev_resources:read`, `file_dev_resources:write`. No Enterprise-only scopes.
-- **Branch:** `feat/T-51-figma-integration`, cut from `feat/T-114-attachments-browser`. Rebase onto `main` once T-114 merges.
+- **Branch:** `feat/T-51-figma-integration`, rebased onto `main` on 2026-09-04 after T-114 merged (#124, #126). `SecretCrypto`, `OrgStorage` and `S3Storage` are all present on `main`.
 
 ## File Structure
 

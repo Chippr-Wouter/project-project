@@ -36,16 +36,16 @@ Explicitly out of scope, tracked separately:
 - **Design tokens / variables sync.** Figma gates `file_variables:read` behind
   Enterprise, so this is not available to us regardless of appetite.
 
-## Dependency on T-114
+## Dependency on T-114 (resolved)
 
-This branch is cut from `feat/T-114-attachments-browser`, not `main`. T-114
-introduces three services T-51 requires and `main` does not have:
+T-51 requires three services T-114 introduced:
 
 - `SecretCrypto` — encryption for stored Figma credentials.
 - `OrgStorage` / `S3Storage` — where cached thumbnails live.
 
-T-51 also mirrors T-114's Lexical node construction directly. Once T-114
-merges, this branch rebases onto `main`.
+T-114 merged to `main` as #124 and #126, and this branch was rebased onto
+`main` on 2026-09-04. All three are present. T-51 also mirrors T-114's
+Lexical node construction directly.
 
 ## What the Figma API actually offers
 
