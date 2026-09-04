@@ -4,6 +4,7 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Redacted from "effect/Redacted"
 import * as SqlClient from "@effect/sql/SqlClient"
+import type { PgRemoteDatabase } from "drizzle-orm/pg-proxy"
 import { and, desc, eq, gt, inArray, isNull } from "drizzle-orm"
 import { createHash, randomBytes } from "node:crypto"
 import {
@@ -25,6 +26,7 @@ import {
   userFigmaIntegration,
   userFigmaOauthState
 } from "../db/schema"
+import type * as schema from "../db/schema"
 import { Db } from "../Services/Db"
 import { Figma, type FigmaCredential } from "../Services/Figma"
 import {
@@ -59,7 +61,7 @@ export interface FigmaTokenGrant {
 
 export interface FigmaOAuthClient {
   readonly clientId: string
-  readonly clientSecret: string
+  readonly clientSecret: Redacted.Redacted<string>
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -75,9 +77,7 @@ const publicBaseUrl = Config.string("BETTER_AUTH_URL").pipe(
 export const figmaOAuthClient: Effect.Effect<FigmaOAuthClient, FigmaError> =
   Effect.all({
     clientId: Config.string("FIGMA_CLIENT_ID"),
-    clientSecret: Config.redacted("FIGMA_CLIENT_SECRET").pipe(
-      Config.map(Redacted.value)
-    )
+    clientSecret: Config.redacted("FIGMA_CLIENT_SECRET")
   }).pipe(
     Effect.mapError(
       () => new FigmaError({ reason: "figma_oauth_unconfigured" })
@@ -102,9 +102,9 @@ export const figmaAuthorizeUrl = (input: {
 }
 
 const basicAuthorization = (client: FigmaOAuthClient) =>
-  `Basic ${Buffer.from(`${client.clientId}:${client.clientSecret}`).toString(
-    "base64"
-  )}`
+  `Basic ${Buffer.from(
+    `${client.clientId}:${Redacted.value(client.clientSecret)}`
+  ).toString("base64")}`
 
 const postForm = <E>(
   url: string,
@@ -259,6 +259,57 @@ export const resolveCredential = <E = never>(input: {
     return { _tag: "Bearer", token: grant.accessToken }
   })
 
+export const consumeOauthStateQuery = (
+  db: PgRemoteDatabase<typeof schema>,
+  userId: string,
+  state: string,
+  now: Date
+) =>
+  db
+    .update(userFigmaOauthState)
+    .set({ consumedAt: now })
+    .where(
+      and(
+        eq(userFigmaOauthState.stateHash, hashState(state)),
+        eq(userFigmaOauthState.userId, userId),
+        isNull(userFigmaOauthState.consumedAt),
+        gt(userFigmaOauthState.expiresAt, now)
+      )
+    )
+    .returning({ id: userFigmaOauthState.id })
+
+export const requireConsumedState = (
+  rows: ReadonlyArray<{ readonly id: string }>
+): Effect.Effect<void, FigmaAuthInvalid> =>
+  rows.length === 0 ? Effect.fail(new FigmaAuthInvalid()) : Effect.void
+
+export const startOauthFlow = (input: {
+  readonly db: PgRemoteDatabase<typeof schema>
+  readonly client: Effect.Effect<FigmaOAuthClient, FigmaError>
+  readonly redirectUri: Effect.Effect<string>
+  readonly userId: string
+}): Effect.Effect<
+  { readonly authorizeUrl: string; readonly state: string },
+  FigmaError
+> =>
+  Effect.gen(function* () {
+    const { clientId } = yield* input.client
+    const uri = yield* input.redirectUri
+    const state = randomBytes(32).toString("base64url")
+    const now = yield* DateTime.now
+    const expiresAt = DateTime.toDate(
+      DateTime.add(now, { minutes: STATE_TTL_MINUTES })
+    )
+    yield* input.db
+      .insert(userFigmaOauthState)
+      .values({ userId: input.userId, stateHash: hashState(state), expiresAt })
+      .pipe(Effect.orDie)
+    return {
+      authorizeUrl: figmaAuthorizeUrl({ clientId, redirectUri: uri, state }),
+      state
+    }
+  })
+
 const notConnectedStatus = (
   storageConnected: boolean
 ): FigmaProjectIntegrationStatus => ({
@@ -314,51 +365,19 @@ export const FigmaIntegrationsLive = Layer.effect(
           }))
         )
 
-    const beginProfileConnect = (
-      userId: string
-    ): Effect.Effect<
-      { readonly authorizeUrl: string; readonly state: string },
-      FigmaError
-    > =>
-      Effect.gen(function* () {
-        const { clientId } = yield* client
-        const uri = yield* redirectUri
-        const state = randomBytes(32).toString("base64url")
-        const now = yield* DateTime.now
-        const expiresAt = DateTime.toDate(
-          DateTime.add(now, { minutes: STATE_TTL_MINUTES })
-        )
-        yield* db
-          .insert(userFigmaOauthState)
-          .values({ userId, stateHash: hashState(state), expiresAt })
-          .pipe(Effect.orDie)
-        return {
-          authorizeUrl: figmaAuthorizeUrl({
-            clientId,
-            redirectUri: uri,
-            state
-          }),
-          state
-        }
-      })
+    const beginProfileConnect = (userId: string) =>
+      startOauthFlow({ db, client, redirectUri, userId })
 
     const consumeState = (userId: string, state: string) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate
-        const consumed = yield* db
-          .update(userFigmaOauthState)
-          .set({ consumedAt: now })
-          .where(
-            and(
-              eq(userFigmaOauthState.stateHash, hashState(state)),
-              eq(userFigmaOauthState.userId, userId),
-              isNull(userFigmaOauthState.consumedAt),
-              gt(userFigmaOauthState.expiresAt, now)
-            )
-          )
-          .returning({ id: userFigmaOauthState.id })
-          .pipe(Effect.orDie)
-        if (consumed.length === 0) return yield* new FigmaAuthInvalid()
+        const consumed = yield* consumeOauthStateQuery(
+          db,
+          userId,
+          state,
+          now
+        ).pipe(Effect.orDie)
+        yield* requireConsumedState(consumed)
       })
 
     const sealToken = (token: string) =>
@@ -430,9 +449,9 @@ export const FigmaIntegrationsLive = Layer.effect(
       state: string
     ): Effect.Effect<PersonalFigma, FigmaAuthInvalid | FigmaError> =>
       Effect.gen(function* () {
-        yield* consumeState(userId, state)
         const oauth = yield* client
         const uri = yield* redirectUri
+        yield* consumeState(userId, state)
         const now = yield* DateTime.nowAsDate
         const grant = yield* exchangeAuthorizationCode({
           client: oauth,
@@ -546,7 +565,7 @@ export const FigmaIntegrationsLive = Layer.effect(
           linkId: projectIntegrationLink.id,
           organizationId: projectIntegrationLink.organizationId,
           connectedAt: projectIntegrationLink.connectedAt,
-          status: projectFigmaIntegration.status,
+          status: projectIntegrationLink.status,
           encryptedAccessToken: projectFigmaIntegration.encryptedAccessToken,
           accessTokenNonce: projectFigmaIntegration.accessTokenNonce,
           accessTokenTag: projectFigmaIntegration.accessTokenTag,
@@ -812,14 +831,15 @@ export const FigmaIntegrationsLive = Layer.effect(
         const personal =
           userId === null ? null : yield* personalCredential(userId)
         const project = yield* projectToken(orgSlug, slug)
-        const oauth = yield* client
         const now = yield* DateTime.nowAsDate
         return yield* resolveCredential({
           personal,
           projectToken: project,
           now,
           refresh: (refreshToken) =>
-            refreshAccessToken({ client: oauth, refreshToken, now }),
+            Effect.flatMap(client, (oauth) =>
+              refreshAccessToken({ client: oauth, refreshToken, now })
+            ),
           persist: (grant) =>
             userId === null
               ? Effect.void
