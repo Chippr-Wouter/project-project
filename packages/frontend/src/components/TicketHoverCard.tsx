@@ -46,12 +46,10 @@ const TicketHoverCardError = () => (
 export function TicketHoverCard({
   ticketId,
   scope,
-  onHoverChange,
   anchor
 }: {
   ticketId: TicketId
   scope: TicketHoverCardScope
-  onHoverChange?: (hovered: boolean) => void
   anchor?: ComponentProps<typeof PopoverContent>["anchor"]
 }) {
   const result = useAtomValue(
@@ -67,13 +65,7 @@ export function TicketHoverCard({
     : EMPTY_STATUSES
 
   return (
-    <PopoverContent
-      className="w-80"
-      align="start"
-      anchor={anchor}
-      onPointerEnter={() => onHoverChange?.(true)}
-      onPointerLeave={() => onHoverChange?.(false)}
-    >
+    <PopoverContent className="w-80" align="start" anchor={anchor}>
       {Result.matchWithError(result, {
         onInitial: () => <CardSkeleton />,
         onError: () => <TicketHoverCardError />,
