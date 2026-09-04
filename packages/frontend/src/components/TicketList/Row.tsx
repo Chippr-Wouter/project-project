@@ -23,6 +23,8 @@ import { SprintField } from "./SprintField"
 import { StatusButton } from "./StatusField"
 import { TypeButton } from "./TypeField"
 
+const TICKET_PREVIEW_DELAY_MS = 400
+
 function RowImpl({
   orgSlug,
   slug,
@@ -33,7 +35,9 @@ function RowImpl({
   showExtraActionsCol,
   sprintMembership,
   extraRowActions,
-  pending
+  pending,
+  activePreviewId,
+  onPreviewOpenChange
 }: {
   orgSlug: string
   slug: string
@@ -45,6 +49,8 @@ function RowImpl({
   sprintMembership: Group | null
   extraRowActions?: (ticket: Ticket) => ReactNode
   pending?: boolean
+  activePreviewId: Ticket["id"] | null
+  onPreviewOpenChange: (ticketId: Ticket["id"], open: boolean) => void
 }) {
   const dashIdx = ticket.id.lastIndexOf("-")
   const idPrefix = dashIdx >= 0 ? ticket.id.slice(0, dashIdx) : ticket.id
@@ -66,24 +72,25 @@ function RowImpl({
     e.preventDefault()
     open()
   }
+  const handleTitlePointerEnter = () => {
+    if (activePreviewId !== null && activePreviewId !== ticket.id) {
+      onPreviewOpenChange(activePreviewId, false)
+    }
+  }
   return (
     <div className="group/list-row col-span-full grid grid-cols-subgrid">
-      <Popover>
-        <PopoverTrigger
-          openOnHover
-          delay={400}
-          nativeButton={false}
-          render={
-            <div
-              role="link"
-              tabIndex={0}
-              onClick={handleClick}
-              onKeyDown={handleKeyDown}
-              className={cn(
-                "col-span-full grid cursor-pointer grid-cols-subgrid items-center gap-3 rounded-lg px-3 py-2.5 text-left outline-none transition-colors hover:bg-muted/60 focus-visible:ring-1 focus-visible:ring-ring"
-              )}
-            />
-          }
+      <Popover
+        open={activePreviewId === ticket.id}
+        onOpenChange={(open) => onPreviewOpenChange(ticket.id, open)}
+      >
+        <div
+          role="link"
+          tabIndex={0}
+          onClick={handleClick}
+          onKeyDown={handleKeyDown}
+          className={cn(
+            "col-span-full grid cursor-pointer grid-cols-subgrid items-center gap-3 rounded-lg px-3 py-2.5 text-left outline-none transition-colors hover:bg-muted/60 focus-visible:ring-1 focus-visible:ring-ring"
+          )}
         >
           <StatusButton
             orgSlug={orgSlug}
@@ -115,7 +122,17 @@ function RowImpl({
               )}
             </AnimatePresence>
           </span>
-          <div className="flex min-w-0 items-center">
+          <PopoverTrigger
+            openOnHover
+            delay={TICKET_PREVIEW_DELAY_MS}
+            nativeButton={false}
+            render={
+              <div
+                onPointerEnter={handleTitlePointerEnter}
+                className="flex min-w-0 items-center"
+              />
+            }
+          >
             <span className="min-w-0 truncate text-sm font-medium">
               {ticket.title}
             </span>
@@ -137,7 +154,7 @@ function RowImpl({
                 className="hidden sm:inline-flex"
               />
             </div>
-          </div>
+          </PopoverTrigger>
           <TypeButton
             orgSlug={orgSlug}
             slug={slug}
@@ -155,7 +172,7 @@ function RowImpl({
               {extraRowActions?.(ticket)}
             </span>
           )}
-        </PopoverTrigger>
+        </div>
         <TicketHoverCard
           ticketId={ticket.id}
           scope={{ orgSlug, slug, members }}

@@ -1,6 +1,6 @@
 import * as Result from "effect/unstable/reactivity/AsyncResult"
 import { useAtomValue } from "@effect/atom-react"
-import { useMemo, useRef, type ReactNode } from "react"
+import { useMemo, useRef, useState, type ReactNode } from "react"
 import { FilterX, ListChecks } from "lucide-react"
 import * as Schema from "effect/Schema"
 import { useLocalStorageState } from "@/hooks/useLocalStorageState"
@@ -66,6 +66,12 @@ export function SegmentedList({
   hasActiveFilter: boolean
 }) {
   const resetFilters = useResetTicketSearch()
+  const [activePreviewId, setActivePreviewId] = useState<TicketId | null>(null)
+  const handlePreviewOpenChange = (ticketId: TicketId, open: boolean) => {
+    setActivePreviewId((current) =>
+      open ? ticketId : current === ticketId ? null : current
+    )
+  }
 
   const statusesResult = useAtomValue(
     projectStatusesAtom(projectStatusKey(orgSlug, slug))
@@ -211,6 +217,8 @@ export function SegmentedList({
             extraRowActions={extraRowActions}
             showSprintCol={showSprintCol}
             showExtraActionsCol={showExtraActionsCol}
+            activePreviewId={activePreviewId}
+            onPreviewOpenChange={handlePreviewOpenChange}
           />
         )
       })}
