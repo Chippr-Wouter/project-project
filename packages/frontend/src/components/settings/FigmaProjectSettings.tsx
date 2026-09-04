@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { type AppError, errorMessage } from "@/lib/errorMessage"
 import { m } from "@/paraglide/messages"
+import { FigmaTokenWalkthrough } from "./FigmaTokenWalkthrough"
 
 export function FigmaProjectSettings({
   orgSlug,
@@ -99,7 +100,10 @@ function FigmaProjectContent({
     <div className="flex flex-col gap-3 rounded-lg border border-border bg-background px-4 py-3">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className={busy ? "min-w-0 animate-pulse" : "min-w-0"}>
-          <p className="text-sm font-medium">{m.figma_project_title()}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-medium">{m.figma_project_title()}</p>
+            {canManage && !status.connected ? <FigmaTokenWalkthrough /> : null}
+          </div>
           <p className="mt-1 text-xs text-muted-foreground">
             {status.storageConnected
               ? m.figma_project_description()
