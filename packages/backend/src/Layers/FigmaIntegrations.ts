@@ -40,7 +40,7 @@ import { SecretCrypto } from "../Services/SecretCrypto"
 import { TicketIndex } from "../Services/TicketIndex"
 
 export const FIGMA_SCOPES =
-  "file_content:read file_metadata:read file_dev_resources:read file_dev_resources:write"
+  "current_user:read file_content:read file_metadata:read file_dev_resources:read file_dev_resources:write"
 
 export const FIGMA_OAUTH_CALLBACK_PATH =
   "/api/integrations/figma/oauth/callback"

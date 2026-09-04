@@ -54,8 +54,8 @@ Verified against Figma's developer documentation, September 2026.
 - **Auth.** OAuth2 with granular scopes, plus personal access tokens (created
   in Account Settings → Security, with configurable expiry and per-token
   scopes). Every scope this design needs is available on all plans:
-  `file_content:read`, `file_metadata:read`, `file_dev_resources:read`,
-  `file_dev_resources:write`. Enterprise-only scopes (`file_variables:*`,
+  `current_user:read`, `file_content:read`, `file_metadata:read`,
+  `file_dev_resources:read`, `file_dev_resources:write`. Enterprise-only scopes (`file_variables:*`,
   `library_analytics:read`, `org:*`) are not used.
 - **Embeds.** Embed Kit 2.0 serves `embed.figma.com/design`, `/proto`,
   `/board`, `/slides`, `/deck` over iframe. Prototype embeds additionally

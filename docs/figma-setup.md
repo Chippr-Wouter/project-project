@@ -28,16 +28,17 @@ need, and requesting a scope the app does not have fails the authorization with:
 {"error":true,"status":400,"message":"Invalid scopes for app","i18n":null}
 ```
 
-Enable all four:
+Enable all five:
 
 | Scope | What breaks without it |
 | --- | --- |
+| `current_user:read` | The OAuth callback fails outright — we cannot read who connected |
 | `file_content:read` | Frame names never resolve; chips stay on URL slugs |
 | `file_metadata:read` | File names and last-modified never resolve |
 | `file_dev_resources:read` | Existing backlinks cannot be read |
 | `file_dev_resources:write` | No Dev Mode backlink — the ticket never appears on the frame |
 
-All four are available on every Figma plan. Figma accepts either a
+All five are available on every Figma plan. Figma accepts either a
 space-separated or comma-separated `scope` parameter; we send space-separated.
 
 `file_dev_resources:write` is the only *write* scope. Dropping it degrades the
@@ -95,7 +96,7 @@ settings. Reads happen as that user, so permissions are exactly right.
 **Project (personal access token).** A scoped Figma PAT pasted into project
 settings, used for everyone on the project — including background work like
 reconciliation, which runs with no user present. Generate one at
-**Figma → Account Settings → Security → Generate new token**, scoped to the four
+**Figma → Account Settings → Security → Generate new token**, scoped to the five
 scopes above.
 
 They are different credential types on purpose. **Figma keeps only one access
