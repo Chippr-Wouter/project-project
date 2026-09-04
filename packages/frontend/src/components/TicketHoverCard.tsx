@@ -1,16 +1,15 @@
 import * as Result from "effect/unstable/reactivity/AsyncResult"
 import { useAtomValue } from "@effect/atom-react"
 import { Link } from "@tanstack/react-router"
-import { Markdown } from "@/components/Markdown"
-import { MemberAvatar } from "@/components/MemberAvatar"
-import { TicketGitChip } from "@/components/TicketGit"
-import { useMentionScope, type MentionScope } from "@/mentions/scope"
-import type { Member, ProjectStatus } from "@projectproject/shared"
 import { ticketAtom, ticketKey } from "@/atoms/tickets"
 import {
   projectKey as projectStatusKey,
   projectStatusesAtom
 } from "@/atoms/projectStatuses"
+import { Markdown } from "@/components/Markdown"
+import { MemberAvatar } from "@/components/MemberAvatar"
+import { TicketGitChip } from "@/components/TicketGit"
+import { PopoverContent } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { PRIORITY_LABELS, PRIORITY_META } from "@/lib/priority-meta"
 import {
@@ -19,8 +18,11 @@ import {
   TYPE_LABELS,
   TYPE_META
 } from "@/lib/ticket-meta"
+import type { MentionScope } from "@/mentions/scope"
 import { m } from "@/paraglide/messages"
 import type {
+  Member,
+  ProjectStatus,
   TicketId,
   TicketPriority,
   TicketStatus,
@@ -29,20 +31,13 @@ import type {
 
 const EMPTY_STATUSES: ReadonlyArray<ProjectStatus> = []
 
-const MentionCardError = () => (
+const TicketHoverCardError = () => (
   <div className="text-xs text-muted-foreground">
     {m.tickets_mention_card_not_available()}
   </div>
 )
 
-export function TicketMentionCard({ ticketId }: { ticketId: TicketId }) {
-  const scope = useMentionScope()
-  if (!scope) return null
-
-  return <TicketHoverCardContent ticketId={ticketId} scope={scope} />
-}
-
-export function TicketHoverCardContent({
+export function TicketHoverCard({
   ticketId,
   scope
 }: {
@@ -61,58 +56,62 @@ export function TicketHoverCardContent({
     ? statusesResult.value
     : EMPTY_STATUSES
 
-  return Result.matchWithError(result, {
-    onInitial: () => <CardSkeleton />,
-    onError: () => <MentionCardError />,
-    onDefect: () => <MentionCardError />,
-    onSuccess: ({ value: ticket }) => {
-      const body = ticket.body.trim()
-      const isOverflowing = body.split("\n").length > 6 || body.length > 320
-      return (
-        <div className="space-y-2">
-          <div className="line-clamp-2 text-sm font-medium leading-snug">
-            {ticket.title}
-          </div>
-          <MetaRow ticket={ticket} scope={scope} statuses={statuses} />
-          {body.length > 0 && (
-            <div className="relative">
-              <Markdown className="line-clamp-6 text-xs leading-relaxed text-muted-foreground [&_*]:!my-0 [&_pre]:!my-1">
-                {body}
-              </Markdown>
-              {isOverflowing && (
-                <>
-                  <div
-                    aria-hidden
-                    className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-popover via-popover/90 to-transparent"
+  return (
+    <PopoverContent className="w-80" align="start">
+      {Result.matchWithError(result, {
+        onInitial: () => <CardSkeleton />,
+        onError: () => <TicketHoverCardError />,
+        onDefect: () => <TicketHoverCardError />,
+        onSuccess: ({ value: ticket }) => {
+          const body = ticket.body.trim()
+          const isOverflowing = body.split("\n").length > 6 || body.length > 320
+          return (
+            <div className="space-y-2">
+              <div className="line-clamp-2 text-sm font-medium leading-snug">
+                {ticket.title}
+              </div>
+              <MetaRow ticket={ticket} scope={scope} statuses={statuses} />
+              {body.length > 0 && (
+                <div className="relative">
+                  <Markdown className="line-clamp-6 text-xs leading-relaxed text-muted-foreground [&_*]:!my-0 [&_pre]:!my-1">
+                    {body}
+                  </Markdown>
+                  {isOverflowing && (
+                    <>
+                      <div
+                        aria-hidden
+                        className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-popover via-popover/90 to-transparent"
+                      />
+                      <Link
+                        to="/orgs/$orgSlug/projects/$slug/tickets/$id"
+                        params={{
+                          orgSlug: scope.orgSlug,
+                          slug: scope.slug,
+                          id: ticketId
+                        }}
+                        className="absolute bottom-0 right-0 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        {m.tickets_mention_card_read_more()} →
+                      </Link>
+                    </>
+                  )}
+                </div>
+              )}
+              {ticket.branch && (
+                <div>
+                  <TicketGitChip
+                    orgSlug={scope.orgSlug}
+                    slug={scope.slug}
+                    ticket={ticket}
                   />
-                  <Link
-                    to="/orgs/$orgSlug/projects/$slug/tickets/$id"
-                    params={{
-                      orgSlug: scope.orgSlug,
-                      slug: scope.slug,
-                      id: ticketId
-                    }}
-                    className="absolute bottom-0 right-0 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    {m.tickets_mention_card_read_more()} →
-                  </Link>
-                </>
+                </div>
               )}
             </div>
-          )}
-          {ticket.branch && (
-            <div>
-              <TicketGitChip
-                orgSlug={scope.orgSlug}
-                slug={scope.slug}
-                ticket={ticket}
-              />
-            </div>
-          )}
-        </div>
-      )
-    }
-  })
+          )
+        }
+      })}
+    </PopoverContent>
+  )
 }
 
 function MetaRow({

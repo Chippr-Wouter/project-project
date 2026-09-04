@@ -7,12 +7,8 @@ import {
 import { AnimatePresence, motion } from "motion/react"
 import { useNavigate } from "@tanstack/react-router"
 import { TicketGitChip } from "@/components/TicketGit"
-import { TicketHoverCardContent } from "@/components/Lexical/TicketMentionCard"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger
-} from "@/components/ui/popover"
+import { TicketHoverCard } from "@/components/TicketHoverCard"
+import { Popover, PopoverTrigger } from "@/components/ui/popover"
 import { transitions } from "@/lib/springs"
 import { cn } from "@/lib/utils"
 import type {
@@ -160,12 +156,10 @@ function RowImpl({
             </span>
           )}
         </PopoverTrigger>
-        <PopoverContent className="w-80" align="start">
-          <TicketHoverCardContent
-            ticketId={ticket.id}
-            scope={{ orgSlug, slug, members }}
-          />
-        </PopoverContent>
+        <TicketHoverCard
+          ticketId={ticket.id}
+          scope={{ orgSlug, slug, members }}
+        />
       </Popover>
     </div>
   )
