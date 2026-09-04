@@ -355,6 +355,7 @@ function FigmaSelectable({
               {compact ? (
                 <FigmaChip
                   reference={reference}
+                  url={url}
                   label={label}
                   morphId={morphId}
                 />
@@ -377,14 +378,10 @@ function FigmaSelectable({
           >
             <Trash2 strokeWidth={1.75} />
           </OverlayAction>
-          {reference === null ? null : (
+          {reference === null || compact ? null : (
             <OverlayAction
               morphId={`${morphId}-open`}
-              slot={
-                compact
-                  ? cn(overlaySlot, "left-full ml-10")
-                  : cn(OVERLAY_SLOT, "-right-2 -bottom-2")
-              }
+              slot={cn(OVERLAY_SLOT, "-right-2 -bottom-2")}
               label={m.figma_embed_open_in_figma()}
               variant="overlay"
               href={url}

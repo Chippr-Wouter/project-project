@@ -3,6 +3,7 @@ import type { FigmaRef } from "@projectproject/shared"
 import { transitions } from "@/lib/springs"
 import { cn } from "@/lib/utils"
 import { m } from "@/paraglide/messages"
+import { FigmaOpen } from "./FigmaOpen"
 import { useFigmaMetadata } from "./figmaMetadata"
 
 const CHIP =
@@ -42,10 +43,12 @@ export const figmaDisplayName = (input: {
 
 export function FigmaChip({
   reference,
+  url,
   label,
   morphId
 }: {
   reference: FigmaRef | null
+  url?: string
   label: string
   morphId: string
 }) {
@@ -89,6 +92,7 @@ export function FigmaChip({
       >
         {resolvedName}
       </motion.span>
+      {url === undefined ? null : <FigmaOpen url={url} morphId={morphId} />}
     </span>
   )
 }
