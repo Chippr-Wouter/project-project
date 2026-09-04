@@ -80,6 +80,24 @@ describe("parseFigmaUrl", () => {
   it("rejects unparseable input", () => {
     expect(parseFigmaUrl("not a url")).toBeNull()
   })
+
+  it("returns null on malformed percent-encoding in slug", () => {
+    expect(parseFigmaUrl(`https://figma.com/design/${KEY}/100%`)).toBeNull()
+  })
+
+  it("normalises an instance node id", () => {
+    expect(
+      parseFigmaUrl(`https://figma.com/design/${KEY}/A?node-id=I1-2;3-4`)?.nodeId
+    ).toBe("I1:2;3:4")
+  })
+
+  it("ignores a fragment", () => {
+    expect(parseFigmaUrl(`https://figma.com/design/${KEY}/A?node-id=1-2#foo`)?.nodeId).toBe("1:2")
+  })
+
+  it("accepts an uppercase host", () => {
+    expect(parseFigmaUrl(`HTTPS://FIGMA.COM/design/${KEY}/A`)?.fileKey).toBe(KEY)
+  })
 })
 
 describe("figmaViewParams", () => {
@@ -163,6 +181,11 @@ describe("extractFigmaRefs", () => {
 
   it("returns nothing for markdown with no figma links", () => {
     expect(extractFigmaRefs("# Title\n\nSome text.")).toEqual([])
+  })
+
+  it("skips malformed percent-encoding without throwing", () => {
+    const md = `before https://figma.com/design/${KEY}/100% after`
+    expect(extractFigmaRefs(md)).toEqual([])
   })
 })
 

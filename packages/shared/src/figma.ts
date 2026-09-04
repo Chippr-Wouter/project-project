@@ -21,8 +21,10 @@ const SEGMENT_KINDS: Record<string, FigmaKind> = {
   file: "design"
 }
 
-const isFigmaHost = (host: string): boolean =>
-  host === "figma.com" || host === "www.figma.com"
+const isFigmaHost = (host: string): boolean => {
+  const lower = host.toLowerCase()
+  return lower === "figma.com" || lower === "www.figma.com"
+}
 
 const toUrl = (url: string): URL | null => {
   try {
@@ -41,7 +43,8 @@ const normaliseNodeId = (raw: string | null): string | null => {
 export const parseFigmaUrl = (url: string): FigmaRef | null => {
   const parsed = toUrl(url)
   if (parsed === null) return null
-  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return null
+  const proto = parsed.protocol.toLowerCase()
+  if (proto !== "https:" && proto !== "http:") return null
   if (!isFigmaHost(parsed.hostname)) return null
 
   const segments = parsed.pathname.split("/").filter((part) => part.length > 0)
@@ -52,11 +55,18 @@ export const parseFigmaUrl = (url: string): FigmaRef | null => {
   if (kind === undefined) return null
   if (!FILE_KEY_PATTERN.test(fileKey)) return null
 
+  let decodedSlug: string
+  try {
+    decodedSlug = slug === undefined ? "" : decodeURIComponent(slug)
+  } catch {
+    return null
+  }
+
   return {
     kind,
     fileKey,
     nodeId: normaliseNodeId(parsed.searchParams.get("node-id")),
-    slug: slug === undefined ? "" : decodeURIComponent(slug)
+    slug: decodedSlug
   }
 }
 
