@@ -1,5 +1,7 @@
 import {
   memo,
+  useEffect,
+  useRef,
   type KeyboardEvent,
   type MouseEvent,
   type ReactNode
@@ -24,6 +26,7 @@ import { StatusButton } from "./StatusField"
 import { TypeButton } from "./TypeField"
 
 const TICKET_PREVIEW_DELAY_MS = 400
+const TICKET_PREVIEW_CLOSE_DELAY_MS = 100
 
 function RowImpl({
   orgSlug,
@@ -55,6 +58,9 @@ function RowImpl({
   const dashIdx = ticket.id.lastIndexOf("-")
   const idPrefix = dashIdx >= 0 ? ticket.id.slice(0, dashIdx) : ticket.id
   const idTail = dashIdx >= 0 ? ticket.id.slice(dashIdx + 1) : ""
+  const rowElement = useRef<HTMLDivElement>(null)
+  const rowHovered = useRef(false)
+  const closePreviewTimer = useRef<number | null>(null)
   const navigate = useNavigate()
   const open = () => {
     void navigate({
@@ -77,15 +83,54 @@ function RowImpl({
       onPreviewOpenChange(activePreviewId, false)
     }
   }
+  const clearPreviewClose = () => {
+    if (closePreviewTimer.current !== null) {
+      window.clearTimeout(closePreviewTimer.current)
+      closePreviewTimer.current = null
+    }
+  }
+  const schedulePreviewClose = () => {
+    clearPreviewClose()
+    closePreviewTimer.current = window.setTimeout(() => {
+      onPreviewOpenChange(ticket.id, false)
+      closePreviewTimer.current = null
+    }, TICKET_PREVIEW_CLOSE_DELAY_MS)
+  }
+  useEffect(
+    () => () => {
+      if (closePreviewTimer.current !== null) {
+        window.clearTimeout(closePreviewTimer.current)
+      }
+    },
+    []
+  )
   return (
     <div className="group/list-row col-span-full grid grid-cols-subgrid">
       <Popover
         open={activePreviewId === ticket.id}
-        onOpenChange={(open) => onPreviewOpenChange(ticket.id, open)}
+        onOpenChange={(open, eventDetails) => {
+          if (
+            !open &&
+            eventDetails.reason === "trigger-hover" &&
+            rowHovered.current
+          ) {
+            return
+          }
+          onPreviewOpenChange(ticket.id, open)
+        }}
       >
         <div
+          ref={rowElement}
           role="link"
           tabIndex={0}
+          onPointerEnter={() => {
+            rowHovered.current = true
+            clearPreviewClose()
+          }}
+          onPointerLeave={() => {
+            rowHovered.current = false
+            schedulePreviewClose()
+          }}
           onClick={handleClick}
           onKeyDown={handleKeyDown}
           className={cn(
@@ -122,20 +167,32 @@ function RowImpl({
               )}
             </AnimatePresence>
           </span>
-          <PopoverTrigger
-            openOnHover
-            delay={TICKET_PREVIEW_DELAY_MS}
-            nativeButton={false}
-            render={
-              <div
-                onPointerEnter={handleTitlePointerEnter}
-                className="flex min-w-0 items-center"
-              />
-            }
-          >
-            <span className="min-w-0 truncate text-sm font-medium">
-              {ticket.title}
-            </span>
+          <div className="flex min-w-0 items-center">
+            <PopoverTrigger
+              openOnHover
+              delay={TICKET_PREVIEW_DELAY_MS}
+              nativeButton={false}
+              render={(triggerProps) => (
+                <div
+                  {...triggerProps}
+                  role={undefined}
+                  tabIndex={undefined}
+                  aria-controls={undefined}
+                  aria-expanded={undefined}
+                  aria-haspopup={undefined}
+                  onClick={undefined}
+                  onKeyDown={undefined}
+                  onKeyUp={undefined}
+                  onPointerDown={undefined}
+                  onPointerEnter={handleTitlePointerEnter}
+                  className="flex min-w-0 flex-1 self-stretch items-center"
+                />
+              )}
+            >
+              <span className="min-w-0 truncate text-sm font-medium">
+                {ticket.title}
+              </span>
+            </PopoverTrigger>
             <div className="ml-auto flex shrink-0 items-center gap-2 pl-3">
               <TicketGitChip orgSlug={orgSlug} slug={slug} ticket={ticket} />
               {showSprintCol && (
@@ -154,7 +211,7 @@ function RowImpl({
                 className="hidden sm:inline-flex"
               />
             </div>
-          </PopoverTrigger>
+          </div>
           <TypeButton
             orgSlug={orgSlug}
             slug={slug}
@@ -176,6 +233,14 @@ function RowImpl({
         <TicketHoverCard
           ticketId={ticket.id}
           scope={{ orgSlug, slug, members }}
+          anchor={rowElement}
+          onHoverChange={(hovered) => {
+            if (hovered) {
+              clearPreviewClose()
+            } else {
+              schedulePreviewClose()
+            }
+          }}
         />
       </Popover>
     </div>
