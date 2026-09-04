@@ -43,7 +43,10 @@ export interface FigmaIntegrationsShape {
   readonly getProfile: (userId: string) => Effect.Effect<PersonalFigma>
   readonly beginProfileConnect: (
     userId: string
-  ) => Effect.Effect<{ readonly authorizeUrl: string; readonly state: string }>
+  ) => Effect.Effect<
+    { readonly authorizeUrl: string; readonly state: string },
+    FigmaError
+  >
   readonly completeProfileConnect: (
     userId: string,
     code: string,

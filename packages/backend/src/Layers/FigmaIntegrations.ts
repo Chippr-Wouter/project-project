@@ -72,12 +72,17 @@ const publicBaseUrl = Config.string("BETTER_AUTH_URL").pipe(
   Config.withDefault("http://localhost:5173")
 )
 
-const oauthClient = Effect.all({
-  clientId: Config.string("FIGMA_CLIENT_ID"),
-  clientSecret: Config.redacted("FIGMA_CLIENT_SECRET").pipe(
-    Config.map(Redacted.value)
+export const figmaOAuthClient: Effect.Effect<FigmaOAuthClient, FigmaError> =
+  Effect.all({
+    clientId: Config.string("FIGMA_CLIENT_ID"),
+    clientSecret: Config.redacted("FIGMA_CLIENT_SECRET").pipe(
+      Config.map(Redacted.value)
+    )
+  }).pipe(
+    Effect.mapError(
+      () => new FigmaError({ reason: "figma_oauth_unconfigured" })
+    )
   )
-})
 
 export const figmaRedirectUri = (baseUrl: string): string =>
   new URL(FIGMA_OAUTH_CALLBACK_PATH, baseUrl).toString()
@@ -183,22 +188,33 @@ export const exchangeAuthorizationCode = (input: {
     return grant
   })
 
+export const isGrantRejection = (status: number): boolean =>
+  status === 400 || status === 401
+
 export const refreshAccessToken = (input: {
   readonly client: FigmaOAuthClient
   readonly refreshToken: string
   readonly now: Date
-}): Effect.Effect<FigmaTokenGrant, FigmaAuthInvalid> =>
+}): Effect.Effect<FigmaTokenGrant, FigmaAuthInvalid | FigmaError> =>
   Effect.gen(function* () {
     const response = yield* postForm(
       `${FIGMA_API_BASE}/v1/oauth/refresh`,
       input.client,
       { refresh_token: input.refreshToken },
-      () => new FigmaAuthInvalid()
+      () => new FigmaError({ reason: "figma_refresh_unreachable" })
     )
-    if (!response.ok) return yield* new FigmaAuthInvalid()
-    const payload = yield* readJson(response, () => new FigmaAuthInvalid())
+    if (isGrantRejection(response.status)) return yield* new FigmaAuthInvalid()
+    if (!response.ok) {
+      return yield* new FigmaError({ reason: "figma_refresh_unavailable" })
+    }
+    const payload = yield* readJson(
+      response,
+      () => new FigmaError({ reason: "figma_refresh_response_unreadable" })
+    )
     const grant = toTokenGrant(payload, input.now, input.refreshToken)
-    if (grant === null) return yield* new FigmaAuthInvalid()
+    if (grant === null) {
+      return yield* new FigmaError({ reason: "figma_refresh_response_invalid" })
+    }
     return grant
   })
 
@@ -214,10 +230,13 @@ export const resolveCredential = <E = never>(input: {
   readonly now: Date
   readonly refresh: (
     refreshToken: string
-  ) => Effect.Effect<FigmaTokenGrant, FigmaAuthInvalid>
+  ) => Effect.Effect<FigmaTokenGrant, FigmaAuthInvalid | FigmaError>
   readonly persist: (grant: FigmaTokenGrant) => Effect.Effect<void, E>
-  readonly onRefreshFailed: Effect.Effect<void>
-}): Effect.Effect<FigmaCredential, FigmaNotConnected | FigmaAuthInvalid | E> =>
+  readonly onGrantRejected: Effect.Effect<void>
+}): Effect.Effect<
+  FigmaCredential,
+  FigmaNotConnected | FigmaAuthInvalid | FigmaError | E
+> =>
   Effect.gen(function* () {
     const personal = input.personal
     const chosen = chooseCredential({
@@ -229,7 +248,13 @@ export const resolveCredential = <E = never>(input: {
     if (!isTokenExpired(personal.expiresAt, input.now)) return chosen
     const grant = yield* input
       .refresh(personal.refreshToken)
-      .pipe(Effect.tapError(() => input.onRefreshFailed))
+      .pipe(
+        Effect.tapError((error) =>
+          error._tag === "FigmaAuthInvalid"
+            ? input.onGrantRejected
+            : Effect.void
+        )
+      )
     yield* input.persist(grant)
     return { _tag: "Bearer", token: grant.accessToken }
   })
@@ -255,7 +280,7 @@ export const FigmaIntegrationsLive = Layer.effect(
     const orgStorage = yield* OrgStorage
     const ticketIndex = yield* TicketIndex
 
-    const client = oauthClient.pipe(Effect.orDie)
+    const client = figmaOAuthClient
 
     const redirectUri = publicBaseUrl.pipe(
       Effect.orDie,
@@ -289,7 +314,12 @@ export const FigmaIntegrationsLive = Layer.effect(
           }))
         )
 
-    const beginProfileConnect = (userId: string) =>
+    const beginProfileConnect = (
+      userId: string
+    ): Effect.Effect<
+      { readonly authorizeUrl: string; readonly state: string },
+      FigmaError
+    > =>
       Effect.gen(function* () {
         const { clientId } = yield* client
         const uri = yield* redirectUri
@@ -794,10 +824,10 @@ export const FigmaIntegrationsLive = Layer.effect(
             userId === null
               ? Effect.void
               : persistPersonalGrant(userId, grant, now),
-          onRefreshFailed:
+          onGrantRejected:
             userId === null
               ? Effect.void
-              : markPersonalBroken(userId, "figma_refresh_failed")
+              : markPersonalBroken(userId, "figma_refresh_rejected")
         })
       })
 

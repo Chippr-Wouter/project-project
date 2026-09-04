@@ -1,11 +1,17 @@
 import { it } from "@effect/vitest"
-import { FigmaAuthInvalid, FigmaNotConnected } from "@projectproject/shared"
+import {
+  FigmaAuthInvalid,
+  FigmaError,
+  FigmaNotConnected
+} from "@projectproject/shared"
+import * as ConfigProvider from "effect/ConfigProvider"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import { afterEach, describe, expect, vi } from "vitest"
 import { chooseCredential, isTokenExpired } from "../Services/FigmaIntegrations"
 import {
+  figmaOAuthClient,
   refreshAccessToken,
   resolveCredential,
   type FigmaTokenGrant
@@ -66,10 +72,10 @@ const harness = (personal: {
   readonly expiresAt: Date
 }) => {
   const persisted: Array<FigmaTokenGrant> = []
-  const failures: Array<string> = []
+  const rejections: Array<string> = []
   return {
     persisted,
-    failures,
+    rejections,
     run: (projectToken: string | null) =>
       resolveCredential({
         personal,
@@ -81,8 +87,8 @@ const harness = (personal: {
           Effect.sync(() => {
             persisted.push(grant)
           }),
-        onRefreshFailed: Effect.sync(() => {
-          failures.push("refresh")
+        onGrantRejected: Effect.sync(() => {
+          rejections.push("rejected")
         })
       })
   }
@@ -126,17 +132,58 @@ describe("credentialFor refresh on expiry", () => {
         expect(test.persisted[0]?.expiresAt.toISOString()).toBe(
           "2026-12-03T12:00:00.000Z"
         )
-        expect(test.failures).toEqual([])
+        expect(test.rejections).toEqual([])
       })
   )
 
+  it.effect("marks the connection broken when figma rejects the grant", () =>
+    Effect.gen(function* () {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse(400, { error: "invalid_grant" }))
+      )
+      const test = harness({
+        accessToken: "stale-token",
+        refreshToken: "refresh-token",
+        expiresAt: at("2026-09-04T12:04:00Z")
+      })
+
+      const error = yield* Effect.flip(test.run("project-token"))
+
+      expect(Schema.is(FigmaAuthInvalid)(error)).toBe(true)
+      expect(test.persisted).toEqual([])
+      expect(test.rejections).toEqual(["rejected"])
+    })
+  )
+
+  it.effect("treats a 401 from the refresh endpoint as a rejected grant", () =>
+    Effect.gen(function* () {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => jsonResponse(401, { error: "invalid_grant" }))
+      )
+      const test = harness({
+        accessToken: "stale-token",
+        refreshToken: "refresh-token",
+        expiresAt: at("2026-09-04T12:04:00Z")
+      })
+
+      const error = yield* Effect.flip(test.run("project-token"))
+
+      expect(Schema.is(FigmaAuthInvalid)(error)).toBe(true)
+      expect(test.rejections).toEqual(["rejected"])
+    })
+  )
+
   it.effect(
-    "fails FigmaAuthInvalid when the refresh fails instead of using the project or stale token",
+    "leaves the connection untouched when the refresh cannot reach figma",
     () =>
       Effect.gen(function* () {
         vi.stubGlobal(
           "fetch",
-          vi.fn(async () => jsonResponse(401, { message: "bad refresh token" }))
+          vi.fn(async () => {
+            throw new TypeError("fetch failed")
+          })
         )
         const test = harness({
           accessToken: "stale-token",
@@ -146,9 +193,33 @@ describe("credentialFor refresh on expiry", () => {
 
         const error = yield* Effect.flip(test.run("project-token"))
 
-        expect(Schema.is(FigmaAuthInvalid)(error)).toBe(true)
+        if (!Schema.is(FigmaError)(error)) throw error
+        expect(error.reason).toBe("figma_refresh_unreachable")
         expect(test.persisted).toEqual([])
-        expect(test.failures).toEqual(["refresh"])
+        expect(test.rejections).toEqual([])
+      })
+  )
+
+  it.effect(
+    "leaves the connection untouched when figma answers the refresh with a 5xx",
+    () =>
+      Effect.gen(function* () {
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(async () => jsonResponse(503, { message: "unavailable" }))
+        )
+        const test = harness({
+          accessToken: "stale-token",
+          refreshToken: "refresh-token",
+          expiresAt: at("2026-09-04T12:04:00Z")
+        })
+
+        const error = yield* Effect.flip(test.run("project-token"))
+
+        if (!Schema.is(FigmaError)(error)) throw error
+        expect(error.reason).toBe("figma_refresh_unavailable")
+        expect(test.persisted).toEqual([])
+        expect(test.rejections).toEqual([])
       })
   )
 
@@ -179,7 +250,7 @@ describe("credentialFor refresh on expiry", () => {
           now,
           refresh: () => Effect.die("unreachable"),
           persist: () => Effect.void,
-          onRefreshFailed: Effect.void
+          onGrantRejected: Effect.void
         })
       )
       expect(Schema.is(FigmaNotConnected)(error)).toBe(true)
@@ -194,12 +265,50 @@ describe("credentialFor refresh on expiry", () => {
         now,
         refresh: () => Effect.die("unreachable"),
         persist: () => Effect.void,
-        onRefreshFailed: Effect.void
+        onGrantRejected: Effect.void
       })
       expect(credential).toEqual({
         _tag: "FigmaToken",
         token: "project-token"
       })
     })
+  )
+})
+
+describe("figmaOAuthClient", () => {
+  it.effect("fails FigmaError when the figma credentials are absent", () =>
+    Effect.gen(function* () {
+      const error = yield* Effect.flip(figmaOAuthClient)
+      if (!Schema.is(FigmaError)(error)) throw error
+      expect(error.reason).toBe("figma_oauth_unconfigured")
+    }).pipe(Effect.withConfigProvider(ConfigProvider.fromMap(new Map())))
+  )
+
+  it.effect("fails FigmaError when only the client id is present", () =>
+    Effect.gen(function* () {
+      const error = yield* Effect.flip(figmaOAuthClient)
+      expect(Schema.is(FigmaError)(error)).toBe(true)
+    }).pipe(
+      Effect.withConfigProvider(
+        ConfigProvider.fromMap(new Map([["FIGMA_CLIENT_ID", "client-id"]]))
+      )
+    )
+  )
+
+  it.effect("reads both credentials when they are configured", () =>
+    Effect.gen(function* () {
+      const configured = yield* figmaOAuthClient
+      expect(configured.clientId).toBe("client-id")
+      expect(configured.clientSecret).toBe("client-secret")
+    }).pipe(
+      Effect.withConfigProvider(
+        ConfigProvider.fromMap(
+          new Map([
+            ["FIGMA_CLIENT_ID", "client-id"],
+            ["FIGMA_CLIENT_SECRET", "client-secret"]
+          ])
+        )
+      )
+    )
   )
 })
