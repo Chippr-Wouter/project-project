@@ -71,6 +71,7 @@ function RowImpl({
       <Popover>
         <PopoverTrigger
           openOnHover
+          delay={400}
           nativeButton={false}
           render={
             <div
