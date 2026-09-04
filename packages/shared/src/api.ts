@@ -87,6 +87,11 @@ import {
   WorkTypeOption
 } from "./schemas/TimeTracking"
 import {
+  ConnectFigmaProjectInput,
+  FigmaProjectIntegrationStatus,
+  PersonalFigma
+} from "./schemas/Figma"
+import {
   CompleteSprintInput,
   CreateGroupInput,
   Group,
@@ -122,6 +127,10 @@ import {
   EverhourConfigMissing,
   EverhourError,
   EverhourRateLimited,
+  FigmaAuthInvalid,
+  FigmaError,
+  FigmaNotConnected,
+  FigmaRateLimited,
   Forbidden,
   GitHubError,
   GitHubScopeInsufficient,
@@ -670,6 +679,57 @@ const EverhourGroup = HttpApiGroup.make("everhour")
         error: [Unauthorized, NotFound]
       }
     )
+  )
+  .middleware(Authentication)
+
+const FigmaGroup = HttpApiGroup.make("figma")
+  .add(
+    HttpApiEndpoint.get("profile", "/integrations/figma/profile")
+      .addSuccess(PersonalFigma)
+      .addError(Unauthorized)
+  )
+  .add(
+    HttpApiEndpoint.del("disconnectProfile", "/integrations/figma/profile")
+      .addSuccess(PersonalFigma)
+      .addError(Unauthorized)
+  )
+  .add(
+    HttpApiEndpoint.get(
+      "projectStatus",
+      "/orgs/:orgSlug/projects/:slug/integrations/figma"
+    )
+      .setPath(ProjectPath)
+      .addSuccess(FigmaProjectIntegrationStatus)
+      .addError(Unauthorized)
+      .addError(NotFound)
+  )
+  .add(
+    HttpApiEndpoint.post(
+      "connectProject",
+      "/orgs/:orgSlug/projects/:slug/integrations/figma/connect"
+    )
+      .setPath(ProjectPath)
+      .setPayload(ConnectFigmaProjectInput)
+      .addSuccess(FigmaProjectIntegrationStatus)
+      .addError(Unauthorized)
+      .addError(NotFound)
+      .addError(Forbidden)
+      .addError(StorageNotConnected)
+      .addError(FigmaNotConnected)
+      .addError(FigmaAuthInvalid)
+      .addError(FigmaRateLimited)
+      .addError(FigmaError)
+  )
+  .add(
+    HttpApiEndpoint.del(
+      "disconnectProject",
+      "/orgs/:orgSlug/projects/:slug/integrations/figma"
+    )
+      .setPath(ProjectPath)
+      .addSuccess(FigmaProjectIntegrationStatus)
+      .addError(Unauthorized)
+      .addError(NotFound)
+      .addError(Forbidden)
   )
   .middleware(Authentication)
 
@@ -1278,6 +1338,7 @@ const AppApi = HttpApi.make("projectproject")
   .add(OrgGroup)
   .add(ProjectsGroup)
   .add(EverhourGroup)
+  .add(FigmaGroup)
   .add(StorageGroup)
   .add(AttachmentsGroup)
   .add(TicketsGroup)
