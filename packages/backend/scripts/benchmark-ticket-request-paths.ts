@@ -11,7 +11,16 @@ import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
 import matter from "gray-matter"
 import pg from "pg"
-import { ProjectDetail, ProjectKey } from "@projectproject/shared"
+import {
+  encodeCursor,
+  GroupDetail,
+  GroupId,
+  padNumericIdSort,
+  ProjectDetail,
+  ProjectKey,
+  TagName,
+  TicketStatus
+} from "@projectproject/shared"
 import { Attachments, type AttachmentsShape } from "../src/Services/Attachments"
 import { Comments, type CommentsShape } from "../src/Services/Comments"
 import { GitHub, type GitHubShape } from "../src/Services/GitHub"
@@ -23,10 +32,18 @@ import { MarkdownLive } from "../src/Layers/Markdown"
 import { TicketDocsLive } from "../src/Layers/TicketDocs"
 import { TicketIndexLive } from "../src/Layers/TicketIndex"
 import { TicketsLive } from "../src/Layers/Tickets"
+import type {
+  BenchmarkReport,
+  BenchmarkResult
+} from "./ticket-benchmark-report"
 
 const { Client } = pg
 const decodeProjectKey = Schema.decodeUnknownSync(ProjectKey)
 const decodeProjectDetail = Schema.decodeUnknownSync(ProjectDetail)
+const decodeGroupDetail = Schema.decodeUnknownSync(GroupDetail)
+const decodeGroupId = Schema.decodeUnknownSync(GroupId)
+const decodeTicketStatus = Schema.decodeUnknownSync(TicketStatus)
+const decodeTagName = Schema.decodeUnknownSync(TagName)
 const orgSlug = "benchmark"
 const userId = "benchmark-user"
 
@@ -46,7 +63,16 @@ const benchmarkProject = decodeProjectDetail({
     connectGithubDismissedAt: null
   },
   body: "",
-  members: [],
+  members: [
+    {
+      id: userId,
+      username: "benchmark",
+      name: "Benchmark User",
+      email: "benchmark@example.com",
+      image: null,
+      role: "owner"
+    }
+  ],
   pendingMembers: []
 })
 
@@ -63,19 +89,6 @@ interface Options {
 interface Sample {
   readonly durationMs: number
   readonly failure: string | null
-}
-
-interface BenchmarkResult {
-  readonly operation: string
-  readonly concurrency: number
-  readonly samples: number
-  readonly failures: number
-  readonly p50Ms: number
-  readonly p95Ms: number
-  readonly p99Ms: number
-  readonly throughputPerSecond: number
-  readonly wallTimeMs: number
-  readonly firstFailure: string | null
 }
 
 const argumentValue = (name: string): string | undefined => {
@@ -104,7 +117,7 @@ const positiveInteger = (
 const parseConcurrencies = (
   value: string | undefined
 ): ReadonlyArray<number> => {
-  if (value === undefined) return [1, 32]
+  if (value === undefined) return [1, 8, 32]
   const values = value
     .split(",")
     .map((part) => positiveInteger(part.trim(), 1, "--concurrency"))
@@ -112,15 +125,23 @@ const parseConcurrencies = (
   return [...new Set(values)]
 }
 
-const parseOptions = (): Options => ({
-  ticketCount: positiveInteger(argumentValue("--tickets"), 10_000, "--tickets"),
-  sampleCount: positiveInteger(argumentValue("--samples"), 200, "--samples"),
-  concurrencies: parseConcurrencies(argumentValue("--concurrency")),
-  projectsRoot: resolve(process.env.PROJECTS_DIR ?? "/data"),
-  variant: argumentValue("--variant") ?? "working-tree",
-  round: positiveInteger(argumentValue("--round"), 1, "--round"),
-  json: process.argv.includes("--json")
-})
+const parseOptions = (): Options => {
+  const ticketCount = positiveInteger(
+    argumentValue("--tickets"),
+    10_000,
+    "--tickets"
+  )
+  if (ticketCount < 20) throw new Error("--tickets must be at least 20")
+  return {
+    ticketCount,
+    sampleCount: positiveInteger(argumentValue("--samples"), 100, "--samples"),
+    concurrencies: parseConcurrencies(argumentValue("--concurrency")),
+    projectsRoot: resolve(process.env.PROJECTS_DIR ?? "/data"),
+    variant: argumentValue("--variant") ?? "working-tree",
+    round: positiveInteger(argumentValue("--round"), 1, "--round"),
+    json: process.argv.includes("--json")
+  }
+}
 
 const bodySizeKiB = (index: number): number => {
   if (index % 20 === 0) return 64
@@ -140,24 +161,87 @@ const makeBody = (index: number): string => {
   )
 }
 
-const ticketContent = (index: number): string => {
-  const timestamp = "2026-01-01T00:00:00.000Z"
+const rareTicketNumber = (ticketCount: number): number => {
+  const candidate = Math.max(1, Math.floor(ticketCount * 0.73))
+  return Math.min(ticketCount, candidate % 20 === 0 ? candidate + 1 : candidate)
+}
+
+const fixtureFor = (index: number, ticketCount: number) => {
+  const number = index + 1
+  const createdAt = new Date(Date.UTC(2026, 0, 1) + number * 1_000)
+  const updatedAt = new Date(createdAt.getTime() + (number % 30) * 60_000)
+  const merged = number % 24 === 0
+  return {
+    number,
+    id: `T-${number}`,
+    title:
+      number === rareTicketNumber(ticketCount)
+        ? "Unique latency sentinel"
+        : number % 10 === 0
+          ? `Performance benchmark ticket ${number}`
+          : `Benchmark ticket ${number}`,
+    status:
+      number % 5 === 0
+        ? ("done" as const)
+        : number % 3 === 0
+          ? ("in_progress" as const)
+          : ("todo" as const),
+    type:
+      number % 4 === 0
+        ? ("bug" as const)
+        : number % 4 === 1
+          ? ("feat" as const)
+          : number % 4 === 2
+            ? ("chore" as const)
+            : ("other" as const),
+    priority:
+      number % 3 === 0
+        ? ("high" as const)
+        : number % 3 === 1
+          ? ("med" as const)
+          : ("low" as const),
+    tags:
+      number % 10 === 0
+        ? ["performance", "backend"]
+        : number % 2 === 0
+          ? ["backend"]
+          : number % 7 === 0
+            ? ["frontend"]
+            : [],
+    assignees:
+      number % 4 === 0
+        ? [userId]
+        : number % 7 === 0
+          ? ["benchmark-user-2"]
+          : [],
+    branch: number % 6 === 0 ? `feat/T-${number}` : null,
+    pr: number % 12 === 0 ? number : null,
+    prState: number % 12 === 0 ? (merged ? "merged" : "open") : null,
+    lastTransitionedPr: merged ? number : null,
+    archivedAt: number % 20 === 0 ? updatedAt.toISOString() : null,
+    createdAt: createdAt.toISOString(),
+    updatedAt: updatedAt.toISOString()
+  }
+}
+
+const ticketContent = (index: number, ticketCount: number): string => {
+  const fixture = fixtureFor(index, ticketCount)
   return matter.stringify(makeBody(index), {
-    id: `T-${index + 1}`,
-    title: `Benchmark ticket ${index + 1}`,
-    status: "todo",
-    type: "other",
-    priority: "med",
-    tags: [],
-    branch: null,
-    pr: null,
-    prState: null,
-    lastTransitionedPr: null,
-    assignees: [],
-    archivedAt: null,
+    id: fixture.id,
+    title: fixture.title,
+    status: fixture.status,
+    type: fixture.type,
+    priority: fixture.priority,
+    tags: fixture.tags,
+    branch: fixture.branch,
+    pr: fixture.pr,
+    prState: fixture.prState,
+    lastTransitionedPr: fixture.lastTransitionedPr,
+    assignees: fixture.assignees,
+    archivedAt: fixture.archivedAt,
     createdBy: userId,
-    createdAt: timestamp,
-    updatedAt: timestamp
+    createdAt: fixture.createdAt,
+    updatedAt: fixture.updatedAt
   })
 }
 
@@ -249,20 +333,39 @@ const FakeProjects = Layer.succeed(Projects, {
   disconnectGithub: () => unexpected("Projects.disconnectGithub")
 } satisfies ProjectsShape)
 
-const FakeGroups = Layer.succeed(Groups, {
-  list: () => unexpected("Groups.list"),
-  listPaged: () => unexpected("Groups.listPaged"),
-  listSprintsPaged: () => unexpected("Groups.listSprintsPaged"),
-  get: () => unexpected("Groups.get"),
-  create: () => unexpected("Groups.create"),
-  update: () => unexpected("Groups.update"),
-  updateTickets: () => unexpected("Groups.updateTickets"),
-  addTickets: () => unexpected("Groups.addTickets"),
-  updateTicketOrder: () => unexpected("Groups.updateTicketOrder"),
-  complete: () => unexpected("Groups.complete"),
-  remove: () => unexpected("Groups.remove"),
-  removeTicketFromAllGroups: () => Effect.void
-} satisfies GroupsShape)
+const makeFakeGroups = (ticketCount: number) => {
+  const group = decodeGroupDetail({
+    id: "G-1",
+    name: "Benchmark group",
+    kind: "epic",
+    tickets: Array.from(
+      { length: Math.floor(ticketCount / 4) },
+      (_, index) => `T-${(index + 1) * 4}`
+    ),
+    color: "#000000",
+    startsAt: null,
+    endsAt: null,
+    completedAt: null,
+    createdBy: userId,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    body: ""
+  })
+  return Layer.succeed(Groups, {
+    list: () => unexpected("Groups.list"),
+    listPaged: () => unexpected("Groups.listPaged"),
+    listSprintsPaged: () => unexpected("Groups.listSprintsPaged"),
+    get: () => Effect.succeed(group),
+    create: () => unexpected("Groups.create"),
+    update: () => unexpected("Groups.update"),
+    updateTickets: () => unexpected("Groups.updateTickets"),
+    addTickets: () => unexpected("Groups.addTickets"),
+    updateTicketOrder: () => unexpected("Groups.updateTicketOrder"),
+    complete: () => unexpected("Groups.complete"),
+    remove: () => unexpected("Groups.remove"),
+    removeTicketFromAllGroups: () => Effect.void
+  } satisfies GroupsShape)
+}
 
 const FakeGitHub = Layer.succeed(GitHub, {
   getInstallationAccount: () => unexpected("GitHub.getInstallationAccount"),
@@ -303,20 +406,21 @@ const IndexLive = TicketIndexLive.pipe(
   Layer.provide(DocsLive),
   Layer.provide(DatabaseLive)
 )
-const BenchmarkLive = TicketsLive.pipe(
-  Layer.provide(
-    Layer.mergeAll(
-      DocsLive,
-      DatabaseLive,
-      IndexLive,
-      FakeProjects,
-      FakeGroups,
-      FakeGitHub,
-      FakeComments,
-      FakeAttachments
+const BenchmarkLive = (options: Options) =>
+  TicketsLive.pipe(
+    Layer.provide(
+      Layer.mergeAll(
+        DocsLive,
+        DatabaseLive,
+        IndexLive,
+        FakeProjects,
+        makeFakeGroups(options.ticketCount),
+        FakeGitHub,
+        FakeComments,
+        FakeAttachments
+      )
     )
   )
-)
 
 const seedFixture = async (
   options: Options,
@@ -334,20 +438,71 @@ const seedFixture = async (
     )
     await client.query(
       `insert into project_index
-         (id, slug, organization_id, key, name, icon, color,
+       (id, slug, organization_id, key, name, icon, color,
           next_ticket_number, created_by, created_at)
-       values ($1, $2, $3, 'T', 'Benchmark', 'folder', 'blue', $4, $5, now())`,
+       values ($1, $2, $3, 'T', 'Benchmark', 'B', '#000000', $4, $5, now())`,
       [projectId, projectSlug, organizationId, options.ticketCount + 1, userId]
     )
     await client.query(
       `insert into ticket_index
          (organization_id, org_slug, project_id, project_slug, ticket_id,
-          title, status, type, priority, tags, assignees, created_by,
-          created_at, updated_at)
+          title, status, type, priority, tags, assignees, branch, pr,
+          pr_state, last_transitioned_pr, archived_at, created_by, created_at,
+          updated_at)
        select $1, $2, $3, $4, 'T-' || value,
-          'Benchmark ticket ' || value, 'todo', 'other', 'med', '{}', '{}', $5,
-          '2026-01-01T00:00:00.000Z'::timestamptz,
+          case
+            when value = $7 then 'Unique latency sentinel'
+            when value % 10 = 0 then 'Performance benchmark ticket ' || value
+            else 'Benchmark ticket ' || value
+          end,
+          case
+            when value % 5 = 0 then 'done'
+            when value % 3 = 0 then 'in_progress'
+            else 'todo'
+          end,
+          case
+            when value % 4 = 0 then 'bug'
+            when value % 4 = 1 then 'feat'
+            when value % 4 = 2 then 'chore'
+            else 'other'
+          end,
+          case
+            when value % 3 = 0 then 'high'
+            when value % 3 = 1 then 'med'
+            else 'low'
+          end,
+          case
+            when value % 10 = 0 then array['performance', 'backend']::text[]
+            when value % 2 = 0 then array['backend']::text[]
+            when value % 7 = 0 then array['frontend']::text[]
+            else '{}'::text[]
+          end,
+          case
+            when value % 4 = 0 then array[$5]::text[]
+            when value % 7 = 0 then array['benchmark-user-2']::text[]
+            else '{}'::text[]
+          end,
+          case when value % 6 = 0 then 'feat/T-' || value else null end,
+          case when value % 12 = 0 then value else null end,
+          case
+            when value % 24 = 0 then 'merged'
+            when value % 12 = 0 then 'open'
+            else null
+          end,
+          case when value % 24 = 0 then value else null end,
+          case
+            when value % 20 = 0
+              then '2026-01-01T00:00:00.000Z'::timestamptz
+                + value * interval '1 second'
+                + (value % 30) * interval '1 minute'
+            else null
+          end,
+          $5,
           '2026-01-01T00:00:00.000Z'::timestamptz
+            + value * interval '1 second',
+          '2026-01-01T00:00:00.000Z'::timestamptz
+            + value * interval '1 second'
+            + (value % 30) * interval '1 minute'
        from generate_series(1, $6) as value`,
       [
         organizationId,
@@ -355,7 +510,8 @@ const seedFixture = async (
         projectId,
         projectSlug,
         userId,
-        options.ticketCount
+        options.ticketCount,
+        rareTicketNumber(options.ticketCount)
       ]
     )
   } finally {
@@ -381,7 +537,7 @@ const seedFixture = async (
       ) {
         await writeFile(
           join(ticketDirectory, `T-${index + 1}.md`),
-          ticketContent(index)
+          ticketContent(index, options.ticketCount)
         )
       }
     })
@@ -408,10 +564,40 @@ const cleanupFixture = async (
   )
 }
 
+const verify = <A, E>(
+  effect: Effect.Effect<A, E>,
+  predicate: (value: A) => boolean,
+  message: string
+): Effect.Effect<void, E | Error> =>
+  effect.pipe(
+    Effect.flatMap((value) =>
+      predicate(value) ? Effect.void : Effect.fail(new Error(message))
+    )
+  )
+
 const benchmarkProgram = (options: Options, projectSlug: string) =>
   Effect.gen(function* () {
     const tickets = yield* Tickets
     const results: Array<BenchmarkResult> = []
+    const fixtures = Array.from({ length: options.ticketCount }, (_, index) =>
+      fixtureFor(index, options.ticketCount)
+    )
+    const activeTicketCount = fixtures.filter(
+      (fixture) => fixture.archivedAt === null
+    ).length
+    const activeBugCount = fixtures.filter(
+      (fixture) => fixture.archivedAt === null && fixture.type === "bug"
+    ).length
+    const defaultPageSize = Math.min(50, activeTicketCount)
+    const inProgress = decodeTicketStatus("in_progress")
+    const performanceTag = decodeTagName("performance")
+    const groupId = decodeGroupId("G-1")
+    const deepNumber = Math.max(1, Math.floor(options.ticketCount / 2))
+    const deepId = `T-${deepNumber}`
+    const deepCursor = encodeCursor({
+      id: deepId,
+      sort: padNumericIdSort(deepId) ?? deepId
+    })
     let targetOffset = 0
     const targetId = (sample: number) =>
       `T-${((targetOffset + sample) % options.ticketCount) + 1}`
@@ -439,25 +625,202 @@ const benchmarkProgram = (options: Options, projectSlug: string) =>
         { concurrency: 1, discard: true }
       )
 
-    yield* measure("create", (sample) =>
-      tickets.create(orgSlug, userId, projectSlug, {
-        title: `Created benchmark ticket ${sample}`,
-        body: makeBody(sample)
-      })
+    yield* measure("list-default", () =>
+      verify(
+        tickets.list(orgSlug, userId, projectSlug, {
+          sort: { key: "created", dir: "desc" }
+        }),
+        (page) =>
+          page.items.length === defaultPageSize &&
+          page.items.every((ticket) => ticket.archivedAt === null),
+        "default ticket list returned an unexpected page"
+      )
     )
-    yield* measure("update", (sample) =>
-      tickets.update(orgSlug, userId, projectSlug, targetId(sample), {
-        title: `Updated benchmark ticket ${sample}`
-      })
+    yield* measure("list-deep-cursor", () =>
+      verify(
+        tickets.list(orgSlug, userId, projectSlug, {
+          sort: { key: "id", dir: "asc" },
+          cursor: deepCursor
+        }),
+        (page) =>
+          page.items.length > 0 &&
+          page.items.every((ticket) => Number(ticket.id.slice(2)) > deepNumber),
+        "deep ticket cursor returned an unexpected page"
+      )
     )
-    yield* measure("update-with-ticket-mentions", (sample) =>
-      tickets.update(orgSlug, userId, projectSlug, targetId(sample), {
-        body: `${makeBody(sample)}\n\nSee [first](mention:ticket/T-1), [middle](mention:ticket/T-${Math.max(1, Math.floor(options.ticketCount / 2))}), and [last](mention:ticket/T-${options.ticketCount}).\n`
-      })
+    yield* measure("list-filter-status", () =>
+      verify(
+        tickets.list(orgSlug, userId, projectSlug, {
+          filter: { status: [inProgress] },
+          sort: { key: "created", dir: "desc" }
+        }),
+        (page) =>
+          page.items.length > 0 &&
+          page.items.every(
+            (ticket) =>
+              ticket.status === inProgress && ticket.archivedAt === null
+          ),
+        "status-filtered ticket list returned unexpected tickets"
+      )
     )
+    yield* measure("list-filter-tag", () =>
+      verify(
+        tickets.list(orgSlug, userId, projectSlug, {
+          filter: { tags: [performanceTag] },
+          sort: { key: "created", dir: "desc" }
+        }),
+        (page) =>
+          page.items.length > 0 &&
+          page.items.every((ticket) => ticket.tags.includes(performanceTag)),
+        "tag-filtered ticket list returned unexpected tickets"
+      )
+    )
+    yield* measure("list-filter-assignee", () =>
+      verify(
+        tickets.list(orgSlug, userId, projectSlug, {
+          filter: { assignee: ["mine"] },
+          sort: { key: "created", dir: "desc" }
+        }),
+        (page) =>
+          page.items.length > 0 &&
+          page.items.every((ticket) => ticket.assignees.includes(userId)),
+        "assignee-filtered ticket list returned unexpected tickets"
+      )
+    )
+    yield* measure("list-archived", () =>
+      verify(
+        tickets.list(orgSlug, userId, projectSlug, {
+          filter: { archived: true },
+          sort: { key: "created", dir: "desc" }
+        }),
+        (page) =>
+          page.items.length > 0 &&
+          page.items.every((ticket) => ticket.archivedAt !== null),
+        "archived ticket list returned active tickets"
+      )
+    )
+    yield* measure("list-filter-group", () =>
+      verify(
+        tickets.list(orgSlug, userId, projectSlug, {
+          filter: { groupId: [groupId] },
+          sort: { key: "created", dir: "desc" }
+        }),
+        (page) =>
+          page.items.length > 0 &&
+          page.items.every((ticket) => Number(ticket.id.slice(2)) % 4 === 0),
+        "group-filtered ticket list returned unexpected tickets"
+      )
+    )
+    yield* measure("count-filtered", () =>
+      verify(
+        tickets.count(orgSlug, userId, projectSlug, {
+          filter: { type: ["bug"] }
+        }),
+        (counts) =>
+          counts.total === activeBugCount &&
+          Object.values(counts.byStatus).reduce(
+            (total, count) => total + count,
+            0
+          ) === activeBugCount,
+        "filtered ticket count returned unexpected totals"
+      )
+    )
+    yield* measure("search-common", () =>
+      verify(
+        tickets.search(orgSlug, userId, projectSlug, {
+          q: "benchmark",
+          limit: 100
+        }),
+        (found) =>
+          found.length === Math.min(100, activeTicketCount - 1) &&
+          found.every((ticket) =>
+            ticket.title.toLowerCase().includes("benchmark")
+          ),
+        "common ticket search returned unexpected tickets"
+      )
+    )
+    yield* measure("search-rare", () =>
+      verify(
+        tickets.search(orgSlug, userId, projectSlug, {
+          q: "unique latency sentinel",
+          limit: 100
+        }),
+        (found) =>
+          found.length === 1 &&
+          found[0].id === `T-${rareTicketNumber(options.ticketCount)}`,
+        "rare ticket search did not return its unique ticket"
+      )
+    )
+    yield* measure("search-empty", () =>
+      verify(
+        tickets.search(orgSlug, userId, projectSlug, {
+          q: "no-ticket-has-this-title",
+          limit: 100
+        }),
+        (found) => found.length === 0,
+        "empty ticket search returned a ticket"
+      )
+    )
+    yield* measure("detail", (sample) => {
+      const id = targetId(sample)
+      return verify(
+        tickets.get(orgSlug, userId, projectSlug, id),
+        (ticket) => ticket.id === id,
+        `ticket detail returned the wrong ticket for ${id}`
+      )
+    })
+    yield* measure("update-metadata", (sample) => {
+      const title = `Updated benchmark ticket ${sample}`
+      return verify(
+        tickets.update(orgSlug, userId, projectSlug, targetId(sample), {
+          title
+        }),
+        (ticket) => ticket.title === title,
+        "metadata update did not return the updated title"
+      )
+    })
+    yield* measure("update-body", (sample) => {
+      const body = makeBody(sample)
+      return verify(
+        tickets.update(orgSlug, userId, projectSlug, targetId(sample), {
+          body
+        }),
+        (ticket) => ticket.body === body,
+        "body update did not return the updated body"
+      )
+    })
+    yield* measure("update-body-with-ticket-mentions", (sample) => {
+      const body = `${makeBody(sample)}\n\nSee [first](mention:ticket/T-1), [middle](mention:ticket/T-${Math.max(1, Math.floor(options.ticketCount / 2))}), and [last](mention:ticket/T-${options.ticketCount}).\n`
+      return verify(
+        tickets.update(orgSlug, userId, projectSlug, targetId(sample), {
+          body
+        }),
+        (ticket) => ticket.body === body,
+        "body update with mentions did not return the updated body"
+      )
+    })
+    const createdIds = new Set<string>()
+    yield* measure("create", (sample) => {
+      const title = `Created benchmark ticket ${sample}`
+      const body = makeBody(sample)
+      return verify(
+        tickets.create(orgSlug, userId, projectSlug, { title, body }),
+        (ticket) => {
+          const unique = !createdIds.has(ticket.id)
+          createdIds.add(ticket.id)
+          return (
+            unique &&
+            ticket.id.startsWith("T-") &&
+            ticket.title === title &&
+            ticket.body === body
+          )
+        },
+        "ticket create returned duplicate or unexpected content"
+      )
+    })
 
     return results
-  }).pipe(Effect.provide(BenchmarkLive))
+  }).pipe(Effect.provide(BenchmarkLive(options)))
 
 const printReport = (report: {
   readonly variant: string
@@ -499,7 +862,7 @@ async function main() {
     const results = await Effect.runPromise(
       benchmarkProgram(options, projectSlug)
     )
-    const report = {
+    const report: BenchmarkReport = {
       generatedAt: new Date().toISOString(),
       environment: {
         platform: platform(),
