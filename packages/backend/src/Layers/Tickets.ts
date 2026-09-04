@@ -649,7 +649,7 @@ export const TicketsLive = Layer.effect(
             createdBy: ownerId,
             createdAt: now,
             updatedAt: now,
-            body: `# ${input.title}\n`
+            body: ""
           })
         )
         yield* attachments.reconcileTicket(
@@ -711,7 +711,7 @@ export const TicketsLive = Layer.effect(
             createdBy: ownerId,
             createdAt: now,
             updatedAt: now,
-            body: input.body ?? `# ${input.title}\n`
+            body: input.body ?? ""
           })
         )
         yield* attachments.reconcileTicket(

@@ -7,6 +7,12 @@ import {
 import { AnimatePresence, motion } from "motion/react"
 import { useNavigate } from "@tanstack/react-router"
 import { TicketGitChip } from "@/components/TicketGit"
+import { TicketHoverCardContent } from "@/components/Lexical/TicketMentionCard"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger
+} from "@/components/ui/popover"
 import { transitions } from "@/lib/springs"
 import { cn } from "@/lib/utils"
 import type {
@@ -67,86 +73,100 @@ function RowImpl({
 
   return (
     <div className="group/list-row col-span-full grid grid-cols-subgrid">
-      <div
-        role="link"
-        tabIndex={0}
-        onClick={handleClick}
-        onKeyDown={handleKeyDown}
-        className={cn(
-          "col-span-full grid cursor-pointer grid-cols-subgrid items-center gap-3 rounded-lg px-3 py-2.5 text-left outline-none transition-colors hover:bg-muted/60 focus-visible:ring-1 focus-visible:ring-ring"
-        )}
-      >
-        <StatusButton
-          orgSlug={orgSlug}
-          slug={slug}
-          ticket={ticket}
-          query={query}
-          stopPropagation
-        />
-        <PriorityButton
-          orgSlug={orgSlug}
-          slug={slug}
-          ticket={ticket}
-          stopPropagation
-        />
-        <span className="inline-flex shrink-0 items-center font-mono text-xs text-muted-foreground tabular-nums">
-          <span>{idPrefix}-</span>
-          <AnimatePresence initial={false} mode="popLayout">
-            {!pending && (
-              <motion.span
-                key={idTail}
-                initial={{ opacity: 0, filter: "blur(4px)" }}
-                animate={{ opacity: 1, filter: "blur(0px)" }}
-                exit={{ opacity: 0, filter: "blur(4px)" }}
-                transition={transitions.presence}
-                className="inline-block"
-              >
-                {idTail}
-              </motion.span>
-            )}
-          </AnimatePresence>
-        </span>
-        <div className="flex min-w-0 items-center">
-          <span className="min-w-0 truncate text-sm font-medium">
-            {ticket.title}
+      <Popover>
+        <PopoverTrigger
+          openOnHover
+          nativeButton={false}
+          render={
+            <div
+              role="link"
+              tabIndex={0}
+              onClick={handleClick}
+              onKeyDown={handleKeyDown}
+              className={cn(
+                "col-span-full grid cursor-pointer grid-cols-subgrid items-center gap-3 rounded-lg px-3 py-2.5 text-left outline-none transition-colors hover:bg-muted/60 focus-visible:ring-1 focus-visible:ring-ring"
+              )}
+            />
+          }
+        >
+          <StatusButton
+            orgSlug={orgSlug}
+            slug={slug}
+            ticket={ticket}
+            query={query}
+            stopPropagation
+          />
+          <PriorityButton
+            orgSlug={orgSlug}
+            slug={slug}
+            ticket={ticket}
+            stopPropagation
+          />
+          <span className="inline-flex shrink-0 items-center font-mono text-xs text-muted-foreground tabular-nums">
+            <span>{idPrefix}-</span>
+            <AnimatePresence initial={false} mode="popLayout">
+              {!pending && (
+                <motion.span
+                  key={idTail}
+                  initial={{ opacity: 0, filter: "blur(4px)" }}
+                  animate={{ opacity: 1, filter: "blur(0px)" }}
+                  exit={{ opacity: 0, filter: "blur(4px)" }}
+                  transition={transitions.presence}
+                  className="inline-block"
+                >
+                  {idTail}
+                </motion.span>
+              )}
+            </AnimatePresence>
           </span>
-          <div className="ml-auto flex shrink-0 items-center gap-2 pl-3">
-            <TicketGitChip orgSlug={orgSlug} slug={slug} ticket={ticket} />
-            {showSprintCol && (
-              <SprintField
+          <div className="flex min-w-0 items-center">
+            <span className="min-w-0 truncate text-sm font-medium">
+              {ticket.title}
+            </span>
+            <div className="ml-auto flex shrink-0 items-center gap-2 pl-3">
+              <TicketGitChip orgSlug={orgSlug} slug={slug} ticket={ticket} />
+              {showSprintCol && (
+                <SprintField
+                  orgSlug={orgSlug}
+                  slug={slug}
+                  ticketId={ticket.id}
+                  membership={sprintMembership}
+                />
+              )}
+              <AssigneeRowTrigger
                 orgSlug={orgSlug}
                 slug={slug}
-                ticketId={ticket.id}
-                membership={sprintMembership}
+                ticket={ticket}
+                members={members}
+                className="hidden sm:inline-flex"
               />
-            )}
-            <AssigneeRowTrigger
-              orgSlug={orgSlug}
-              slug={slug}
-              ticket={ticket}
-              members={members}
-              className="hidden sm:inline-flex"
-            />
+            </div>
           </div>
-        </div>
-        <TypeButton
-          orgSlug={orgSlug}
-          slug={slug}
-          ticket={ticket}
-          className="hidden sm:inline-flex"
-        />
-        {showExtraActionsCol && (
-          <span
-            className="inline-flex shrink-0 items-center"
-            onClick={(e) => {
-              e.stopPropagation()
-              e.preventDefault()
-            }}
-          >
-            {extraRowActions?.(ticket)}
-          </span>
-        )}
-      </div>
+          <TypeButton
+            orgSlug={orgSlug}
+            slug={slug}
+            ticket={ticket}
+            className="hidden sm:inline-flex"
+          />
+          {showExtraActionsCol && (
+            <span
+              className="inline-flex shrink-0 items-center"
+              onClick={(e) => {
+                e.stopPropagation()
+                e.preventDefault()
+              }}
+            >
+              {extraRowActions?.(ticket)}
+            </span>
+          )}
+        </PopoverTrigger>
+        <PopoverContent className="w-80" align="start">
+          <TicketHoverCardContent
+            ticketId={ticket.id}
+            scope={{ orgSlug, slug, members }}
+          />
+        </PopoverContent>
+      </Popover>
     </div>
   )
 }

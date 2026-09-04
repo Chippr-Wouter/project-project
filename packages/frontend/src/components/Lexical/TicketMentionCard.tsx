@@ -38,6 +38,17 @@ const MentionCardError = () => (
 export function TicketMentionCard({ ticketId }: { ticketId: TicketId }) {
   const scope = useMentionScope()
   if (!scope) return null
+
+  return <TicketHoverCardContent ticketId={ticketId} scope={scope} />
+}
+
+export function TicketHoverCardContent({
+  ticketId,
+  scope
+}: {
+  ticketId: TicketId
+  scope: MentionScope
+}) {
   const result = useAtomValue(
     ticketAtom(ticketKey(scope.orgSlug, scope.slug, ticketId))
   )
