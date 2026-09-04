@@ -709,6 +709,23 @@ export const userFigmaIntegration = pgTable("user_figma_integration", {
   lastCheckError: text("last_check_error")
 })
 
+export const userFigmaOauthState = pgTable(
+  "user_figma_oauth_state",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    stateHash: text("state_hash").notNull().unique(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+  },
+  (t) => [index("user_figma_oauth_state_user_idx").on(t.userId)]
+)
+
 export const projectFigmaIntegration = pgTable(
   "project_figma_integration",
   {
