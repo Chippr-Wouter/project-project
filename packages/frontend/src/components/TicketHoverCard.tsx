@@ -71,6 +71,7 @@ export function TicketHoverCard({
       className={cn("w-80", !interactive && "pointer-events-none")}
       align="start"
       anchor={anchor}
+      inert={interactive ? undefined : true}
     >
       {Result.matchWithError(result, {
         onInitial: () => <CardSkeleton />,

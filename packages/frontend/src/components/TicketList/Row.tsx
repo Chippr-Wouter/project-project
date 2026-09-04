@@ -24,7 +24,7 @@ import { SprintField } from "./SprintField"
 import { StatusButton } from "./StatusField"
 import { TypeButton } from "./TypeField"
 
-const TICKET_PREVIEW_DELAY_MS = 400
+const TICKET_PREVIEW_DELAY_MS = 550
 
 function RowImpl({
   orgSlug,
