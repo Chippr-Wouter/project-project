@@ -18,7 +18,6 @@ import {
   TYPE_LABELS,
   TYPE_META
 } from "@/lib/ticket-meta"
-import type { MentionScope } from "@/mentions/scope"
 import { m } from "@/paraglide/messages"
 import type {
   Member,
@@ -31,6 +30,12 @@ import type {
 
 const EMPTY_STATUSES: ReadonlyArray<ProjectStatus> = []
 
+interface TicketHoverCardScope {
+  orgSlug: string
+  slug: string
+  members?: ReadonlyArray<Member>
+}
+
 const TicketHoverCardError = () => (
   <div className="text-xs text-muted-foreground">
     {m.tickets_mention_card_not_available()}
@@ -42,7 +47,7 @@ export function TicketHoverCard({
   scope
 }: {
   ticketId: TicketId
-  scope: MentionScope
+  scope: TicketHoverCardScope
 }) {
   const result = useAtomValue(
     ticketAtom(ticketKey(scope.orgSlug, scope.slug, ticketId))
@@ -125,7 +130,7 @@ function MetaRow({
     priority: TicketPriority
     assignees: ReadonlyArray<string>
   }
-  scope: MentionScope
+  scope: TicketHoverCardScope
   statuses: ReadonlyArray<ProjectStatus>
 }) {
   const statusMeta = statusMetaFor(ticket.status, statuses)
