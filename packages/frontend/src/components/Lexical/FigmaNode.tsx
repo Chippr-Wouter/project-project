@@ -67,7 +67,7 @@ const isInteractiveTarget = (target: EventTarget | null): boolean =>
   target instanceof Element && target.closest(INTERACTIVE_SELECTOR) !== null
 
 const OVERLAY_REVEAL =
-  "opacity-0 transition-opacity group-hover/hitbox:opacity-100 group-focus-within/hitbox:opacity-100"
+  "invisible opacity-0 transition-opacity group-focus-within/editing:visible group-hover/hitbox:opacity-100 group-focus-within/hitbox:opacity-100"
 
 const OVERLAY_SLOT = "absolute flex h-8 items-center"
 
@@ -337,9 +337,11 @@ function FigmaSelectable({
         ref={wrapperRef}
         data-figma-selected={isSelected ? "true" : undefined}
         className={cn(
-          "group/hitbox relative inline-block max-w-full align-middle ring-offset-2 ring-offset-background transition-shadow duration-150 hover:z-20 focus-within:z-20",
+          "group/hitbox relative inline-block max-w-full align-middle transition-shadow duration-150 hover:z-20 focus-within:z-20",
           compact ? "my-0.5 rounded-md" : "my-2 rounded-xl",
-          isSelected ? "z-20 ring-2 ring-ring" : "z-0 ring-0 ring-transparent"
+          isSelected
+            ? "z-20 ring-2 ring-ring ring-offset-2 ring-offset-background"
+            : "z-0 ring-0 ring-transparent"
         )}
       >
         <LayoutGroup id={morphId}>

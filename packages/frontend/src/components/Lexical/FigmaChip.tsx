@@ -7,7 +7,7 @@ import { FigmaOpen } from "./FigmaOpen"
 import { useFigmaMetadata } from "./figmaMetadata"
 
 const CHIP =
-  "mx-0.5 inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-card px-2 py-0.5 align-baseline text-xs transition-colors duration-100 hover:bg-accent/40"
+  "mx-0.5 inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-card px-2 py-0.5 align-baseline text-xs transition-colors duration-100 group-focus-within/editing:hover:bg-accent/40"
 
 export function FigmaGlyph({ className }: { className?: string }) {
   return (
