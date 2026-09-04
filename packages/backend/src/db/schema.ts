@@ -764,11 +764,9 @@ export const figmaLinkIndex = pgTable(
       .defaultNow()
   },
   (t) => [
-    uniqueIndex("figma_link_index_node_uidx").on(
-      t.orgSlug,
-      t.fileKey,
-      t.nodeId
-    ),
+    unique("figma_link_index_node_uidx")
+      .on(t.orgSlug, t.fileKey, t.nodeId)
+      .nullsNotDistinct(),
     index("figma_link_index_org_idx").on(t.organizationId),
     index("figma_link_index_file_idx").on(t.orgSlug, t.fileKey)
   ]
