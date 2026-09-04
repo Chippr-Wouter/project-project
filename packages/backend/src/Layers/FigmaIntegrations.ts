@@ -176,7 +176,22 @@ export const exchangeAuthorizationCode = (input: {
       },
       () => new FigmaError({ reason: "figma_token_exchange_unreachable" })
     )
-    if (!response.ok) return yield* new FigmaAuthInvalid()
+    if (!response.ok) {
+      const detail = yield* Effect.tryPromise({
+        try: () => response.text(),
+        catch: () => new FigmaError({ reason: "figma_token_error_unreadable" })
+      }).pipe(Effect.orElseSucceed(() => ""))
+      yield* Effect.logWarning("figma token exchange rejected").pipe(
+        Effect.annotateLogs({
+          status: response.status,
+          detail: detail.slice(0, 500),
+          redirectUri: input.redirectUri
+        })
+      )
+      return yield* isGrantRejection(response.status)
+        ? new FigmaAuthInvalid()
+        : new FigmaError({ reason: "figma_token_exchange_failed" })
+    }
     const payload = yield* readJson(
       response,
       () => new FigmaError({ reason: "figma_token_response_unreadable" })
