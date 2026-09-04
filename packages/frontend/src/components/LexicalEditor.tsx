@@ -47,6 +47,9 @@ import { MENTION_TRANSFORMER } from "./Lexical/mentionTransformer"
 import { AttachmentExtension } from "./Lexical/AttachmentExtension"
 import { AttachmentsPlugin } from "./Lexical/AttachmentsPlugin"
 import { ATTACHMENT_TRANSFORMER } from "./Lexical/attachmentTransformer"
+import { FigmaExtension } from "./Lexical/FigmaExtension"
+import { FigmaPlugin } from "./Lexical/FigmaPlugin"
+import { FIGMA_TRANSFORMER } from "./Lexical/figmaTransformer"
 import {
   HORIZONTAL_RULE,
   HorizontalRuleEnterExtension
@@ -61,6 +64,7 @@ export const MARKDOWN_TRANSFORMERS = [
   MENTION_TRANSFORMER,
   CHECK_LIST,
   HORIZONTAL_RULE,
+  FIGMA_TRANSFORMER,
   ...TRANSFORMERS
 ]
 
@@ -290,6 +294,7 @@ export function LexicalEditor({
         HorizontalRuleExtension,
         HorizontalRuleEnterExtension,
         MentionExtension,
+        FigmaExtension,
         ...(attachmentNodesEnabled ? [AttachmentExtension] : []),
         configExtension(TabIndentationExtension, {
           $canIndent: $canIndentInsideLists,
@@ -398,6 +403,7 @@ export function LexicalEditor({
         contentEditable={contentEditable}
       >
         <MentionsPlugin />
+        <FigmaPlugin />
         {attachments !== undefined && attachments.uploadsEnabled ? (
           <AttachmentsPlugin
             orgSlug={attachments.orgSlug}
