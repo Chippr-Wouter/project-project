@@ -12,6 +12,11 @@ import type {
   EverhourConfigMissing,
   EverhourError,
   EverhourRateLimited,
+  FigmaAuthInvalid,
+  FigmaError,
+  FigmaFileNotFound,
+  FigmaNotConnected,
+  FigmaRateLimited,
   Forbidden,
   GitHubError,
   GitHubScopeInsufficient,
@@ -58,6 +63,11 @@ export type AppError =
   | AttachmentTooLarge
   | AttachmentTypeRejected
   | AttachmentNotUploaded
+  | FigmaNotConnected
+  | FigmaAuthInvalid
+  | FigmaRateLimited
+  | FigmaFileNotFound
+  | FigmaError
 
 export const errorMessage = (error: AppError): string =>
   Match.value(error)
@@ -111,6 +121,11 @@ export const errorMessage = (error: AppError): string =>
       Match.tag("AttachmentNotUploaded", () =>
         m.editor_attachment_upload_failed()
       ),
+      Match.tag("FigmaNotConnected", () => m.figma_error_not_connected()),
+      Match.tag("FigmaAuthInvalid", () => m.figma_error_auth_invalid()),
+      Match.tag("FigmaRateLimited", () => m.figma_error_rate_limited()),
+      Match.tag("FigmaFileNotFound", () => m.figma_error_file_not_found()),
+      Match.tag("FigmaError", () => m.figma_error_generic()),
       Match.orElse(() => m.error_unknown())
     )
 
