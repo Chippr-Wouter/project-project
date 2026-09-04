@@ -704,6 +704,7 @@ const baseDocument = (overrides: Partial<TicketDocument> = {}): TicketDocument =
   createdAt: DateTime.toDate(DateTime.unsafeMake("2026-05-01T00:00:00.000Z")),
   updatedAt: DateTime.toDate(DateTime.unsafeMake("2026-05-01T00:00:00.000Z")),
   body: "",
+  commentsRegion: "",
   ...overrides
 })
 
@@ -734,6 +735,21 @@ const makeFakeDocs = (initial: ReadonlyArray<TicketDocument>) => {
         documents.set(id, document)
         writes.push({ id, document })
       }),
+    update: (_org, _slug, id, transform) => {
+      reads.push(id)
+      const document = documents.get(id)
+      if (!document) return Effect.fail(new NotFound())
+      return transform(document).pipe(
+        Effect.tap((next) =>
+          next === document
+            ? Effect.void
+            : Effect.sync(() => {
+                documents.set(id, next)
+                writes.push({ id, document: next })
+              })
+        )
+      )
+    },
     remove: () => Effect.die(new Error("unexpected TicketDocs.remove call")),
     readRaw: () => Effect.die(new Error("unexpected TicketDocs.readRaw call"))
   }
@@ -746,6 +762,8 @@ const makeFakeIndex = (overrides: Partial<TicketIndexShape> = {}) => {
     projectFor: () => Effect.die(new Error("unexpected TicketIndex.projectFor call")),
     list: () => Effect.succeed([]),
     listIds: () => Effect.succeed([]),
+    existingIds: () => Effect.succeed(new Set()),
+    reserveTicketNumber: () => Effect.succeed(1),
     tagUsageCounts: () => Effect.succeed({}),
     findTicketIdsByTag: () => Effect.succeed([]),
     findTicketIdsByStatus: () => Effect.succeed([]),
@@ -828,12 +846,12 @@ it.effect("applyPullRequestWebhookToTicket serializes same-ticket deliveries", (
     let maxActiveReads = 0
     const serialDocs: TicketDocsShape = {
       ...docs.shape,
-      read: (org, slug, id) =>
+      update: (org, slug, id, transform) =>
         Effect.gen(function* () {
           activeReads += 1
           maxActiveReads = Math.max(maxActiveReads, activeReads)
           yield* Effect.yieldNow()
-          return yield* docs.shape.read(org, slug, id)
+          return yield* docs.shape.update(org, slug, id, transform)
         }).pipe(
           Effect.ensuring(
             Effect.sync(() => {
@@ -890,7 +908,7 @@ it.effect("applyPullRequestWebhookToTicket skips when markdown is malformed", ()
     const index = makeFakeIndex()
     const malformedDocs: TicketDocsShape = {
       ...docs.shape,
-      read: () =>
+      update: () =>
         Effect.fail(
           new MalformedTicketDocument({
             orgSlug: "org",

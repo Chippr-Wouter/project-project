@@ -70,8 +70,57 @@ export const applyPullRequestWebhookToTicket = (
   deliveryId: string | null
 ): Effect.Effect<void, MarkdownError> =>
   withPullRequestTicketLock(match, Effect.gen(function* () {
-    const ticket = yield* deps.ticketDocs
-      .read(match.orgSlug, match.projectSlug, match.ticketId)
+    let changed = false
+    const next = yield* deps.ticketDocs
+      .update(match.orgSlug, match.projectSlug, match.ticketId, (ticket) =>
+        Effect.gen(function* () {
+          if (ticket.branch !== match.branch) {
+            yield* Effect.logDebug("github pull_request branch index stale").pipe(
+              Effect.annotateLogs({
+                module: "GitHubWebhooks",
+                deliveryId,
+                orgSlug: match.orgSlug,
+                slug: match.projectSlug,
+                ticketId: match.ticketId,
+                indexedBranch: match.branch,
+                ticketBranch: ticket.branch
+              })
+            )
+            return ticket
+          }
+          if (ticket.pr !== null && change.number < ticket.pr) {
+            yield* Effect.logDebug("github pull_request delivery stale").pipe(
+              Effect.annotateLogs({
+                module: "GitHubWebhooks",
+                deliveryId,
+                orgSlug: match.orgSlug,
+                slug: match.projectSlug,
+                ticketId: match.ticketId,
+                ticketPr: ticket.pr,
+                webhookPr: change.number
+              })
+            )
+            return ticket
+          }
+          const write = planPullRequestWebhookTicket(ticket, change)
+          if (!write) return ticket
+          changed = true
+          return {
+            ...ticket,
+            pr: write.patch.pr !== undefined ? write.patch.pr : ticket.pr,
+            prState:
+              write.patch.prState !== undefined
+                ? write.patch.prState
+                : ticket.prState,
+            lastTransitionedPr:
+              write.patch.lastTransitionedPr !== undefined
+                ? write.patch.lastTransitionedPr
+                : ticket.lastTransitionedPr,
+            status: write.patch.status ?? ticket.status,
+            updatedAt: yield* DateTime.nowAsDate
+          }
+        })
+      )
       .pipe(
         Effect.catchTag("NotFound", (error) =>
           Effect.logWarning("github pull_request ticket ignored").pipe(
@@ -98,56 +147,7 @@ export const applyPullRequestWebhookToTicket = (
             }),
             Effect.as(null)
           )
-        )
-      )
-    if (!ticket) return
-    if (ticket.branch !== match.branch) {
-      yield* Effect.logDebug("github pull_request branch index stale").pipe(
-        Effect.annotateLogs({
-          module: "GitHubWebhooks",
-          deliveryId,
-          orgSlug: match.orgSlug,
-          slug: match.projectSlug,
-          ticketId: match.ticketId,
-          indexedBranch: match.branch,
-          ticketBranch: ticket.branch
-        })
-      )
-      return
-    }
-    if (ticket.pr !== null && change.number < ticket.pr) {
-      yield* Effect.logDebug("github pull_request delivery stale").pipe(
-        Effect.annotateLogs({
-          module: "GitHubWebhooks",
-          deliveryId,
-          orgSlug: match.orgSlug,
-          slug: match.projectSlug,
-          ticketId: match.ticketId,
-          ticketPr: ticket.pr,
-          webhookPr: change.number
-        })
-      )
-      return
-    }
-    const write = planPullRequestWebhookTicket(ticket, change)
-    if (!write) return
-    const next = {
-      ...ticket,
-      pr: write.patch.pr !== undefined ? write.patch.pr : ticket.pr,
-      prState:
-        write.patch.prState !== undefined
-          ? write.patch.prState
-          : ticket.prState,
-      lastTransitionedPr:
-        write.patch.lastTransitionedPr !== undefined
-          ? write.patch.lastTransitionedPr
-          : ticket.lastTransitionedPr,
-      status: write.patch.status ?? ticket.status,
-      updatedAt: yield* DateTime.nowAsDate
-    }
-    yield* deps.ticketDocs
-      .write(match.orgSlug, match.projectSlug, match.ticketId, next)
-      .pipe(
+        ),
         Effect.tapError((error) =>
           Effect.logWarning("github pull_request ticket write failed").pipe(
             Effect.annotateLogs({
@@ -161,6 +161,7 @@ export const applyPullRequestWebhookToTicket = (
           )
         )
       )
+    if (next === null || !changed) return
     const indexProject = {
       orgSlug: match.orgSlug,
       organizationId: match.organizationId,

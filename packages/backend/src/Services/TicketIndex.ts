@@ -92,6 +92,13 @@ export interface TicketIndexShape {
   readonly listIds: (
     project: TicketIndexProject
   ) => Effect.Effect<ReadonlyArray<string>>
+  readonly existingIds: (
+    project: TicketIndexProject,
+    ticketIds: ReadonlyArray<string>
+  ) => Effect.Effect<ReadonlySet<string>>
+  readonly reserveTicketNumber: (
+    project: TicketIndexProject
+  ) => Effect.Effect<number>
   readonly tagUsageCounts: (
     project: TicketIndexProject
   ) => Effect.Effect<Readonly<Record<string, number>>>

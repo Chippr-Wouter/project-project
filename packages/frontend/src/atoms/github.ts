@@ -23,7 +23,6 @@ import type {
   TicketId
 } from "@projectproject/shared"
 import { projectAtom, projectBaseAtom } from "./projects"
-import { ticketBaseAtom, ticketKey } from "./tickets"
 
 export const githubAuthEpochAtom = Atom.make(0)
 
@@ -285,7 +284,6 @@ export const createBranchAtom = Atom.family((key: string) => {
           payload: { name: input.name, baseBranch: input.baseBranch }
         })
         get.refresh(projectGitStatesBaseAtom(key))
-        get.refresh(ticketBaseAtom(ticketKey(orgSlug, slug, input.id)))
         yield* Reactivity.invalidate(["tickets", orgSlug, slug])
         yield* Reactivity.invalidate(["branches", orgSlug, slug])
         return updated
@@ -333,7 +331,6 @@ export const attachBranchAtom = Atom.family((key: string) => {
           payload: { name: input.name }
         })
         get.refresh(projectGitStatesBaseAtom(key))
-        get.refresh(ticketBaseAtom(ticketKey(orgSlug, slug, input.id)))
         yield* Reactivity.invalidate(["tickets", orgSlug, slug])
         return updated
       })
@@ -364,7 +361,6 @@ export const clearBranchAtom = Atom.family((key: string) => {
         const updated = yield* client.tickets.clearBranch({
           path: { orgSlug, slug, id: input.id }
         })
-        get.refresh(ticketBaseAtom(ticketKey(orgSlug, slug, input.id)))
         yield* Reactivity.invalidate(["tickets", orgSlug, slug])
         get.refresh(projectGitStatesBaseAtom(key))
         return updated

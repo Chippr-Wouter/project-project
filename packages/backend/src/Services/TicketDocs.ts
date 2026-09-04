@@ -40,6 +40,7 @@ export interface TicketDocument {
   readonly createdAt: Date
   readonly updatedAt: Date
   readonly body: string
+  readonly commentsRegion: string
 }
 
 export interface TicketDocsShape {
@@ -66,6 +67,18 @@ export interface TicketDocsShape {
     id: string,
     document: TicketDocument
   ) => Effect.Effect<void, MarkdownError>
+  readonly update: <E, R>(
+    orgSlug: string,
+    slug: string,
+    id: string,
+    transform: (
+      document: TicketDocument
+    ) => Effect.Effect<TicketDocument, E, R>
+  ) => Effect.Effect<
+    TicketDocument,
+    NotFound | MarkdownError | MalformedTicketDocument | E,
+    R
+  >
   readonly remove: (
     orgSlug: string,
     slug: string,

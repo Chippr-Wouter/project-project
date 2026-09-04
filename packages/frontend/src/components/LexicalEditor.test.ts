@@ -7,7 +7,7 @@ import { HorizontalRuleNode } from "@lexical/extension"
 import { LinkNode } from "@lexical/link"
 import { ListItemNode, ListNode } from "@lexical/list"
 import { HeadingNode, QuoteNode } from "@lexical/rich-text"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { $getRoot, $isElementNode, createEditor } from "lexical"
 import * as Schema from "effect/Schema"
 import { TicketId } from "@projectproject/shared"
@@ -16,6 +16,7 @@ import { AttachmentNode } from "./Lexical/AttachmentNode"
 import {
   attachmentsForDescription,
   AUTO_LINK_MATCHERS,
+  createCoalescedSaveQueue,
   MARKDOWN_TRANSFORMERS,
   nextMarkdownChange,
   transformersForAttachments
@@ -150,6 +151,89 @@ describe("nextMarkdownChange", () => {
 
   it("ignores updates that serialize to the loaded markdown", () => {
     expect(nextMarkdownChange("unchanged", "unchanged")).toBeNull()
+  })
+})
+
+describe("createCoalescedSaveQueue", () => {
+  it("debounces queued changes down to the latest value", async () => {
+    const save = vi.fn(async () => {})
+    const queue = createCoalescedSaveQueue({
+      save,
+      schedule: vi.fn(),
+      onStatus: vi.fn(),
+      onError: vi.fn()
+    })
+
+    queue.enqueue("first")
+    queue.enqueue("latest")
+    await queue.flush()
+
+    expect(save).toHaveBeenCalledTimes(1)
+    expect(save).toHaveBeenCalledWith("latest")
+  })
+
+  it("coalesces edits made during a save and keeps their status dirty", async () => {
+    let finishFirstSave: (() => void) | undefined
+    const save = vi.fn((value: string) =>
+      value === "first"
+        ? new Promise<void>((resolve) => {
+            finishFirstSave = resolve
+          })
+        : Promise.resolve()
+    )
+    const schedule = vi.fn()
+    const onStatus = vi.fn()
+    const queue = createCoalescedSaveQueue({
+      save,
+      schedule,
+      onStatus,
+      onError: vi.fn()
+    })
+
+    queue.enqueue("first")
+    const firstSave = queue.flush()
+    queue.enqueue("second")
+    queue.enqueue("latest")
+    finishFirstSave?.()
+    await firstSave
+
+    expect(onStatus).not.toHaveBeenCalledWith("saved")
+    expect(schedule).toHaveBeenCalledTimes(1)
+
+    await queue.flush()
+
+    expect(save).toHaveBeenNthCalledWith(1, "first")
+    expect(save).toHaveBeenNthCalledWith(2, "latest")
+    expect(onStatus).toHaveBeenLastCalledWith("saved")
+  })
+
+  it("keeps a failed save queued for retry", async () => {
+    const save = vi
+      .fn<(value: string) => Promise<void>>()
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValue()
+    const schedule = vi.fn()
+    const onStatus = vi.fn()
+    const onError = vi.fn()
+    const queue = createCoalescedSaveQueue({
+      save,
+      schedule,
+      onStatus,
+      onError
+    })
+
+    queue.enqueue("latest")
+    await queue.flush()
+
+    expect(onError).toHaveBeenCalledOnce()
+    expect(onStatus).toHaveBeenLastCalledWith("dirty")
+    expect(schedule).not.toHaveBeenCalled()
+
+    await queue.flush()
+
+    expect(save).toHaveBeenCalledTimes(2)
+    expect(save).toHaveBeenNthCalledWith(2, "latest")
+    expect(onStatus).toHaveBeenLastCalledWith("saved")
   })
 })
 

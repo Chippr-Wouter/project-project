@@ -88,21 +88,26 @@ function frontmatterToDisk(document: TicketDocument): Record<string, unknown> {
 
 function toDocument(
   frontmatter: typeof TicketFrontmatter.Type,
-  body: string
+  body: string,
+  commentsRegion: string
 ): TicketDocument {
   return {
     ...frontmatter,
-    body
+    body,
+    commentsRegion
   }
 }
 
-function withTicketDocTelemetry<A, E>(
+const bodyWithCommentsRegion = (body: string, commentsRegion: string) =>
+  commentsRegion ? `${body.replace(/\s+$/, "")}\n\n${commentsRegion}` : body
+
+function withTicketDocTelemetry<A, E, R>(
   operation: string,
   orgSlug: string,
   slug: string,
   attributes: Record<string, unknown>,
-  effect: Effect.Effect<A, E>
-): Effect.Effect<A, E> {
+  effect: Effect.Effect<A, E, R>
+): Effect.Effect<A, E, R> {
   const annotations = {
     module: "TicketDocs",
     operation,
@@ -120,6 +125,42 @@ export const TicketDocsLive = Layer.effect(
   TicketDocs,
   Effect.gen(function* () {
     const markdown = yield* Markdown
+    const mutationLocks = new Map<
+      string,
+      { readonly semaphore: Effect.Semaphore; references: number }
+    >()
+
+    const withMutationLock = <A, E, R>(
+      orgSlug: string,
+      slug: string,
+      id: string,
+      effect: Effect.Effect<A, E, R>
+    ): Effect.Effect<A, E, R> => {
+      const key = JSON.stringify([orgSlug, slug, id])
+      return Effect.acquireUseRelease(
+        Effect.sync(() => {
+          const current = mutationLocks.get(key)
+          if (current) {
+            current.references++
+            return current
+          }
+          const created = {
+            semaphore: Effect.unsafeMakeSemaphore(1),
+            references: 1
+          }
+          mutationLocks.set(key, created)
+          return created
+        }),
+        (lock) => lock.semaphore.withPermits(1)(effect),
+        (lock) =>
+          Effect.sync(() => {
+            lock.references--
+            if (lock.references === 0 && mutationLocks.get(key) === lock) {
+              mutationLocks.delete(key)
+            }
+          })
+      )
+    }
 
     const listIds = (
       orgSlug: string,
@@ -167,7 +208,7 @@ export const TicketDocsLive = Layer.effect(
                 })
             )
           )
-          return toDocument(frontmatter, file.description)
+          return toDocument(frontmatter, file.description, file.region)
         })
       )
 
@@ -186,7 +227,7 @@ export const TicketDocsLive = Layer.effect(
           slug,
           document.id,
           frontmatterToDisk(document),
-          document.body
+          bodyWithCommentsRegion(document.body, document.commentsRegion)
         )
       )
 
@@ -201,19 +242,44 @@ export const TicketDocsLive = Layer.effect(
         orgSlug,
         slug,
         { ticketId: id },
-        Effect.gen(function* () {
-          const file = yield* markdown
-            .readTicketParts(orgSlug, slug, id)
-            .pipe(Effect.catchTag("NotFound", (error) => Effect.die(error)))
-          yield* markdown.writeTicketWithRegion(
-            orgSlug,
-            slug,
-            id,
-            frontmatterToDisk(document),
-            document.body,
-            file.region
-          )
-        })
+        markdown.writeTicketWithRegion(
+          orgSlug,
+          slug,
+          id,
+          frontmatterToDisk(document),
+          document.body,
+          document.commentsRegion
+        )
+      )
+
+    const update = <E, R>(
+      orgSlug: string,
+      slug: string,
+      id: string,
+      transform: (
+        document: TicketDocument
+      ) => Effect.Effect<TicketDocument, E, R>
+    ): Effect.Effect<
+      TicketDocument,
+      NotFound | MarkdownError | MalformedTicketDocument | E,
+      R
+    > =>
+      withTicketDocTelemetry(
+        "update",
+        orgSlug,
+        slug,
+        { ticketId: id },
+        withMutationLock(
+          orgSlug,
+          slug,
+          id,
+          Effect.gen(function* () {
+            const current = yield* read(orgSlug, slug, id)
+            const next = yield* transform(current)
+            if (next !== current) yield* write(orgSlug, slug, id, next)
+            return next
+          })
+        )
       )
 
     const remove = (
@@ -250,6 +316,7 @@ export const TicketDocsLive = Layer.effect(
       read,
       create,
       write,
+      update,
       remove,
       readRaw
     } satisfies TicketDocsShape

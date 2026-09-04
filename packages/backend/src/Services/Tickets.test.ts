@@ -85,6 +85,7 @@ function makeTicketDocument(
     createdAt: now,
     updatedAt: now,
     body: "",
+    commentsRegion: "",
     ...overrides
   }
 }
@@ -94,9 +95,8 @@ function makeFakeTicketDocs(initialIds: ReadonlyArray<string>) {
     initialIds.map((id) => [id, makeTicketDocument(id)])
   )
 
-  const service = {
-    listIds: () =>
-      Effect.succeed([...documents.keys()].map((id) => ticketId(id))),
+  const service: TicketDocsShape = {
+    listIds: () => unexpected("TicketDocs.listIds"),
     read: (_org: string, _slug: string, id: string) => {
       const document = documents.get(id)
       return document ? Effect.succeed(document) : Effect.fail(new NotFound())
@@ -115,12 +115,21 @@ function makeFakeTicketDocs(initialIds: ReadonlyArray<string>) {
       documents.set(id, document)
       return Effect.void
     },
+    update: (org: string, slug: string, id: string, transform) =>
+      service
+        .read(org, slug, id)
+        .pipe(
+          Effect.flatMap(transform),
+          Effect.tap((document) =>
+            Effect.sync(() => documents.set(id, document))
+          )
+        ),
     remove: (_org: string, _slug: string, id: string) => {
       documents.delete(id)
       return Effect.void
     },
     readRaw: () => unexpected("TicketDocs.readRaw")
-  } satisfies TicketDocsShape
+  }
 
   return {
     documents,
@@ -248,7 +257,7 @@ const makeFakeGitHub = (overrides: Partial<GitHubShape> = {}) =>
   } satisfies GitHubShape)
 
 const entryFromDocument = (document: TicketDocument) => {
-  const { body: _body, ...entry } = document
+  const { body: _body, commentsRegion: _commentsRegion, ...entry } = document
   return {
     ...entry,
     branchDeletedAt: null,
@@ -261,8 +270,15 @@ const entryFromDocument = (document: TicketDocument) => {
 const makeFakeTicketIndex = (
   documents: Map<string, TicketDocument>,
   overrides: Partial<TicketIndexShape> = {}
-) =>
-  Layer.succeed(TicketIndex, {
+) => {
+  let nextTicketNumber =
+    Math.max(
+      0,
+      ...[...documents.keys()].map((id) =>
+        Number(id.slice(id.lastIndexOf("-") + 1))
+      )
+    ) + 1
+  return Layer.succeed(TicketIndex, {
     projectFor: () => Effect.succeed(ticketIndexProject),
     list: (_project, ticketIds) =>
       Effect.sync(() => {
@@ -272,6 +288,11 @@ const makeFakeTicketIndex = (
           .map(entryFromDocument)
       }),
     listIds: () => Effect.sync(() => [...documents.keys()]),
+    existingIds: (_project, ticketIds) =>
+      Effect.sync(
+        () => new Set(ticketIds.filter((ticketId) => documents.has(ticketId)))
+      ),
+    reserveTicketNumber: () => Effect.sync(() => nextTicketNumber++),
     tagUsageCounts: () =>
       Effect.sync(() => {
         const counts: Record<string, number> = {}
@@ -351,6 +372,7 @@ const makeFakeTicketIndex = (
       }),
     ...overrides
   } satisfies TicketIndexShape)
+}
 
 const makeRecordingTicketIndex = (documents: Map<string, TicketDocument>) => {
   const calls: Array<
@@ -641,6 +663,51 @@ it.effect("create keeps legacy T project ids readable and sequential", () => {
 
     expect(created.id).toBe("T-36")
     expect(documents.has("T-36")).toBe(true)
+  }).pipe(Effect.provide(layer))
+})
+
+it.effect(
+  "create advances past an unindexed file collision without scanning the ticket directory",
+  () => {
+    const docs = makeFakeTicketDocs(["FOO-2"])
+    const indexed = new Map([["FOO-1", makeTicketDocument("FOO-1")]])
+    const layer = makeTicketsLayer("FOO", docs.layer, {
+      ticketIndex: makeFakeTicketIndex(indexed, {
+        listIds: () => unexpected("TicketIndex.listIds")
+      })
+    })
+
+    return Effect.gen(function* () {
+      const tickets = yield* Tickets
+      const created = yield* tickets.create("org", "user-1", "p", {
+        title: "Skip stale collision"
+      })
+
+      expect(created.id).toBe("FOO-3")
+      expect(docs.documents.has("FOO-3")).toBe(true)
+    }).pipe(Effect.provide(layer))
+  }
+)
+
+it.effect("ticket mention validation trusts the ticket index", () => {
+  const docs = makeFakeTicketDocs(["T-1"])
+  const layer = makeTicketsLayer("T", docs.layer, {
+    ticketIndex: makeFakeTicketIndex(new Map())
+  })
+
+  return Effect.gen(function* () {
+    const tickets = yield* Tickets
+    const error = yield* tickets
+      .create("org", "user-1", "p", {
+        title: "Reference a ticket",
+        body: "See [T-1](mention:ticket/T-1)."
+      })
+      .pipe(Effect.flip)
+
+    expect(error).toMatchObject({
+      _tag: "MentionInvalid",
+      kind: "unknown_ticket"
+    })
   }).pipe(Effect.provide(layer))
 })
 

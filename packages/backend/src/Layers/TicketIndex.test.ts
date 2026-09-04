@@ -45,6 +45,7 @@ const doc = (
   createdAt: at("2026-05-01T00:00:00.000Z"),
   updatedAt: at(updatedAt),
   body: "",
+  commentsRegion: "",
   ...overrides
 })
 

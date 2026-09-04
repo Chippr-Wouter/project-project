@@ -101,10 +101,10 @@ export const GroupsLive = Layer.effect(
     ): Effect.Effect<void, NotFound | MarkdownError> =>
       Effect.gen(function* () {
         if (ticketIds.length === 0) return
-        const existing = yield* ticketDocs.listIds(orgSlug, slug)
-        const set = new Set<string>(existing)
+        const project = yield* ticketIndex.projectFor(orgSlug, slug)
+        const existing = yield* ticketIndex.existingIds(project, ticketIds)
         for (const id of ticketIds) {
-          if (!set.has(id)) {
+          if (!existing.has(id)) {
             return yield* new NotFound()
           }
         }
@@ -578,21 +578,27 @@ export const GroupsLive = Layer.effect(
           const now = yield* DateTime.nowAsDate
 
           if (input.status !== undefined) {
+            const status = input.status
             const indexProject = yield* ticketIndex.projectFor(orgSlug, slug)
-            const ticket = yield* ticketDocs
-              .read(orgSlug, slug, input.ticketId)
+            let changed = false
+            const next = yield* ticketDocs
+              .update(orgSlug, slug, input.ticketId, (ticket) => {
+                if (ticket.status === status) {
+                  return Effect.succeed(ticket)
+                }
+                changed = true
+                return Effect.succeed({
+                  ...ticket,
+                  status,
+                  updatedAt: now
+                })
+              })
               .pipe(
                 Effect.catchTag("MalformedTicketDocument", () =>
                   Effect.fail(new NotFound())
                 )
               )
-            if (ticket.status !== input.status) {
-              const next = {
-                ...ticket,
-                status: input.status,
-                updatedAt: now
-              }
-              yield* ticketDocs.write(orgSlug, slug, input.ticketId, next)
+            if (changed) {
               yield* ticketIndex.upsertTicket(indexProject, next)
             }
           }

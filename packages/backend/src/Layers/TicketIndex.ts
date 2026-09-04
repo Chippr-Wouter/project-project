@@ -2,7 +2,15 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
 import * as SqlClient from "@effect/sql/SqlClient"
-import { and, eq, inArray, isNull, lt, or } from "drizzle-orm"
+import {
+  and,
+  eq,
+  inArray,
+  isNull,
+  lt,
+  or,
+  sql as drizzleSql
+} from "drizzle-orm"
 import {
   NotFound,
   TagName,
@@ -29,6 +37,15 @@ import { TicketDocs, type TicketDocument } from "../Services/TicketDocs"
 
 const makeTicketId = Schema.decodeUnknownSync(TicketId)
 const makeTagName = Schema.decodeUnknownSync(TagName)
+
+const nextTicketNumberFor = (
+  documents: ReadonlyArray<TicketDocument>
+): number =>
+  documents.reduce((next, document) => {
+    const dash = document.id.lastIndexOf("-")
+    const number = Number(document.id.slice(dash + 1))
+    return Number.isSafeInteger(number) ? Math.max(next, number + 1) : next
+  }, 1)
 
 export interface IndexedTicketRef {
   readonly ticketId: string
@@ -270,6 +287,49 @@ export const TicketIndexLive = Layer.effect(
           Effect.orDie
         )
 
+    const existingIds = (
+      project: TicketIndexProject,
+      ticketIds: ReadonlyArray<string>
+    ): Effect.Effect<ReadonlySet<string>> => {
+      if (ticketIds.length === 0) return Effect.succeed(new Set())
+      return db
+        .select({ ticketId: ticketIndex.ticketId })
+        .from(ticketIndex)
+        .where(
+          and(
+            eq(ticketIndex.projectId, project.projectId),
+            inArray(ticketIndex.ticketId, [...ticketIds])
+          )
+        )
+        .pipe(
+          Effect.map((rows) => new Set(rows.map((row) => row.ticketId))),
+          Effect.orDie
+        )
+    }
+
+    const reserveTicketNumber = (
+      project: TicketIndexProject
+    ): Effect.Effect<number> =>
+      db
+        .update(projectIndex)
+        .set({
+          nextTicketNumber: drizzleSql`${projectIndex.nextTicketNumber} + 1`
+        })
+        .where(eq(projectIndex.id, project.projectId))
+        .returning({ value: projectIndex.nextTicketNumber })
+        .pipe(
+          Effect.flatMap((rows) => {
+            const value = rows[0]?.value
+            if (value === undefined) {
+              return Effect.die(
+                new Error(`project not found: ${project.projectId}`)
+              )
+            }
+            return Effect.succeed(value - 1)
+          }),
+          Effect.orDie
+        )
+
     const tagUsageCounts = (
       project: TicketIndexProject
     ): Effect.Effect<Readonly<Record<string, number>>> =>
@@ -508,6 +568,13 @@ export const TicketIndexLive = Layer.effect(
                 .values(documents.map((document) => rowFor(project, document)))
                 .pipe(Effect.asVoid, Effect.orDie)
             }
+            yield* db
+              .update(projectIndex)
+              .set({
+                nextTicketNumber: drizzleSql`greatest(${projectIndex.nextTicketNumber}, ${nextTicketNumberFor(documents)})`
+              })
+              .where(eq(projectIndex.id, project.projectId))
+              .pipe(Effect.asVoid, Effect.orDie)
           })
         )
         .pipe(Effect.catchTag("SqlError", Effect.die), Effect.asVoid)
@@ -560,6 +627,8 @@ export const TicketIndexLive = Layer.effect(
       projectFor,
       list,
       listIds,
+      existingIds,
+      reserveTicketNumber,
       tagUsageCounts,
       findTicketIdsByTag,
       findTicketIdsByStatus,
