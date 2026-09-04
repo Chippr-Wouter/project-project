@@ -405,72 +405,98 @@ describe("credentialFor without oauth configuration", () => {
   )
 })
 
-const recordingDb = () => {
-  const calls: Array<{ readonly sql: string }> = []
+const proxyDb = (rows: ReadonlyArray<ReadonlyArray<unknown>> = []) => {
+  const calls: Array<{
+    readonly sql: string
+    readonly params: ReadonlyArray<unknown>
+  }> = []
   const db = drizzle(
-    async (sql: string) => {
-      calls.push({ sql })
-      return { rows: [] }
+    async (sql: string, params: Array<unknown>) => {
+      calls.push({ sql, params })
+      return { rows: rows.map((row) => [...row]) }
     },
     { schema }
   )
   return { calls, db }
 }
 
-describe("consumeOauthStateQuery", () => {
-  const { db } = recordingDb()
-  const state = "raw-state-value"
-  const built = consumeOauthStateQuery(
-    db,
+const whereClauseOf = (sql: string): string => {
+  const afterWhere = sql.slice(sql.indexOf(" where ") + " where ".length)
+  return afterWhere.slice(0, afterWhere.lastIndexOf(" returning ")).trim()
+}
+
+const STATE = "raw-state-value"
+
+const STATE_HASH = createHash("sha256").update(STATE).digest("hex")
+
+const CONSUME_WHERE_CLAUSE =
+  '("user_figma_oauth_state"."state_hash" = $2 and ' +
+  '"user_figma_oauth_state"."user_id" = $3 and ' +
+  '"user_figma_oauth_state"."consumed_at" is null and ' +
+  '"user_figma_oauth_state"."expires_at" > $4)'
+
+const consumeQuery = () =>
+  consumeOauthStateQuery(
+    proxyDb().db,
     "user-1",
-    state,
+    STATE,
     at("2026-09-04T12:00:00Z")
-  ).toSQL()
+  )
 
-  it("rejects an already-consumed state by guarding on consumed_at", () => {
-    expect(built.sql).toContain('"consumed_at" is null')
+describe("oauth state replay defences", () => {
+  it("requires every replay guard to hold at once, not any one of them", () => {
+    expect(whereClauseOf(consumeQuery().toSQL().sql)).toBe(CONSUME_WHERE_CLAUSE)
   })
 
-  it("rejects an expired state by guarding on expires_at", () => {
-    expect(built.sql).toContain('"expires_at" >')
+  it("consumes the state in the same statement that guards it", () => {
+    const built = consumeQuery().toSQL()
+    expect(built.sql.startsWith('update "user_figma_oauth_state" set ')).toBe(
+      true
+    )
+    expect(built.sql).toContain('set "consumed_at" = $1')
+    expect(built.sql.endsWith('returning "id"')).toBe(true)
   })
 
-  it("rejects another user's state by guarding on user_id", () => {
-    expect(built.sql).toContain('"user_id" =')
-    expect(built.params).toContain("user-1")
+  it("never sends the raw state to the database", () => {
+    const built = consumeQuery().toSQL()
+    expect(built.params).toContain(STATE_HASH)
+    expect(built.params).not.toContain(STATE)
+    expect(built.sql).not.toContain(STATE)
   })
 
-  it("marks the row consumed and returns it in one statement", () => {
-    expect(built.sql).toContain("update")
-    expect(built.sql).toContain('set "consumed_at"')
-    expect(built.sql).toContain("returning")
-  })
-
-  it("matches on the state hash and never sends the raw state", () => {
-    const hashed = createHash("sha256").update(state).digest("hex")
-    expect(built.params).toContain(hashed)
-    expect(built.params).not.toContain(state)
-    expect(built.sql).not.toContain(state)
-  })
-})
-
-describe("requireConsumedState", () => {
-  it.effect("fails FigmaAuthInvalid when no row was consumed", () =>
+  it.effect("rejects a state the guarded update did not match", () =>
     Effect.gen(function* () {
-      const error = yield* Effect.flip(requireConsumedState([]))
+      const { calls, db } = proxyDb([])
+      const consumed = yield* Effect.promise(() =>
+        consumeOauthStateQuery(db, "user-1", STATE, at("2026-09-04T12:00:00Z"))
+      )
+
+      const error = yield* Effect.flip(requireConsumedState(consumed))
+
       expect(Schema.is(FigmaAuthInvalid)(error)).toBe(true)
+      expect(calls).toHaveLength(1)
+      expect(whereClauseOf(calls[0]!.sql)).toBe(CONSUME_WHERE_CLAUSE)
+      expect(calls[0]!.params).toContain(STATE_HASH)
     })
   )
 
-  it.effect("succeeds when exactly one row was consumed", () =>
-    requireConsumedState([{ id: "state-1" }])
+  it.effect("accepts a state the guarded update claimed exactly once", () =>
+    Effect.gen(function* () {
+      const { db } = proxyDb([["state-1"]])
+      const consumed = yield* Effect.promise(() =>
+        consumeOauthStateQuery(db, "user-1", STATE, at("2026-09-04T12:00:00Z"))
+      )
+
+      expect(consumed).toEqual([{ id: "state-1" }])
+      yield* requireConsumedState(consumed)
+    })
   )
 })
 
 describe("startOauthFlow", () => {
   it.effect("fails FigmaError and writes no state row when unconfigured", () =>
     Effect.gen(function* () {
-      const { calls, db } = recordingDb()
+      const { calls, db } = proxyDb()
       const error = yield* Effect.flip(
         startOauthFlow({
           db,
