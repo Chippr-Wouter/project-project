@@ -79,6 +79,9 @@ function RowImpl({
       onPreviewOpenChange(activePreviewId, false)
     }
   }
+  const handleTitlePointerLeave = () => {
+    onPreviewOpenChange(ticket.id, false)
+  }
   return (
     <div className="group/list-row col-span-full grid grid-cols-subgrid">
       <Popover
@@ -143,6 +146,7 @@ function RowImpl({
                   onKeyUp={undefined}
                   onPointerDown={undefined}
                   onPointerEnter={handleTitlePointerEnter}
+                  onPointerLeave={handleTitlePointerLeave}
                   className="flex min-w-0 flex-1 self-stretch items-center"
                 />
               )}
@@ -192,6 +196,7 @@ function RowImpl({
           ticketId={ticket.id}
           scope={{ orgSlug, slug, members }}
           anchor={rowElement}
+          interactive={false}
         />
       </Popover>
     </div>

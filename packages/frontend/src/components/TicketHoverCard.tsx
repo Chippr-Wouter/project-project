@@ -46,11 +46,13 @@ const TicketHoverCardError = () => (
 export function TicketHoverCard({
   ticketId,
   scope,
-  anchor
+  anchor,
+  interactive = true
 }: {
   ticketId: TicketId
   scope: TicketHoverCardScope
   anchor?: ComponentProps<typeof PopoverContent>["anchor"]
+  interactive?: boolean
 }) {
   const result = useAtomValue(
     ticketAtom(ticketKey(scope.orgSlug, scope.slug, ticketId))
@@ -65,7 +67,11 @@ export function TicketHoverCard({
     : EMPTY_STATUSES
 
   return (
-    <PopoverContent className="w-80" align="start" anchor={anchor}>
+    <PopoverContent
+      className={cn("w-80", !interactive && "pointer-events-none")}
+      align="start"
+      anchor={anchor}
+    >
       {Result.matchWithError(result, {
         onInitial: () => <CardSkeleton />,
         onError: () => <TicketHoverCardError />,
@@ -84,7 +90,7 @@ export function TicketHoverCard({
                   <Markdown className="line-clamp-6 text-xs leading-relaxed text-muted-foreground [&_*]:!my-0 [&_pre]:!my-1">
                     {body}
                   </Markdown>
-                  {isOverflowing && (
+                  {isOverflowing && interactive && (
                     <>
                       <div
                         aria-hidden
