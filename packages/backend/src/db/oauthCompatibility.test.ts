@@ -170,7 +170,7 @@ describe.skipIf(!databaseUrl)("MCP OAuth provider compatibility", () => {
   it("migrates malformed legacy metadata without copying clients missing redirects", async () => {
     const migration = await Effect.runPromise(
       filesystem.readFileString(
-        `${import.meta.dirname}/migrations/0029_better_auth_17.sql`
+        `${import.meta.dirname}/migrations/20260907091000_better_auth_17/migration.sql`
       )
     )
     const backfill = migration

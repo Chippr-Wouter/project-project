@@ -1,4 +1,4 @@
-import { and, eq, max } from "drizzle-orm"
+import { and, eq, sql } from "drizzle-orm"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import { NotFound, type OAuthApplication } from "@projectproject/shared"
@@ -26,7 +26,9 @@ export const OAuthApplicationsLive = Layer.effect(
         const access = db
           .select({
             clientId: oauthAccessToken.clientId,
-            lastUsedAt: max(oauthAccessToken.createdAt).as("last_access_at")
+            lastUsedAt: sql<Date | null>`max(${oauthAccessToken.createdAt})`.as(
+              "last_access_at"
+            )
           })
           .from(oauthAccessToken)
           .where(eq(oauthAccessToken.userId, userId))
@@ -35,7 +37,10 @@ export const OAuthApplicationsLive = Layer.effect(
         const refresh = db
           .select({
             clientId: oauthRefreshToken.clientId,
-            lastUsedAt: max(oauthRefreshToken.createdAt).as("last_refresh_at")
+            lastUsedAt:
+              sql<Date | null>`max(${oauthRefreshToken.createdAt})`.as(
+                "last_refresh_at"
+              )
           })
           .from(oauthRefreshToken)
           .where(eq(oauthRefreshToken.userId, userId))
