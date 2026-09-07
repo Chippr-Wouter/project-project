@@ -53,7 +53,7 @@
   "profile_connect_mcp_caveat": "Replace the URL with your own deployment if it differs.",
   "profile_connect_mcp_claude_description": "Adds an HTTP MCP server entry. The CLI walks you through the OAuth flow on first use.",
   "profile_connect_mcp_claude_label": "Claude Code",
-  "profile_connect_mcp_codex_description": "Codex talks to MCP over stdio, so we bridge through mcp-remote. Add this to ~/.codex/config.toml.",
+  "profile_connect_mcp_codex_description": "Add this to ~/.codex/config.toml, then run codex mcp login projectproject to connect your account.",
   "profile_connect_mcp_codex_label": "Codex CLI",
   "profile_connect_mcp_gemini_description": "Add this entry to ~/.gemini/settings.json. The CLI handles OAuth on first request.",
   "profile_connect_mcp_gemini_label": "Gemini CLI",
