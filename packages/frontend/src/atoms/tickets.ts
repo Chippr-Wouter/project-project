@@ -319,7 +319,9 @@ const ticketRemoteAtom = Atom.family((key: string) => {
 })
 
 const ticketUpdateBaseAtom = Atom.family((_key: string) =>
-  Atom.make<UpdateTicketInput>({}).pipe(Atom.setIdleTTL("2 minutes"))
+  Atom.readable<UpdateTicketInput>(() => ({})).pipe(
+    Atom.setIdleTTL("2 minutes")
+  )
 )
 
 const optimisticTicketUpdateAtom = Atom.family((key: string) =>
@@ -345,7 +347,9 @@ export const updateTicketAtom = Atom.family((key: string) => {
         const remote = ticketRemoteAtom(ticketKey(orgSlug, slug, id))
         get.refresh(remote)
         yield* Reactivity.invalidate(["tickets", orgSlug, slug])
-        yield* get.result(remote, { suspendOnWaiting: true }).pipe(Effect.ignore)
+        yield* get
+          .result(remote, { suspendOnWaiting: true })
+          .pipe(Effect.ignore)
         return updated
       })
     )
@@ -353,8 +357,12 @@ export const updateTicketAtom = Atom.family((key: string) => {
 })
 
 const ticketDetailBaseAtom = Atom.family((key: string) =>
+  Atom.optimistic(ticketRemoteAtom(key)).pipe(Atom.setIdleTTL("2 minutes"))
+)
+
+export const ticketAtom = Atom.family((key: string) =>
   Atom.readable((get) => {
-    const remote = get(ticketRemoteAtom(key))
+    const remote = get(ticketDetailBaseAtom(key))
     if (!Result.isSuccess(remote)) return remote
     const input = get(optimisticTicketUpdateAtom(key))
     const mutation = get(updateTicketAtom(key))
@@ -365,15 +373,11 @@ const ticketDetailBaseAtom = Atom.family((key: string) =>
     return mutation.waiting || statusMutation.waiting
       ? Result.waiting(updated)
       : updated
-  })
-)
-
-export const ticketAtom = Atom.family((key: string) =>
-  Atom.optimistic(ticketDetailBaseAtom(key)).pipe(Atom.setIdleTTL("2 minutes"))
+  }).pipe(Atom.setIdleTTL("2 minutes"))
 )
 
 export const hydrateTicketAtom = Atom.family((key: string) =>
-  Atom.optimisticFn(ticketAtom(key), {
+  Atom.optimisticFn(ticketDetailBaseAtom(key), {
     reducer: (_current, ticket: TicketDetail) => Result.success(ticket),
     fn: runtime.fn(
       Effect.fn(function* (_ticket: TicketDetail, get) {
@@ -589,7 +593,7 @@ export const ticketSearchAtom = Atom.family((key: string) => {
 
 export const archiveTicketAtom = Atom.family((key: string) => {
   const { orgSlug, slug, id } = splitTicketKey(key)
-  return Atom.optimisticFn(ticketAtom(key), {
+  return Atom.optimisticFn(ticketDetailBaseAtom(key), {
     reducer: (current, _input: { reason?: string }) =>
       Result.isSuccess(current)
         ? Result.success(
@@ -619,7 +623,7 @@ export const archiveTicketAtom = Atom.family((key: string) => {
 
 export const unarchiveTicketAtom = Atom.family((key: string) => {
   const { orgSlug, slug, id } = splitTicketKey(key)
-  return Atom.optimisticFn(ticketAtom(key), {
+  return Atom.optimisticFn(ticketDetailBaseAtom(key), {
     reducer: (current, _input: void) =>
       Result.isSuccess(current)
         ? Result.success(

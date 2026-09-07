@@ -1,18 +1,15 @@
-import { Registry } from "@effect-atom/atom-react"
-import { describe, expect, it } from "vitest"
+import { Registry, Result } from "@effect-atom/atom-react"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import * as DateTime from "effect/DateTime"
 import * as Schema from "effect/Schema"
-import {
-  TicketId,
-  TicketStatus,
-  type TicketDetail
-} from "@projectproject/shared"
+import { TicketId, TicketStatus, TicketDetail } from "@projectproject/shared"
 import {
   applyOptimisticTicketPreview,
   applyOptimisticTicketUpdate,
   hydrateTicketAtom,
   ticketAtom,
   ticketKey,
+  ticketsListKeyForStatus,
   ticketUpdatePreviewAtom,
   updateTicketAtom,
   updateTicketStatusAtom
@@ -37,6 +34,8 @@ const ticket = {
   updatedAt: DateTime.toDate(DateTime.unsafeMake("2026-01-01T00:00:00.000Z")),
   body: "Before"
 } satisfies TicketDetail
+
+afterEach(() => vi.unstubAllGlobals())
 
 describe("applyOptimisticTicketUpdate", () => {
   it("applies the visible patch while preserving server-owned fields", () => {
@@ -123,5 +122,163 @@ describe("applyOptimisticTicketUpdate", () => {
       waiting: true
     })
     registry.dispose()
+  })
+
+  it.each(["fields", "status"] as const)(
+    "shows pending %s edits and releases them after confirmation",
+    async (kind) => {
+      const registry = Registry.make()
+      const key = ticketKey("org", "project", ticket.id)
+      const detail = ticketAtom(key)
+      const preview = ticketUpdatePreviewAtom(key)
+      let server: TicketDetail = ticket
+      let finishUpdate: (response: Response) => void = vi.fn()
+      const response = () =>
+        Response.json(Schema.encodeSync(TicketDetail)(server))
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((_input: RequestInfo | URL, init?: RequestInit) =>
+          init?.method === "PATCH"
+            ? new Promise<Response>((resolve) => {
+                finishUpdate = resolve
+              })
+            : Promise.resolve(response())
+        )
+      )
+      registry.mount(detail)
+      registry.mount(preview)
+      try {
+        await vi.waitFor(() =>
+          expect(registry.get(detail)).toMatchObject({
+            _tag: "Success",
+            value: ticket,
+            waiting: false
+          })
+        )
+        const status = Schema.decodeUnknownSync(TicketStatus)("in_progress")
+        const patch = kind === "fields" ? { title: "After" } : { status }
+        const mutation =
+          kind === "fields"
+            ? updateTicketAtom(key)
+            : updateTicketStatusAtom(key)
+        if (kind === "fields") {
+          registry.set(updateTicketAtom(key), patch)
+        } else {
+          const query = { sort: { key: "id", dir: "asc" } } as const
+          registry.set(updateTicketStatusAtom(key), {
+            status,
+            sourceSectionKey: ticketsListKeyForStatus(
+              "org",
+              "project",
+              query,
+              ticket.status
+            ),
+            destSectionKey: ticketsListKeyForStatus(
+              "org",
+              "project",
+              query,
+              status
+            )
+          })
+        }
+        expect(registry.get(detail)).toMatchObject({
+          _tag: "Success",
+          value: { ...ticket, ...patch },
+          waiting: true
+        })
+        await vi.waitFor(() =>
+          expect(fetch).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({ method: "PATCH" })
+          )
+        )
+        server = { ...server, ...patch }
+        finishUpdate(response())
+        await vi.waitFor(() =>
+          expect(registry.get(mutation).waiting).toBe(false)
+        )
+        expect(registry.get(preview)).toEqual({ input: {}, waiting: false })
+        expect(registry.get(detail)).toMatchObject({
+          value: server,
+          waiting: false
+        })
+
+        server = {
+          ...server,
+          title: "Changed by another user",
+          status: ticket.status
+        }
+        registry.set(updateTicketAtom(key), { priority: "high" })
+        await vi.waitFor(() =>
+          expect(
+            vi
+              .mocked(fetch)
+              .mock.calls.filter(([, init]) => init?.method === "PATCH")
+          ).toHaveLength(2)
+        )
+        server = { ...server, priority: "high" }
+        finishUpdate(response())
+        await vi.waitFor(() =>
+          expect(registry.get(updateTicketAtom(key)).waiting).toBe(false)
+        )
+        expect(registry.get(detail)).toMatchObject({
+          value: server,
+          waiting: false
+        })
+        expect(registry.get(preview)).toEqual({ input: {}, waiting: false })
+      } finally {
+        registry.dispose()
+      }
+    }
+  )
+
+  it("rolls back a rejected detail edit", async () => {
+    const registry = Registry.make()
+    const key = ticketKey("org", "project", ticket.id)
+    const detail = ticketAtom(key)
+    let rejectUpdate: (error: Error) => void = vi.fn()
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_input: RequestInfo | URL, init?: RequestInit) =>
+        init?.method === "PATCH"
+          ? new Promise<Response>((_resolve, reject) => {
+              rejectUpdate = reject
+            })
+          : Promise.resolve(
+              Response.json(Schema.encodeSync(TicketDetail)(ticket))
+            )
+      )
+    )
+    registry.mount(detail)
+    try {
+      await vi.waitFor(() =>
+        expect(Result.isSuccess(registry.get(detail))).toBe(true)
+      )
+      registry.set(updateTicketAtom(key), { title: "Rejected" })
+      expect(registry.get(detail)).toMatchObject({
+        value: { title: "Rejected" },
+        waiting: true
+      })
+      await vi.waitFor(() =>
+        expect(fetch).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ method: "PATCH" })
+        )
+      )
+      rejectUpdate(new Error("offline"))
+      await vi.waitFor(() =>
+        expect(Result.isFailure(registry.get(updateTicketAtom(key)))).toBe(true)
+      )
+      expect(registry.get(detail)).toMatchObject({
+        value: ticket,
+        waiting: false
+      })
+      expect(registry.get(ticketUpdatePreviewAtom(key))).toEqual({
+        input: {},
+        waiting: false
+      })
+    } finally {
+      registry.dispose()
+    }
   })
 })
