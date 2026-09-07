@@ -294,6 +294,9 @@ export function useStableTicketKeys(
   const justSettled = prevWaitingRef.current && !waiting
   const prevItems = prevItemsRef.current
   const currIds = new Set(items.map((t) => t.id))
+  const usedKeys = new Set(
+    [...entriesRef.current.values()].map(({ key }) => key)
+  )
 
   const states = items.map<RowState>((t, idx) => {
     const existing = entriesRef.current.get(t.id)
@@ -314,16 +317,15 @@ export function useStableTicketKeys(
           key: inheritedKey,
           bornWaiting: false
         })
+        usedKeys.add(inheritedKey)
         return { key: inheritedKey, pending: false }
       }
     }
-    const usedKeys = new Set(
-      [...entriesRef.current.values()].map(({ key }) => key)
-    )
     const key = usedKeys.has(t.id)
       ? `${t.id}:${++keySequenceRef.current}`
       : t.id
     entriesRef.current.set(t.id, { key, bornWaiting: waiting })
+    usedKeys.add(key)
     return { key, pending: waiting }
   })
 

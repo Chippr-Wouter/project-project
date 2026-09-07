@@ -1,0 +1,1698 @@
+{
+  "before": {
+    "reloads": [
+      {
+        "port": 4188,
+        "longTasks": [
+          {
+            "duration": 72,
+            "start": 65.5
+          },
+          {
+            "duration": 165,
+            "start": 248.90000000596046
+          },
+          {
+            "duration": 123,
+            "start": 695.8000000119209
+          }
+        ],
+        "measures": [],
+        "ready": {
+          "loaded": [
+            50,
+            50,
+            50
+          ],
+          "mounted": [
+            15,
+            7,
+            7
+          ],
+          "ms": 818.3000000119209
+        },
+        "resources": [
+          {
+            "ms": 229,
+            "url": "http://localhost:4188/api/orgs/measure"
+          },
+          {
+            "ms": 209.09999999403954,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand"
+          },
+          {
+            "ms": 182.2000000178814,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/groups"
+          },
+          {
+            "ms": 326.59999999403954,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets/count"
+          },
+          {
+            "ms": 182.7999999821186,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/statuses"
+          },
+          {
+            "ms": 262.69999998807907,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=todo"
+          },
+          {
+            "ms": 234,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=in_progress"
+          },
+          {
+            "ms": 250.39999997615814,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=done"
+          },
+          {
+            "ms": 8.800000011920929,
+            "url": "http://localhost:4188/api/me"
+          }
+        ],
+        "size": [
+          1402,
+          876
+        ],
+        "text": "Dashboard\nProjects\nSetup\nReview workflow\nInvite people\nConnect GitHub\nSystem\nProjects\n10,000 tickets\nM\nLayers\n10,000 tickets\n\n/ten-thousand\n\nConnect repo\nBacklog\n10000\n3334\n3333\n3333\nSprints\n0\n0\n0\n0\nAbout\nc\n/\nAll\n10000\nFilters\nRecently created\nTodo\n3"
+      },
+      {
+        "port": 4189,
+        "longTasks": [
+          {
+            "duration": 140,
+            "start": 148.40000000596046
+          },
+          {
+            "duration": 215,
+            "start": 526.9000000059605
+          },
+          {
+            "duration": 801,
+            "start": 764.0999999940395
+          }
+        ],
+        "measures": [
+          {
+            "ms": 144.80000001192093,
+            "name": "replica-hydrate"
+          }
+        ],
+        "ready": {
+          "loaded": [
+            3334,
+            3333,
+            3333
+          ],
+          "mounted": [
+            15,
+            7,
+            7
+          ],
+          "ms": 1564.9000000059605
+        },
+        "resources": [
+          {
+            "ms": 381.2999999821186,
+            "url": "http://localhost:4189/api/orgs/measure"
+          },
+          {
+            "ms": 444.2999999821186,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand"
+          },
+          {
+            "ms": 424.69999998807907,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand/groups"
+          },
+          {
+            "ms": 429.40000000596046,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand/statuses"
+          },
+          {
+            "ms": 13.699999988079071,
+            "url": "http://localhost:4189/api/me"
+          }
+        ],
+        "size": [
+          1402,
+          876
+        ],
+        "text": "Dashboard\nProjects\nSetup\nReview workflow\nInvite people\nConnect GitHub\nSystem\nProjects\n10,000 tickets\nM\nLayers\n10,000 tickets\n\n/ten-thousand\n\nConnect repo\nBacklog\n10000\n3334\n3333\n3333\nSprints\n0\n0\n0\n0\nAbout\nc\n/\nAll\n10000\nFilters\nRecently created\nTodo\n3"
+      },
+      {
+        "port": 4189,
+        "longTasks": [
+          {
+            "duration": 69,
+            "start": 106.7000000178814
+          },
+          {
+            "duration": 141,
+            "start": 207.40000000596046
+          },
+          {
+            "duration": 219,
+            "start": 449.90000000596046
+          },
+          {
+            "duration": 964,
+            "start": 700
+          }
+        ],
+        "measures": [
+          {
+            "ms": 155.69999998807907,
+            "name": "replica-hydrate"
+          }
+        ],
+        "ready": {
+          "loaded": [
+            3334,
+            3333,
+            3333
+          ],
+          "mounted": [
+            15,
+            7,
+            7
+          ],
+          "ms": 1663.5
+        },
+        "resources": [
+          {
+            "ms": 338.19999998807907,
+            "url": "http://localhost:4189/api/orgs/measure"
+          },
+          {
+            "ms": 346.5,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand"
+          },
+          {
+            "ms": 314.80000001192093,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand/groups"
+          },
+          {
+            "ms": 314.09999999403954,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand/statuses"
+          },
+          {
+            "ms": 21,
+            "url": "http://localhost:4189/api/me"
+          }
+        ],
+        "size": [
+          1402,
+          876
+        ],
+        "text": "Dashboard\nProjects\nSetup\nReview workflow\nInvite people\nConnect GitHub\nSystem\nProjects\n10,000 tickets\nM\nLayers\n10,000 tickets\n\n/ten-thousand\n\nConnect repo\nBacklog\n10000\n3334\n3333\n3333\nSprints\n0\n0\n0\n0\nAbout\nc\n/\nAll\n10000\nFilters\nRecently created\nTodo\n3"
+      },
+      {
+        "port": 4188,
+        "longTasks": [
+          {
+            "duration": 75,
+            "start": 101.19999998807907
+          },
+          {
+            "duration": 226,
+            "start": 426.59999999403954
+          },
+          {
+            "duration": 157,
+            "start": 2281.699999988079
+          }
+        ],
+        "measures": [],
+        "ready": {
+          "loaded": [
+            50,
+            50,
+            50
+          ],
+          "mounted": [
+            15,
+            7,
+            7
+          ],
+          "ms": 2438.899999976158
+        },
+        "resources": [
+          {
+            "ms": 282.40000000596046,
+            "url": "http://localhost:4188/api/orgs/measure"
+          },
+          {
+            "ms": 543.0999999940395,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand"
+          },
+          {
+            "ms": 302.7999999821186,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/groups"
+          },
+          {
+            "ms": 794.5999999940395,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets/count"
+          },
+          {
+            "ms": 297.09999999403954,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/statuses"
+          },
+          {
+            "ms": 1385.2999999821186,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=todo"
+          },
+          {
+            "ms": 1471.3999999761581,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=in_progress"
+          },
+          {
+            "ms": 1427.699999988079,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=done"
+          },
+          {
+            "ms": 148.90000000596046,
+            "url": "http://localhost:4188/api/me"
+          }
+        ],
+        "size": [
+          1402,
+          876
+        ],
+        "text": "Dashboard\nProjects\nSetup\nReview workflow\nInvite people\nConnect GitHub\nSystem\nProjects\n10,000 tickets\nM\nLayers\n10,000 tickets\n\n/ten-thousand\n\nConnect repo\nBacklog\n10000\n3334\n3333\n3333\nSprints\n0\n0\n0\n0\nAbout\nc\n/\nAll\n10000\nFilters\nRecently created\nTodo\n3"
+      },
+      {
+        "port": 4188,
+        "longTasks": [
+          {
+            "duration": 56,
+            "start": 109.30000001192093
+          },
+          {
+            "duration": 207,
+            "start": 341.59999999403954
+          },
+          {
+            "duration": 117,
+            "start": 1102.9000000059605
+          }
+        ],
+        "measures": [],
+        "ready": {
+          "loaded": [
+            50,
+            50,
+            50
+          ],
+          "mounted": [
+            15,
+            7,
+            7
+          ],
+          "ms": 1219.7000000178814
+        },
+        "resources": [
+          {
+            "ms": 199.90000000596046,
+            "url": "http://localhost:4188/api/orgs/measure"
+          },
+          {
+            "ms": 314.60000002384186,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand"
+          },
+          {
+            "ms": 191.69999998807907,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/groups"
+          },
+          {
+            "ms": 350,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets/count"
+          },
+          {
+            "ms": 207.89999997615814,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/statuses"
+          },
+          {
+            "ms": 518.8999999761581,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=todo"
+          },
+          {
+            "ms": 531.3999999761581,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=in_progress"
+          },
+          {
+            "ms": 501.09999999403954,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=done"
+          },
+          {
+            "ms": 11,
+            "url": "http://localhost:4188/api/me"
+          }
+        ],
+        "size": [
+          1402,
+          876
+        ],
+        "text": "Dashboard\nProjects\nSetup\nReview workflow\nInvite people\nConnect GitHub\nSystem\nProjects\n10,000 tickets\nM\nLayers\n10,000 tickets\n\n/ten-thousand\n\nConnect repo\nBacklog\n10000\n3334\n3333\n3333\nSprints\n0\n0\n0\n0\nAbout\nc\n/\nAll\n10000\nFilters\nRecently created\nTodo\n3"
+      },
+      {
+        "port": 4189,
+        "longTasks": [
+          {
+            "duration": 63,
+            "start": 82.7000000178814
+          },
+          {
+            "duration": 293,
+            "start": 166
+          },
+          {
+            "duration": 201,
+            "start": 488
+          },
+          {
+            "duration": 593,
+            "start": 699.8000000119209
+          }
+        ],
+        "measures": [
+          {
+            "ms": 290.19999998807907,
+            "name": "replica-hydrate"
+          }
+        ],
+        "ready": {
+          "loaded": [
+            3334,
+            3333,
+            3333
+          ],
+          "mounted": [
+            15,
+            7,
+            7
+          ],
+          "ms": 1292.6000000238419
+        },
+        "resources": [
+          {
+            "ms": 231.19999998807907,
+            "url": "http://localhost:4189/api/orgs/measure"
+          },
+          {
+            "ms": 223.40000000596046,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand"
+          },
+          {
+            "ms": 202.30000001192093,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand/groups"
+          },
+          {
+            "ms": 206,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand/statuses"
+          },
+          {
+            "ms": 11.100000023841858,
+            "url": "http://localhost:4189/api/me"
+          }
+        ],
+        "size": [
+          1402,
+          876
+        ],
+        "text": "Dashboard\nProjects\nSetup\nReview workflow\nInvite people\nConnect GitHub\nSystem\nProjects\n10,000 tickets\nM\nLayers\n10,000 tickets\n\n/ten-thousand\n\nConnect repo\nBacklog\n10000\n3334\n3333\n3333\nSprints\n0\n0\n0\n0\nAbout\nc\n/\nAll\n10000\nFilters\nRecently created\nTodo\n3"
+      },
+      {
+        "port": 4189,
+        "longTasks": [
+          {
+            "duration": 93,
+            "start": 116.19999998807907
+          },
+          {
+            "duration": 249,
+            "start": 241.89999997615814
+          },
+          {
+            "duration": 561,
+            "start": 498
+          }
+        ],
+        "measures": [
+          {
+            "ms": 92,
+            "name": "replica-hydrate"
+          }
+        ],
+        "ready": {
+          "loaded": [
+            3334,
+            3333,
+            3333
+          ],
+          "mounted": [
+            15,
+            7,
+            7
+          ],
+          "ms": 1059.5999999940395
+        },
+        "resources": [
+          {
+            "ms": 119,
+            "url": "http://localhost:4189/api/orgs/measure"
+          },
+          {
+            "ms": 117.7999999821186,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand"
+          },
+          {
+            "ms": 106.59999999403954,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand/groups"
+          },
+          {
+            "ms": 107.7999999821186,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand/statuses"
+          },
+          {
+            "ms": 7.199999988079071,
+            "url": "http://localhost:4189/api/me"
+          }
+        ],
+        "size": [
+          1402,
+          876
+        ],
+        "text": "Dashboard\nProjects\nSetup\nReview workflow\nInvite people\nConnect GitHub\nSystem\nProjects\n10,000 tickets\nM\nLayers\n10,000 tickets\n\n/ten-thousand\n\nConnect repo\nBacklog\n10000\n3334\n3333\n3333\nSprints\n0\n0\n0\n0\nAbout\nc\n/\nAll\n10000\nFilters\nRecently created\nTodo\n3"
+      },
+      {
+        "port": 4188,
+        "longTasks": [
+          {
+            "duration": 172,
+            "start": 281.40000000596046
+          },
+          {
+            "duration": 97,
+            "start": 647.5999999940395
+          }
+        ],
+        "measures": [],
+        "ready": {
+          "loaded": [
+            50,
+            50,
+            50
+          ],
+          "mounted": [
+            15,
+            7,
+            7
+          ],
+          "ms": 744.5
+        },
+        "resources": [
+          {
+            "ms": 193.80000001192093,
+            "url": "http://localhost:4188/api/orgs/measure"
+          },
+          {
+            "ms": 197.2999999821186,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand"
+          },
+          {
+            "ms": 178,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/groups"
+          },
+          {
+            "ms": 292,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets/count"
+          },
+          {
+            "ms": 184.40000000596046,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/statuses"
+          },
+          {
+            "ms": 178.40000000596046,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=todo"
+          },
+          {
+            "ms": 170,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=in_progress"
+          },
+          {
+            "ms": 160.69999998807907,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=done"
+          },
+          {
+            "ms": 6.200000017881393,
+            "url": "http://localhost:4188/api/me"
+          }
+        ],
+        "size": [
+          1402,
+          876
+        ],
+        "text": "Dashboard\nProjects\nSetup\nReview workflow\nInvite people\nConnect GitHub\nSystem\nProjects\n10,000 tickets\nM\nLayers\n10,000 tickets\n\n/ten-thousand\n\nConnect repo\nBacklog\n10000\n3334\n3333\n3333\nSprints\n0\n0\n0\n0\nAbout\nc\n/\nAll\n10000\nFilters\nRecently created\nTodo\n3"
+      },
+      {
+        "port": 4188,
+        "longTasks": [
+          {
+            "duration": 158,
+            "start": 223.89999997615814
+          },
+          {
+            "duration": 112,
+            "start": 607.6999999880791
+          }
+        ],
+        "measures": [],
+        "ready": {
+          "loaded": [
+            50,
+            50,
+            50
+          ],
+          "mounted": [
+            15,
+            7,
+            7
+          ],
+          "ms": 719.5999999940395
+        },
+        "resources": [
+          {
+            "ms": 154.40000000596046,
+            "url": "http://localhost:4188/api/orgs/measure"
+          },
+          {
+            "ms": 186.09999999403954,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand"
+          },
+          {
+            "ms": 137.7999999821186,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/groups"
+          },
+          {
+            "ms": 208.90000000596046,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets/count"
+          },
+          {
+            "ms": 137.90000000596046,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/statuses"
+          },
+          {
+            "ms": 207.5,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=todo"
+          },
+          {
+            "ms": 193.40000000596046,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=in_progress"
+          },
+          {
+            "ms": 181,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=done"
+          },
+          {
+            "ms": 9.200000017881393,
+            "url": "http://localhost:4188/api/me"
+          }
+        ],
+        "size": [
+          1402,
+          876
+        ],
+        "text": "Dashboard\nProjects\nSetup\nReview workflow\nInvite people\nConnect GitHub\nSystem\nProjects\n10,000 tickets\nM\nLayers\n10,000 tickets\n\n/ten-thousand\n\nConnect repo\nBacklog\n10000\n3334\n3333\n3333\nSprints\n0\n0\n0\n0\nAbout\nc\n/\nAll\n10000\nFilters\nRecently created\nTodo\n3"
+      },
+      {
+        "port": 4189,
+        "longTasks": [
+          {
+            "duration": 50,
+            "start": 86
+          },
+          {
+            "duration": 111,
+            "start": 158
+          },
+          {
+            "duration": 207,
+            "start": 487.40000000596046
+          },
+          {
+            "duration": 779,
+            "start": 709.5999999940395
+          }
+        ],
+        "measures": [
+          {
+            "ms": 110.40000000596046,
+            "name": "replica-hydrate"
+          }
+        ],
+        "ready": {
+          "loaded": [
+            3334,
+            3333,
+            3333
+          ],
+          "mounted": [
+            15,
+            7,
+            7
+          ],
+          "ms": 1489
+        },
+        "resources": [
+          {
+            "ms": 216.69999998807907,
+            "url": "http://localhost:4189/api/orgs/measure"
+          },
+          {
+            "ms": 211,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand"
+          },
+          {
+            "ms": 197.09999999403954,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand/groups"
+          },
+          {
+            "ms": 202.09999999403954,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand/statuses"
+          },
+          {
+            "ms": 14.800000011920929,
+            "url": "http://localhost:4189/api/me"
+          }
+        ],
+        "size": [
+          1402,
+          876
+        ],
+        "text": "Dashboard\nProjects\nSetup\nReview workflow\nInvite people\nConnect GitHub\nSystem\nProjects\n10,000 tickets\nM\nLayers\n10,000 tickets\n\n/ten-thousand\n\nConnect repo\nBacklog\n10000\n3334\n3333\n3333\nSprints\n0\n0\n0\n0\nAbout\nc\n/\nAll\n10000\nFilters\nRecently created\nTodo\n3"
+      }
+    ],
+    "navs": [
+      {
+        "port": 4189,
+        "samples": [
+          {
+            "api": 0,
+            "loaded": [
+              3334,
+              3333,
+              3333
+            ],
+            "ms": 457.7000000178814
+          },
+          {
+            "api": 0,
+            "loaded": [
+              3334,
+              3333,
+              3333
+            ],
+            "ms": 420.7999999821186
+          },
+          {
+            "api": 0,
+            "loaded": [
+              3334,
+              3333,
+              3333
+            ],
+            "ms": 418.5
+          },
+          {
+            "api": 0,
+            "loaded": [
+              3334,
+              3333,
+              3333
+            ],
+            "ms": 462.09999999403954
+          },
+          {
+            "api": 0,
+            "loaded": [
+              3334,
+              3333,
+              3333
+            ],
+            "ms": 411.90000000596046
+          }
+        ]
+      },
+      {
+        "port": 4188,
+        "samples": [
+          {
+            "api": 0,
+            "loaded": [
+              50,
+              50,
+              50
+            ],
+            "ms": 58.599999994039536
+          },
+          {
+            "api": 0,
+            "loaded": [
+              50,
+              50,
+              50
+            ],
+            "ms": 50.80000001192093
+          },
+          {
+            "api": 0,
+            "loaded": [
+              50,
+              50,
+              50
+            ],
+            "ms": 48.79999998211861
+          },
+          {
+            "api": 0,
+            "loaded": [
+              50,
+              50,
+              50
+            ],
+            "ms": 31.799999982118607
+          },
+          {
+            "api": 0,
+            "loaded": [
+              50,
+              50,
+              50
+            ],
+            "ms": 43.30000001192093
+          }
+        ]
+      }
+    ]
+  },
+  "after": {
+    "reloads": [
+      {
+        "port": 4188,
+        "longTasks": [
+          {
+            "duration": 185,
+            "start": 222.5
+          },
+          {
+            "duration": 107,
+            "start": 596.1999999880791
+          }
+        ],
+        "measures": [],
+        "ready": {
+          "loaded": [
+            50,
+            50,
+            50
+          ],
+          "mounted": [
+            15,
+            7,
+            7
+          ],
+          "ms": 703.2999999821186
+        },
+        "resources": [
+          {
+            "ms": 141.90000000596046,
+            "url": "http://localhost:4188/api/orgs/measure"
+          },
+          {
+            "ms": 168.7000000178814,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand"
+          },
+          {
+            "ms": 139.7999999821186,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/groups"
+          },
+          {
+            "ms": 209.40000000596046,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets/count"
+          },
+          {
+            "ms": 146,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/statuses"
+          },
+          {
+            "ms": 168.80000001192093,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=todo"
+          },
+          {
+            "ms": 157.40000000596046,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=in_progress"
+          },
+          {
+            "ms": 146.90000000596046,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=done"
+          },
+          {
+            "ms": 10.099999994039536,
+            "url": "http://localhost:4188/api/me"
+          }
+        ],
+        "size": [
+          1402,
+          876
+        ],
+        "text": "Dashboard\nProjects\nSetup\nReview workflow\nInvite people\nConnect GitHub\nSystem\nProjects\n10,000 tickets\nM\nLayers\n10,000 tickets\n\n/ten-thousand\n\nConnect repo\nBacklog\n10000\n3334\n3333\n3333\nSprints\n0\n0\n0\n0\nAbout\nc\n/\nAll\n10000\nFilters\nRecently created\nTodo\n3"
+      },
+      {
+        "port": 4189,
+        "longTasks": [
+          {
+            "duration": 97,
+            "start": 105.7999999821186
+          },
+          {
+            "duration": 160,
+            "start": 231.40000000596046
+          },
+          {
+            "duration": 113,
+            "start": 410.7999999821186
+          }
+        ],
+        "measures": [
+          {
+            "ms": 99.2000000178814,
+            "name": "replica-hydrate"
+          }
+        ],
+        "ready": {
+          "loaded": [
+            3334,
+            3333,
+            3333
+          ],
+          "mounted": [
+            15,
+            7,
+            7
+          ],
+          "ms": 523.5
+        },
+        "resources": [
+          {
+            "ms": 186.40000000596046,
+            "url": "http://localhost:4189/api/orgs/measure"
+          },
+          {
+            "ms": 178.7999999821186,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand"
+          },
+          {
+            "ms": 167.69999998807907,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand/groups"
+          },
+          {
+            "ms": 168,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand/statuses"
+          },
+          {
+            "ms": 8.799999982118607,
+            "url": "http://localhost:4189/api/me"
+          }
+        ],
+        "size": [
+          1402,
+          876
+        ],
+        "text": "Dashboard\nProjects\nSetup\nReview workflow\nInvite people\nConnect GitHub\nSystem\nProjects\n10,000 tickets\nM\nLayers\n10,000 tickets\n\n/ten-thousand\n\nConnect repo\nBacklog\n10000\n3334\n3333\n3333\nSprints\n0\n0\n0\n0\nAbout\nc\n/\nAll\n10000\nFilters\nRecently created\nTodo\n3"
+      },
+      {
+        "port": 4189,
+        "longTasks": [
+          {
+            "duration": 104,
+            "start": 114.40000000596046
+          },
+          {
+            "duration": 198,
+            "start": 234.5
+          },
+          {
+            "duration": 117,
+            "start": 455.09999999403954
+          }
+        ],
+        "measures": [
+          {
+            "ms": 102.59999999403954,
+            "name": "replica-hydrate"
+          }
+        ],
+        "ready": {
+          "loaded": [
+            3334,
+            3333,
+            3333
+          ],
+          "mounted": [
+            15,
+            7,
+            7
+          ],
+          "ms": 572.2999999821186
+        },
+        "resources": [
+          {
+            "ms": 176.40000000596046,
+            "url": "http://localhost:4189/api/orgs/measure"
+          },
+          {
+            "ms": 179.10000002384186,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand"
+          },
+          {
+            "ms": 165.39999997615814,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand/groups"
+          },
+          {
+            "ms": 169.7000000178814,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand/statuses"
+          },
+          {
+            "ms": 9.5,
+            "url": "http://localhost:4189/api/me"
+          }
+        ],
+        "size": [
+          1402,
+          876
+        ],
+        "text": "Dashboard\nProjects\nSetup\nReview workflow\nInvite people\nConnect GitHub\nSystem\nProjects\n10,000 tickets\nM\nLayers\n10,000 tickets\n\n/ten-thousand\n\nConnect repo\nBacklog\n10000\n3334\n3333\n3333\nSprints\n0\n0\n0\n0\nAbout\nc\n/\nAll\n10000\nFilters\nRecently created\nTodo\n3"
+      },
+      {
+        "port": 4188,
+        "longTasks": [
+          {
+            "duration": 191,
+            "start": 191.09999999403954
+          },
+          {
+            "duration": 134,
+            "start": 689.5
+          }
+        ],
+        "measures": [],
+        "ready": {
+          "loaded": [
+            50,
+            50,
+            50
+          ],
+          "mounted": [
+            15,
+            7,
+            7
+          ],
+          "ms": 823.6999999880791
+        },
+        "resources": [
+          {
+            "ms": 188,
+            "url": "http://localhost:4188/api/orgs/measure"
+          },
+          {
+            "ms": 209.40000000596046,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand"
+          },
+          {
+            "ms": 186.80000001192093,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/groups"
+          },
+          {
+            "ms": 311.69999998807907,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets/count"
+          },
+          {
+            "ms": 188,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/statuses"
+          },
+          {
+            "ms": 266.19999998807907,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=todo"
+          },
+          {
+            "ms": 227.09999999403954,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=in_progress"
+          },
+          {
+            "ms": 243.89999997615814,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=done"
+          },
+          {
+            "ms": 27.700000017881393,
+            "url": "http://localhost:4188/api/me"
+          }
+        ],
+        "size": [
+          1402,
+          876
+        ],
+        "text": "Dashboard\nProjects\nSetup\nReview workflow\nInvite people\nConnect GitHub\nSystem\nProjects\n10,000 tickets\nM\nLayers\n10,000 tickets\n\n/ten-thousand\n\nConnect repo\nBacklog\n10000\n3334\n3333\n3333\nSprints\n0\n0\n0\n0\nAbout\nc\n/\nAll\n10000\nFilters\nRecently created\nTodo\n3"
+      },
+      {
+        "port": 4188,
+        "longTasks": [
+          {
+            "duration": 176,
+            "start": 210.59999999403954
+          },
+          {
+            "duration": 91,
+            "start": 632.5999999940395
+          }
+        ],
+        "measures": [],
+        "ready": {
+          "loaded": [
+            50,
+            50,
+            50
+          ],
+          "mounted": [
+            15,
+            7,
+            7
+          ],
+          "ms": 724.2000000178814
+        },
+        "resources": [
+          {
+            "ms": 142.7000000178814,
+            "url": "http://localhost:4188/api/orgs/measure"
+          },
+          {
+            "ms": 206.19999998807907,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand"
+          },
+          {
+            "ms": 141.39999997615814,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/groups"
+          },
+          {
+            "ms": 219.59999999403954,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets/count"
+          },
+          {
+            "ms": 144.60000002384186,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/statuses"
+          },
+          {
+            "ms": 228.90000000596046,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=todo"
+          },
+          {
+            "ms": 196.90000000596046,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=in_progress"
+          },
+          {
+            "ms": 218,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=done"
+          },
+          {
+            "ms": 8.300000011920929,
+            "url": "http://localhost:4188/api/me"
+          }
+        ],
+        "size": [
+          1402,
+          876
+        ],
+        "text": "Dashboard\nProjects\nSetup\nReview workflow\nInvite people\nConnect GitHub\nSystem\nProjects\n10,000 tickets\nM\nLayers\n10,000 tickets\n\n/ten-thousand\n\nConnect repo\nBacklog\n10000\n3334\n3333\n3333\nSprints\n0\n0\n0\n0\nAbout\nc\n/\nAll\n10000\nFilters\nRecently created\nTodo\n3"
+      },
+      {
+        "port": 4189,
+        "longTasks": [
+          {
+            "duration": 93,
+            "start": 109
+          },
+          {
+            "duration": 154,
+            "start": 219.5
+          },
+          {
+            "duration": 106,
+            "start": 390.69999998807907
+          }
+        ],
+        "measures": [
+          {
+            "ms": 92.80000001192093,
+            "name": "replica-hydrate"
+          }
+        ],
+        "ready": {
+          "loaded": [
+            3334,
+            3333,
+            3333
+          ],
+          "mounted": [
+            15,
+            7,
+            7
+          ],
+          "ms": 496.40000000596046
+        },
+        "resources": [
+          {
+            "ms": 174.40000000596046,
+            "url": "http://localhost:4189/api/orgs/measure"
+          },
+          {
+            "ms": 166.2000000178814,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand"
+          },
+          {
+            "ms": 156.7000000178814,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand/groups"
+          },
+          {
+            "ms": 160.30000001192093,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand/statuses"
+          },
+          {
+            "ms": 8,
+            "url": "http://localhost:4189/api/me"
+          }
+        ],
+        "size": [
+          1402,
+          876
+        ],
+        "text": "Dashboard\nProjects\nSetup\nReview workflow\nInvite people\nConnect GitHub\nSystem\nProjects\n10,000 tickets\nM\nLayers\n10,000 tickets\n\n/ten-thousand\n\nConnect repo\nBacklog\n10000\n3334\n3333\n3333\nSprints\n0\n0\n0\n0\nAbout\nc\n/\nAll\n10000\nFilters\nRecently created\nTodo\n3"
+      },
+      {
+        "port": 4189,
+        "longTasks": [
+          {
+            "duration": 93,
+            "start": 93.2000000178814
+          },
+          {
+            "duration": 156,
+            "start": 206.7000000178814
+          },
+          {
+            "duration": 109,
+            "start": 378.80000001192093
+          }
+        ],
+        "measures": [
+          {
+            "ms": 92.19999998807907,
+            "name": "replica-hydrate"
+          }
+        ],
+        "ready": {
+          "loaded": [
+            3334,
+            3333,
+            3333
+          ],
+          "mounted": [
+            15,
+            7,
+            7
+          ],
+          "ms": 487.59999999403954
+        },
+        "resources": [
+          {
+            "ms": 130.80000001192093,
+            "url": "http://localhost:4189/api/orgs/measure"
+          },
+          {
+            "ms": 152.40000000596046,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand"
+          },
+          {
+            "ms": 144.19999998807907,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand/groups"
+          },
+          {
+            "ms": 143.90000000596046,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand/statuses"
+          },
+          {
+            "ms": 7.800000011920929,
+            "url": "http://localhost:4189/api/me"
+          }
+        ],
+        "size": [
+          1402,
+          876
+        ],
+        "text": "Dashboard\nProjects\nSetup\nReview workflow\nInvite people\nConnect GitHub\nSystem\nProjects\n10,000 tickets\nM\nLayers\n10,000 tickets\n\n/ten-thousand\n\nConnect repo\nBacklog\n10000\n3334\n3333\n3333\nSprints\n0\n0\n0\n0\nAbout\nc\n/\nAll\n10000\nFilters\nRecently created\nTodo\n3"
+      },
+      {
+        "port": 4188,
+        "longTasks": [
+          {
+            "duration": 169,
+            "start": 363.90000000596046
+          },
+          {
+            "duration": 107,
+            "start": 756.5
+          }
+        ],
+        "measures": [],
+        "ready": {
+          "loaded": [
+            50,
+            50,
+            50
+          ],
+          "mounted": [
+            15,
+            7,
+            7
+          ],
+          "ms": 863.2999999821186
+        },
+        "resources": [
+          {
+            "ms": 209.59999999403954,
+            "url": "http://localhost:4188/api/orgs/measure"
+          },
+          {
+            "ms": 252,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand"
+          },
+          {
+            "ms": 194.80000001192093,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/groups"
+          },
+          {
+            "ms": 267.40000000596046,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets/count"
+          },
+          {
+            "ms": 200,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/statuses"
+          },
+          {
+            "ms": 195,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=todo"
+          },
+          {
+            "ms": 184.90000000596046,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=in_progress"
+          },
+          {
+            "ms": 204,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=done"
+          },
+          {
+            "ms": 7.800000011920929,
+            "url": "http://localhost:4188/api/me"
+          }
+        ],
+        "size": [
+          1402,
+          876
+        ],
+        "text": "Dashboard\nProjects\nSetup\nReview workflow\nInvite people\nConnect GitHub\nSystem\nProjects\n10,000 tickets\nM\nLayers\n10,000 tickets\n\n/ten-thousand\n\nConnect repo\nBacklog\n10000\n3334\n3333\n3333\nSprints\n0\n0\n0\n0\nAbout\nc\n/\nAll\n10000\nFilters\nRecently created\nTodo\n3"
+      },
+      {
+        "port": 4188,
+        "longTasks": [
+          {
+            "duration": 159,
+            "start": 188
+          },
+          {
+            "duration": 109,
+            "start": 542.7999999821186
+          }
+        ],
+        "measures": [],
+        "ready": {
+          "loaded": [
+            50,
+            50,
+            50
+          ],
+          "mounted": [
+            15,
+            7,
+            7
+          ],
+          "ms": 652.2999999821186
+        },
+        "resources": [
+          {
+            "ms": 133,
+            "url": "http://localhost:4188/api/orgs/measure"
+          },
+          {
+            "ms": 145.89999997615814,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand"
+          },
+          {
+            "ms": 122.60000002384186,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/groups"
+          },
+          {
+            "ms": 188.89999997615814,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets/count"
+          },
+          {
+            "ms": 125.80000001192093,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/statuses"
+          },
+          {
+            "ms": 153.30000001192093,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=todo"
+          },
+          {
+            "ms": 177.5,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=in_progress"
+          },
+          {
+            "ms": 162.7999999821186,
+            "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=done"
+          },
+          {
+            "ms": 8.700000017881393,
+            "url": "http://localhost:4188/api/me"
+          }
+        ],
+        "size": [
+          1402,
+          876
+        ],
+        "text": "Dashboard\nProjects\nSetup\nReview workflow\nInvite people\nConnect GitHub\nSystem\nProjects\n10,000 tickets\nM\nLayers\n10,000 tickets\n\n/ten-thousand\n\nConnect repo\nBacklog\n10000\n3334\n3333\n3333\nSprints\n0\n0\n0\n0\nAbout\nc\n/\nAll\n10000\nFilters\nRecently created\nTodo\n3"
+      },
+      {
+        "port": 4189,
+        "longTasks": [
+          {
+            "duration": 94,
+            "start": 124
+          },
+          {
+            "duration": 164,
+            "start": 291.60000002384186
+          },
+          {
+            "duration": 153,
+            "start": 484.60000002384186
+          }
+        ],
+        "measures": [
+          {
+            "ms": 93.40000000596046,
+            "name": "replica-hydrate"
+          }
+        ],
+        "ready": {
+          "loaded": [
+            3334,
+            3333,
+            3333
+          ],
+          "mounted": [
+            15,
+            7,
+            7
+          ],
+          "ms": 637.4000000059605
+        },
+        "resources": [
+          {
+            "ms": 213.39999997615814,
+            "url": "http://localhost:4189/api/orgs/measure"
+          },
+          {
+            "ms": 225.7999999821186,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand"
+          },
+          {
+            "ms": 210.2999999821186,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand/groups"
+          },
+          {
+            "ms": 222.40000000596046,
+            "url": "http://localhost:4189/api/orgs/measure/projects/ten-thousand/statuses"
+          },
+          {
+            "ms": 17.400000005960464,
+            "url": "http://localhost:4189/api/me"
+          }
+        ],
+        "size": [
+          1402,
+          876
+        ],
+        "text": "Dashboard\nProjects\nSetup\nReview workflow\nInvite people\nConnect GitHub\nSystem\nProjects\n10,000 tickets\nM\nLayers\n10,000 tickets\n\n/ten-thousand\n\nConnect repo\nBacklog\n10000\n3334\n3333\n3333\nSprints\n0\n0\n0\n0\nAbout\nc\n/\nAll\n10000\nFilters\nRecently created\nTodo\n3"
+      }
+    ],
+    "navs": [
+      {
+        "port": 4189,
+        "samples": [
+          {
+            "api": 0,
+            "loaded": [
+              3334,
+              3333,
+              3333
+            ],
+            "ms": 66.2000000178814
+          },
+          {
+            "api": 0,
+            "loaded": [
+              3334,
+              3333,
+              3333
+            ],
+            "ms": 55.70000001788139
+          },
+          {
+            "api": 0,
+            "loaded": [
+              3334,
+              3333,
+              3333
+            ],
+            "ms": 50.099999994039536
+          },
+          {
+            "api": 0,
+            "loaded": [
+              3334,
+              3333,
+              3333
+            ],
+            "ms": 42.400000005960464
+          },
+          {
+            "api": 0,
+            "loaded": [
+              3334,
+              3333,
+              3333
+            ],
+            "ms": 42.30000001192093
+          }
+        ]
+      },
+      {
+        "port": 4188,
+        "samples": [
+          {
+            "api": 0,
+            "loaded": [
+              50,
+              50,
+              50
+            ],
+            "ms": 47.60000002384186
+          },
+          {
+            "api": 0,
+            "loaded": [
+              50,
+              50,
+              50
+            ],
+            "ms": 39
+          },
+          {
+            "api": 0,
+            "loaded": [
+              50,
+              50,
+              50
+            ],
+            "ms": 41
+          },
+          {
+            "api": 0,
+            "loaded": [
+              50,
+              50,
+              50
+            ],
+            "ms": 42.599999994039536
+          },
+          {
+            "api": 0,
+            "loaded": [
+              50,
+              50,
+              50
+            ],
+            "ms": 50.5
+          }
+        ]
+      }
+    ]
+  },
+  "scrollChecks": [
+    {
+      "port": 4188,
+      "frames": [
+        {
+          "dt": 300.39999997615814,
+          "height": 8960,
+          "loaded": [
+            50,
+            50,
+            50
+          ],
+          "loading": false,
+          "missing": 0,
+          "ms": 300.39999997615814,
+          "top": 0
+        },
+        {
+          "dt": 1065.2000000178814,
+          "height": 8960,
+          "loaded": [
+            50,
+            50,
+            50
+          ],
+          "loading": false,
+          "missing": 0,
+          "ms": 1365.5999999940395,
+          "top": 3605
+        },
+        {
+          "dt": 979.9000000059605,
+          "height": 11760,
+          "loaded": [
+            50,
+            50,
+            100
+          ],
+          "loading": false,
+          "missing": 0,
+          "ms": 2345.5,
+          "top": 8172
+        },
+        {
+          "dt": 980.6999999880791,
+          "height": 14560,
+          "loaded": [
+            50,
+            50,
+            150
+          ],
+          "loading": false,
+          "missing": 0,
+          "ms": 3326.199999988079,
+          "top": 10972
+        }
+      ],
+      "longTasks": [
+        {
+          "duration": 66,
+          "start": 2182.0999999940395
+        },
+        {
+          "duration": 52,
+          "start": 3182
+        }
+      ],
+      "resources": [
+        {
+          "ms": 53.599999994039536,
+          "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=done&cursor=eyJpZCI6IlQtOTg1MiIsInNvcnQiOiIyMDI2LTAxLTAxVDAyOjQ0OjEyLjAwMFoifQ"
+        },
+        {
+          "ms": 41.80000001192093,
+          "url": "http://localhost:4188/api/orgs/measure/projects/ten-thousand/tickets?status=done&cursor=eyJpZCI6IlQtOTcwMiIsInNvcnQiOiIyMDI2LTAxLTAxVDAyOjQxOjQyLjAwMFoifQ"
+        }
+      ]
+    },
+    {
+      "port": 4189,
+      "frames": [
+        {
+          "dt": 653.5999999940395,
+          "height": 560416,
+          "loaded": [
+            3334,
+            3333,
+            3333
+          ],
+          "loading": false,
+          "missing": 0,
+          "ms": 653.5999999940395,
+          "top": 0
+        },
+        {
+          "dt": 1042.7000000178814,
+          "height": 560416,
+          "loaded": [
+            3334,
+            3333,
+            3333
+          ],
+          "loading": false,
+          "missing": 0,
+          "ms": 1696.300000011921,
+          "top": 7843
+        },
+        {
+          "dt": 984.2999999821186,
+          "height": 560416,
+          "loaded": [
+            3334,
+            3333,
+            3333
+          ],
+          "loading": false,
+          "missing": 0,
+          "ms": 2680.5999999940395,
+          "top": 20356
+        }
+      ],
+      "longTasks": [
+        {
+          "duration": 50,
+          "start": 2423.199999988079
+        }
+      ],
+      "resources": []
+    }
+  ]
+}

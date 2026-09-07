@@ -1,5 +1,28 @@
 # Production overview: API versus IndexedDB
 
+## Follow-up: linear row-key bookkeeping
+
+Moved the occupied-key Set construction out of the per-ticket loop and update it as keys are assigned or inherited. This removes repeated scans of the growing key map while preserving optimistic replacement keys. No data-flow, bootstrap, or virtualizer changes.
+
+Fresh production before/after measurements, five samples per cell:
+
+| Mode | Reload before | Reload after | Warm navigation before | Warm navigation after |
+| --- | ---: | ---: | ---: | ---: |
+| API pagination | 818.3 ms | 724.2 ms | 48.8 ms | 42.6 ms |
+| IndexedDB → memory | 1,489.0 ms | 523.5 ms | 420.8 ms | 50.1 ms |
+
+These are medians. Local warm navigation improved about 8.4× with 10,000 records available, while mounting the same initial 29 rows. Both warm navigation modes made zero API requests. This directly supports the row-bookkeeping diagnosis.
+
+Reload results are noisier: API before ranged from 719.6 to 2,438.9 ms, after from 652.3 to 863.3 ms. Local before ranged from 1,059.6 to 1,663.5 ms, after from 487.6 to 637.4 ms. Local hydration itself was faster in the after batch despite unchanged storage code, so do not attribute the entire reload reduction to this fix.
+
+The same origins, persisted snapshot, production build commands, fixture, viewport and probes below were reused. Before is commit 547f8ecdf; after changes only useStableTicketKeys in SectionList.tsx. Before measurements precede rebuilding; after measurements follow one warm-up visit per rebuilt origin. Each reload batch alternates API/local/local/API/API/local/local/API/API/local; each navigation batch runs five local then five API samples. Background machine activity is uncontrolled.
+
+Scroll rechecks confirmed zero ticket requests and unchanged 560,416 px extent locally, but rAF was throttled to only three local / four API samples. They do not validate fast-scroll smoothness or FPS. Raw data: [overview-key-fix-results.json](overview-key-fix-results.json).
+
+The existing optimistic-ID reuse hook test, frontend typecheck, and both production builds passed. Lint completed with warnings in SectionList. First synchronization through 200 sequential API pages is unchanged and remains the next separate bottleneck.
+
+The original experiment and its measurements follow for context.
+
 Question: does a persisted 10,000-ticket local snapshot make the actual overview load and scroll faster than API pagination?
 
 ## Result
