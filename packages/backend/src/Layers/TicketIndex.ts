@@ -2,6 +2,7 @@ import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
+import * as Schedule from "effect/Schedule"
 import * as Schema from "effect/Schema"
 import * as SqlClient from "effect/unstable/sql/SqlClient"
 import {
@@ -354,12 +355,17 @@ export const makeTicketIndexReconciler = (deps: TicketIndexReconcilerDeps) => {
   return { reconcileProject, reconcileAllProjects }
 }
 
+const TICKET_INDEX_PUBLISH_RETRY_BASE = "50 millis"
+const TICKET_INDEX_PUBLISH_RETRY_BUDGET = "1 second"
+const TICKET_INDEX_REPAIR_INTERVAL = "5 seconds"
+
 export const TicketIndexLive = Layer.effect(
   TicketIndex,
   Effect.gen(function* () {
     const db = yield* Db
     const sql = yield* SqlClient.SqlClient
     const ticketDocs = yield* TicketDocs
+    const unpublished = new Map<string, TicketIndexProject>()
 
     const projectFor = (
       orgSlug: string,
@@ -707,7 +713,35 @@ export const TicketIndexLive = Layer.effect(
           target: [ticketIndex.projectId, ticketIndex.ticketId],
           set: rowFor(project, document)
         })
-        .pipe(Effect.asVoid, Effect.orDie)
+        .pipe(
+          Effect.asVoid,
+          Effect.retry({
+            schedule: Schedule.exponential(
+              TICKET_INDEX_PUBLISH_RETRY_BASE
+            ).pipe(
+              Schedule.upTo({ duration: TICKET_INDEX_PUBLISH_RETRY_BUDGET })
+            )
+          }),
+          Effect.catchCause((cause) =>
+            Effect.logError(
+              "ticket index publication failed; queued for reconcile",
+              cause
+            ).pipe(
+              Effect.annotateLogs({
+                module: "TicketIndex",
+                orgSlug: project.orgSlug,
+                slug: project.projectSlug,
+                projectId: project.projectId,
+                ticketId: document.id
+              }),
+              Effect.andThen(
+                Effect.sync(() => {
+                  unpublished.set(project.projectId, project)
+                })
+              )
+            )
+          )
+        )
 
     const markBranchStale = (
       projectId: string,
@@ -897,6 +931,45 @@ export const TicketIndexLive = Layer.effect(
       indexedRefs,
       writeProject: writeProjectIndex
     })
+
+    const repairUnpublished = Effect.gen(function* () {
+      if (unpublished.size === 0) return
+      const pending = [...unpublished.values()]
+      unpublished.clear()
+      yield* Effect.forEach(
+        pending,
+        (project) =>
+          reconciler.reconcileProject(project).pipe(
+            Effect.flatMap((summary) =>
+              Effect.logInfo("repaired drifted ticket index", {
+                orgSlug: project.orgSlug,
+                slug: project.projectSlug,
+                rebuilt: summary.rebuilt
+              })
+            ),
+            Effect.catchCause((cause) =>
+              Effect.logError(
+                "ticket index repair failed; requeued",
+                cause
+              ).pipe(
+                Effect.andThen(
+                  Effect.sync(() => {
+                    unpublished.set(project.projectId, project)
+                  })
+                )
+              )
+            )
+          ),
+        { concurrency: 1 }
+      )
+    })
+
+    yield* Effect.forkScoped(
+      repairUnpublished.pipe(
+        Effect.delay(TICKET_INDEX_REPAIR_INTERVAL),
+        Effect.forever
+      )
+    )
 
     return {
       projectFor,
