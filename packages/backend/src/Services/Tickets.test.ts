@@ -1211,3 +1211,33 @@ for (const scenario of [
     }
   )
 }
+
+it.effect(
+  "metadata edits skip attachment reconciliation while body edits retain it",
+  () => {
+    const docs = makeFakeTicketDocs(["T-1"])
+    const attachments = makeRecordingAttachments()
+    const layer = makeTicketsLayer("T", docs.layer, {
+      attachments: attachments.layer
+    })
+    return Effect.gen(function* () {
+      const tickets = yield* Tickets
+      yield* tickets.update("org", "user-1", "p", "T-1", {
+        title: "New title",
+        priority: "high"
+      })
+      expect(attachments.calls).toEqual([])
+      yield* tickets.update("org", "user-1", "p", "T-1", {
+        body: "Updated description"
+      })
+      expect(attachments.calls).toEqual([
+        {
+          orgSlug: "org",
+          slug: "p",
+          ticketId: "T-1",
+          body: "Updated description"
+        }
+      ])
+    }).pipe(Effect.provide(layer))
+  }
+)

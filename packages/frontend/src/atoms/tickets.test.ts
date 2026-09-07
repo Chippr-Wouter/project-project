@@ -1,4 +1,4 @@
-import { Registry, Result } from "@effect-atom/atom-react"
+import { Atom, Registry, Result } from "@effect-atom/atom-react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import * as DateTime from "effect/DateTime"
 import * as Schema from "effect/Schema"
@@ -10,6 +10,8 @@ import {
   ticketAtom,
   ticketKey,
   ticketsCountKey,
+  ticketsListAtom,
+  ticketsListKey,
   ticketsListKeyForStatus,
   ticketUpdatePreviewAtom,
   updateTicketAtom,
@@ -314,4 +316,82 @@ describe("applyOptimisticTicketUpdate", () => {
       registry.dispose()
     }
   })
+})
+
+it("refreshes one edited detail and its project lists without refetching unrelated tickets", async () => {
+  const registry = Registry.make()
+  let server = ticket
+  const requests: string[] = []
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(input instanceof Request ? input.url : String(input))
+      requests.push(`${init?.method ?? "GET"} ${url.pathname}`)
+      if (init?.method === "PATCH") server = { ...server, title: "Updated" }
+      if (url.pathname.endsWith("/tickets"))
+        return Promise.resolve(
+          Response.json({
+            items: [Schema.encodeSync(TicketDetail)(server)],
+            nextCursor: null
+          })
+        )
+      const id = url.pathname.endsWith("T-2")
+        ? Schema.decodeUnknownSync(TicketId)("T-2")
+        : ticket.id
+      return Promise.resolve(
+        Response.json(Schema.encodeSync(TicketDetail)({ ...server, id }))
+      )
+    })
+  )
+  const key = ticketKey("org", "project", ticket.id)
+  const atoms: ReadonlyArray<Atom.Atom<unknown>> = [
+    ticketAtom(key),
+    ticketAtom(
+      ticketKey("org", "project", Schema.decodeUnknownSync(TicketId)("T-2"))
+    ),
+    ticketAtom(ticketKey("org", "other", ticket.id)),
+    ticketsListAtom(
+      ticketsListKey("org", "project", { sort: { key: "id", dir: "asc" } })
+    ),
+    ticketsListAtom(
+      ticketsListKey("org", "other", { sort: { key: "id", dir: "asc" } })
+    )
+  ]
+  try {
+    for (const atom of atoms) registry.mount(atom)
+    await vi.waitFor(() => {
+      for (const atom of atoms)
+        expect(registry.get(atom)).toMatchObject({
+          _tag: "Success",
+          waiting: false
+        })
+    })
+    requests.length = 0
+    registry.set(updateTicketAtom(key), { title: "Updated" })
+    await vi.waitFor(() =>
+      expect(registry.get(updateTicketAtom(key))).toMatchObject({
+        _tag: "Success",
+        waiting: false
+      })
+    )
+    await vi.waitFor(() =>
+      expect(
+        requests.filter((request) => request.endsWith("/project/tickets"))
+      ).toHaveLength(1)
+    )
+    expect(
+      requests.filter((request) => request.startsWith("GET"))
+    ).toHaveLength(2)
+    expect(
+      requests.some(
+        (request) => request.includes("/other/") || request.endsWith("T-2")
+      )
+    ).toBe(false)
+    expect(registry.get(ticketAtom(key))).toMatchObject({
+      value: { title: "Updated" },
+      waiting: false
+    })
+  } finally {
+    registry.dispose()
+  }
 })

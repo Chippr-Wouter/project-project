@@ -388,7 +388,6 @@ export const TicketsLive = Layer.effect(
       id: string
     ): Effect.Effect<TicketDetail, TicketReadError> =>
       Effect.gen(function* () {
-        yield* ensureAccess(orgSlug, ownerId, slug)
         const projectGithub = yield* projects.getGithubIntegration(
           orgSlug,
           ownerId,
@@ -669,7 +668,11 @@ export const TicketsLive = Layer.effect(
       TicketReadError | Validation | MentionInvalid
     > =>
       Effect.gen(function* () {
-        yield* ensureAccess(orgSlug, ownerId, slug)
+        const projectGithub = yield* projects.getGithubIntegration(
+          orgSlug,
+          ownerId,
+          slug
+        )
         const indexProject = yield* ticketIndex.projectFor(orgSlug, slug)
 
         if (input.tags !== undefined) {
@@ -712,18 +715,14 @@ export const TicketsLive = Layer.effect(
               }
             }),
           (next) =>
-            attachments
-              .reconcileTicket(orgSlug, slug, id, next.body)
-              .pipe(
-                Effect.zipRight(ticketIndex.upsertTicket(indexProject, next))
-              )
+            (input.body === undefined
+              ? Effect.void
+              : attachments.reconcileTicket(orgSlug, slug, id, next.body)
+            ).pipe(
+              Effect.zipRight(ticketIndex.upsertTicket(indexProject, next))
+            )
         )
 
-        const projectGithub = yield* projects.getGithubIntegration(
-          orgSlug,
-          ownerId,
-          slug
-        )
         return yield* withMissingAttachments(
           orgSlug,
           documentToDetail(next, projectGithub)

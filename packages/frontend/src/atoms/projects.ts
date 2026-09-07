@@ -109,7 +109,7 @@ export const deleteProjectAtom = Atom.family((key: string) => {
       yield* client.projects.delete({ path: { orgSlug, slug } })
       get.refresh(projectBaseAtom(key))
       get.refresh(projectsListBaseAtom(orgSlug))
-      yield* Reactivity.invalidate(["tickets", orgSlug, slug])
+      yield* Reactivity.invalidate([`tickets/${orgSlug}/${slug}`])
     })
   )
 })
@@ -216,7 +216,7 @@ export const createProjectAtom = Atom.family((orgSlug: string) =>
       })
       get.refresh(projectBaseAtom(projectKey(orgSlug, project.slug)))
       get.refresh(projectsListBaseAtom(orgSlug))
-      yield* Reactivity.invalidate(["tickets", orgSlug, project.slug])
+      yield* Reactivity.invalidate([`tickets/${orgSlug}/${project.slug}`])
       return project
     })
   )

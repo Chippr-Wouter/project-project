@@ -121,7 +121,10 @@ const ticketsListBaseAtom = Atom.family((key: string) => {
       })
     )
     .pipe(
-      Atom.withReactivity(["tickets", orgSlug, slug]),
+      Atom.withReactivity([
+        `tickets/${orgSlug}/${slug}`,
+        `ticket-lists/${orgSlug}/${slug}`
+      ]),
       Atom.setIdleTTL("2 minutes")
     )
 })
@@ -259,7 +262,10 @@ const ticketsCountBaseAtom = Atom.family((key: string) => {
       })
     )
     .pipe(
-      Atom.withReactivity(["tickets", orgSlug, slug]),
+      Atom.withReactivity([
+        `tickets/${orgSlug}/${slug}`,
+        `ticket-lists/${orgSlug}/${slug}`
+      ]),
       Atom.setIdleTTL("2 minutes")
     )
 })
@@ -313,7 +319,7 @@ const ticketRemoteAtom = Atom.family((key: string) => {
       })
     )
     .pipe(
-      Atom.withReactivity(["tickets", orgSlug, slug]),
+      Atom.withReactivity([`tickets/${orgSlug}/${slug}`]),
       Atom.setIdleTTL("2 minutes")
     )
 })
@@ -346,7 +352,7 @@ export const updateTicketAtom = Atom.family((key: string) => {
         })
         const remote = ticketRemoteAtom(ticketKey(orgSlug, slug, id))
         get.refresh(remote)
-        yield* Reactivity.invalidate(["tickets", orgSlug, slug])
+        yield* Reactivity.invalidate([`ticket-lists/${orgSlug}/${slug}`])
         yield* get
           .result(remote, { suspendOnWaiting: true })
           .pipe(Effect.ignore)
@@ -480,7 +486,7 @@ export const quickCreateTicketAtom = Atom.family((sectionKey: string) => {
           payload: input.ticket
         })
         get.refresh(ticketsListBaseAtom(sectionKey))
-        yield* Reactivity.invalidate(["tickets", orgSlug, slug])
+        yield* Reactivity.invalidate([`tickets/${orgSlug}/${slug}`])
         get.set(
           hydrateTicketAtom(ticketKey(orgSlug, slug, created.id)),
           created
@@ -520,7 +526,10 @@ export const ticketsInSprintAtom = Atom.family((key: string) => {
       })
     )
     .pipe(
-      Atom.withReactivity(["tickets", orgSlug, slug]),
+      Atom.withReactivity([
+        `tickets/${orgSlug}/${slug}`,
+        `ticket-lists/${orgSlug}/${slug}`
+      ]),
       Atom.setIdleTTL("2 minutes")
     )
 })
@@ -586,7 +595,10 @@ export const ticketSearchAtom = Atom.family((key: string) => {
       })
     )
     .pipe(
-      Atom.withReactivity(["tickets", orgSlug, slug]),
+      Atom.withReactivity([
+        `tickets/${orgSlug}/${slug}`,
+        `ticket-lists/${orgSlug}/${slug}`
+      ]),
       Atom.setIdleTTL("2 minutes")
     )
 })
@@ -614,7 +626,7 @@ export const archiveTicketAtom = Atom.family((key: string) => {
           payload: { reason: input.reason }
         })
         get.refresh(ticketRemoteAtom(ticketKey(orgSlug, slug, id)))
-        yield* Reactivity.invalidate(["tickets", orgSlug, slug])
+        yield* Reactivity.invalidate([`tickets/${orgSlug}/${slug}`])
         return updated
       })
     )
@@ -638,7 +650,7 @@ export const unarchiveTicketAtom = Atom.family((key: string) => {
           path: { orgSlug, slug, id }
         })
         get.refresh(ticketRemoteAtom(ticketKey(orgSlug, slug, id)))
-        yield* Reactivity.invalidate(["tickets", orgSlug, slug])
+        yield* Reactivity.invalidate([`tickets/${orgSlug}/${slug}`])
         return updated
       })
     )
@@ -652,7 +664,7 @@ export const deleteTicketAtom = Atom.family((key: string) => {
       const client = yield* ApiClient
       yield* client.tickets.delete({ path: { orgSlug, slug, id } })
       get.refresh(ticketRemoteAtom(ticketKey(orgSlug, slug, id)))
-      yield* Reactivity.invalidate(["tickets", orgSlug, slug])
+      yield* Reactivity.invalidate([`tickets/${orgSlug}/${slug}`])
     })
   )
 })
@@ -713,7 +725,7 @@ export const updateTicketStatusAtom = Atom.family((key: string) => {
             .result(counts, { suspendOnWaiting: true })
             .pipe(Effect.ignore)
           yield* clearPending
-          yield* Reactivity.invalidate(["tickets", orgSlug, slug])
+          yield* Reactivity.invalidate([`tickets/${orgSlug}/${slug}`])
           return updated
         }).pipe(Effect.ensuring(clearPending))
       })

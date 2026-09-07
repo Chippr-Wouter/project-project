@@ -488,11 +488,14 @@ export const ProjectsLive = Layer.effect(
         })
       })
 
-    const requireMember = (
+    const requireMemberContext = (
       orgSlug: string,
       userId: string,
       slug: string
-    ): Effect.Effect<{ role: Role }, NotFound> =>
+    ): Effect.Effect<
+      { role: Role; indexRow: typeof projectIndex.$inferSelect },
+      NotFound
+    > =>
       withProjectTelemetry(
         "requireMember",
         orgSlug,
@@ -509,14 +512,20 @@ export const ProjectsLive = Layer.effect(
             })
             .pipe(Effect.orDie)
           const explicitRole = explicit ? makeRole(explicit.role) : null
-          if (explicitRole === "owner") return { role: "owner" as const }
+          if (explicitRole === "owner")
+            return { role: "owner" as const, indexRow }
           const orgRole = yield* orgRoleForUser(indexRow.organizationId, userId)
           if (orgRole === "owner" || orgRole === "admin") {
-            return { role: "admin" as const }
+            return { role: "admin" as const, indexRow }
           }
-          if (explicitRole) return { role: explicitRole }
+          if (explicitRole) return { role: explicitRole, indexRow }
           return yield* new NotFound()
         })
+      )
+
+    const requireMember = (orgSlug: string, userId: string, slug: string) =>
+      requireMemberContext(orgSlug, userId, slug).pipe(
+        Effect.map(({ role }) => ({ role }))
       )
 
     const requireRole = (
@@ -543,8 +552,11 @@ export const ProjectsLive = Layer.effect(
         orgSlug,
         { slug, userId },
         Effect.gen(function* () {
-          yield* requireMember(orgSlug, userId, slug)
-          const indexRow = yield* getIndexRowInOrg(orgSlug, slug)
+          const { indexRow } = yield* requireMemberContext(
+            orgSlug,
+            userId,
+            slug
+          )
           return yield* Effect.sync(() => makeProjectKey(indexRow.key)).pipe(
             Effect.orDie
           )
@@ -557,8 +569,7 @@ export const ProjectsLive = Layer.effect(
       slug: string
     ): Effect.Effect<ProjectGithubIntegration | null, NotFound> =>
       Effect.gen(function* () {
-        yield* requireMember(orgSlug, userId, slug)
-        const indexRow = yield* getIndexRowInOrg(orgSlug, slug)
+        const { indexRow } = yield* requireMemberContext(orgSlug, userId, slug)
         return yield* loadGithubIntegration(indexRow)
       })
 
@@ -738,8 +749,11 @@ export const ProjectsLive = Layer.effect(
         orgSlug,
         { slug, userId },
         Effect.gen(function* () {
-          yield* requireMember(orgSlug, userId, slug)
-          const indexRow = yield* getIndexRowInOrg(orgSlug, slug)
+          const { indexRow } = yield* requireMemberContext(
+            orgSlug,
+            userId,
+            slug
+          )
           const file = yield* projectDocs.read(orgSlug, slug)
           const members = yield* loadMembers(slug)
           const pendingMembers = yield* loadPendingMembers(slug)
