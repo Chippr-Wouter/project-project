@@ -42,6 +42,7 @@ export function DescriptionField({
 }) {
   const tKey = ticketKey(orgSlug, slug, ticket.id)
   const update = useAtomSet(updateTicketAtom(tKey), { mode: "promiseExit" })
+  const updateState = useAtomValue(updateTicketAtom(tKey))
   const bodyDraft = useAtomValue(ticketBodyDraftAtom(tKey))
   const setBodyDraft = useAtomSet(ticketBodyDraftAtom(tKey))
   const storageResult = useAtomValue(orgStorageAtom(orgSlug))
@@ -53,8 +54,14 @@ export function DescriptionField({
     (orgResult.value.role === "owner" || orgResult.value.role === "admin")
 
   useEffect(() => {
-    if (bodyDraft !== null && ticket.body === bodyDraft) setBodyDraft(null)
-  }, [bodyDraft, setBodyDraft, ticket.body])
+    if (
+      !updateState.waiting &&
+      bodyDraft !== null &&
+      ticket.body === bodyDraft
+    ) {
+      setBodyDraft(null)
+    }
+  }, [bodyDraft, setBodyDraft, ticket.body, updateState.waiting])
 
   const wrapperRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)

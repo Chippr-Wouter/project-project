@@ -110,7 +110,7 @@ export const updateStatusAtom = Atom.family((key: string) => {
         })
         get.refresh(projectStatusesBaseAtom(key))
         if (input.patch.label) {
-          yield* Reactivity.invalidate(["tickets", orgSlug, slug])
+          yield* Reactivity.invalidate([`tickets/${orgSlug}/${slug}`])
         }
         return updated
       })
@@ -184,7 +184,7 @@ export const deleteStatusAtom = Atom.family((key: string) => {
           query: input.reassignTo ? { reassignTo: input.reassignTo } : {}
         })
         get.refresh(projectStatusesBaseAtom(key))
-        yield* Reactivity.invalidate(["tickets", orgSlug, slug])
+        yield* Reactivity.invalidate([`tickets/${orgSlug}/${slug}`])
       })
     )
   })
