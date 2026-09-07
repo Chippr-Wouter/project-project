@@ -10,7 +10,11 @@ import {
   ticketsListKeyForStatus
 } from "@/atoms/tickets"
 import { createFileRoute } from "@tanstack/react-router"
-import { useAtomValue } from "@effect/atom-react"
+import { useAtomValue, useAtomSet } from "@effect/atom-react"
+import { useEffect } from "react"
+import { pollTicketSyncPrototypeAtom } from "@/atoms/tickets"
+import { ticketSyncPrototypeEnabled } from "@/atoms/ticketSyncPrototype"
+import { usesTicketReplicaPrototype } from "@/atoms/ticketReplicaPrototype"
 import {
   ticketListQueryFromSearch,
   ticketListQueryToSearch
@@ -81,6 +85,34 @@ export const Route = createFileRoute("/_authed/orgs/$orgSlug/projects/$slug/")({
 
 function TicketsTab() {
   const { orgSlug, slug } = Route.useParams()
+  const poll = useAtomSet(
+    pollTicketSyncPrototypeAtom(projectKey(orgSlug, slug)),
+    { mode: "promiseExit" }
+  )
+  useEffect(() => {
+    if (
+      !ticketSyncPrototypeEnabled ||
+      !usesTicketReplicaPrototype(orgSlug, slug)
+    )
+      return undefined
+    let busy = false
+    const refresh = () => {
+      if (!navigator.onLine || busy) return
+      busy = true
+      void poll().finally(() => {
+        busy = false
+      })
+    }
+    refresh()
+    const interval = window.setInterval(refresh, 2000)
+    window.addEventListener("focus", refresh)
+    window.addEventListener("online", refresh)
+    return () => {
+      window.clearInterval(interval)
+      window.removeEventListener("focus", refresh)
+      window.removeEventListener("online", refresh)
+    }
+  }, [orgSlug, slug, poll])
   const search = Route.useSearch()
   const project = useProject()
   const query = ticketListQueryFromSearch(search)

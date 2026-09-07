@@ -13,12 +13,24 @@ import * as Config from "effect/Config"
 import { CurrentOrg } from "../Services/CurrentOrg"
 import { Tickets } from "../Services/Tickets"
 import { dieOnMarkdown } from "./lib"
+import {
+  syncSnapshotPrototype,
+  syncDeltaPrototype
+} from "./ticketSyncPrototype"
 
 export const TicketsHandlerLive = HttpApiBuilder.group(
   AppApi,
   "tickets",
   (handlers) =>
     handlers
+      .handle("prototypeSyncSnapshot", ({ params }) =>
+        syncSnapshotPrototype(params.orgSlug, params.slug).pipe(dieOnMarkdown)
+      )
+      .handle("prototypeSyncDelta", ({ params, query }) =>
+        syncDeltaPrototype(params.orgSlug, params.slug, query).pipe(
+          dieOnMarkdown
+        )
+      )
       .handle("prototypeSnapshot", ({ params }) =>
         Effect.gen(function* () {
           const enabled = yield* Config.boolean(

@@ -141,7 +141,7 @@ function documentToTicket(
   return { ...ticket, gitState: pendingGitState(document, github) }
 }
 
-function indexEntryToTicket(
+export function indexEntryToTicket(
   entry: TicketIndexEntry,
   github: ProjectGithubIntegration | null
 ): Ticket {

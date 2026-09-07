@@ -35,7 +35,14 @@ Bun.serve({
   async fetch(request) {
     const url = new URL(request.url)
     if (url.pathname.startsWith("/api/")) {
-      if (request.method !== "GET")
+      const fixtureWrite =
+        Bun.env.PROTOTYPE_ALLOW_TICKET_WRITES === "true" &&
+        backendPort === 3110 &&
+        /^(?:PATCH|DELETE|POST)$/.test(request.method) &&
+        /^\/api\/orgs\/measure\/projects\/ten-thousand\/tickets\/(?:quick|T-\d+)$/.test(
+          url.pathname
+        )
+      if (request.method !== "GET" && !fixtureWrite)
         return new Response("Read-only fixture preview", { status: 405 })
       const headers = new Headers(request.headers)
       headers.set("cookie", Bun.env.PROTOTYPE_COOKIE!)
@@ -43,7 +50,11 @@ Bun.serve({
       return fetch(
         `http://127.0.0.1:${backendPort}${url.pathname}${url.search}`,
         {
-          headers
+          headers,
+          method: request.method,
+          ...(request.method !== "GET"
+            ? { body: await request.arrayBuffer() }
+            : {})
         }
       )
     }

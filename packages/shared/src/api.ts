@@ -22,6 +22,10 @@ import {
   OpenApi
 } from "effect/unstable/httpapi"
 import * as Schema from "effect/Schema"
+import {
+  TicketSyncSnapshotPrototype,
+  TicketSyncDeltaPrototype
+} from "./schemas/TicketSyncPrototype"
 import { User } from "./schemas/User"
 import { Org, OrgDetail } from "./schemas/Org"
 import {
@@ -790,6 +794,34 @@ const TicketSearchParams = Schema.Struct({
 })
 
 const TicketsGroup = HttpApiGroup.make("tickets")
+  .add(
+    HttpApiEndpoint.get(
+      "prototypeSyncSnapshot",
+      "/orgs/:orgSlug/projects/:slug/tickets/prototype-sync-snapshot",
+      {
+        params: ProjectPath,
+        success: TicketSyncSnapshotPrototype,
+        error: [Unauthorized, NotFound]
+      }
+    )
+  )
+  .add(
+    HttpApiEndpoint.get(
+      "prototypeSyncDelta",
+      "/orgs/:orgSlug/projects/:slug/tickets/prototype-sync-delta",
+      {
+        params: ProjectPath,
+        query: Schema.Struct({
+          epoch: Schema.String,
+          revision: Schema.NumberFromString.pipe(
+            Schema.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))
+          )
+        }),
+        success: TicketSyncDeltaPrototype,
+        error: [Unauthorized, NotFound]
+      }
+    )
+  )
   .add(
     HttpApiEndpoint.get(
       "prototypeSnapshot",

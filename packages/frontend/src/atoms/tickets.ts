@@ -7,6 +7,7 @@ import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import { runtime } from "@/runtime"
 import { ApiClient } from "@/services/ApiClient"
+import { pollTicketSyncPrototype } from "./ticketSyncPrototype"
 import {
   usesTicketReplicaPrototype,
   replicaListPrototype,
@@ -27,6 +28,16 @@ import {
 class MalformedQuery extends Data.TaggedError("MalformedQuery")<{
   readonly cause: unknown
 }> {}
+
+export const pollTicketSyncPrototypeAtom = Atom.family((_key: string) =>
+  runtime.fn(
+    Effect.fn(function* () {
+      const changed = yield* pollTicketSyncPrototype
+      if (changed)
+        yield* Reactivity.invalidate(["tickets", "measure", "ten-thousand"])
+    })
+  )
+)
 
 const encodeQueryForKey = Schema.encodeSync(TicketListQuery)
 

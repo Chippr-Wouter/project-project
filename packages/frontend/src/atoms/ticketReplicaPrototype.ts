@@ -13,6 +13,10 @@ import {
   type TicketListQuery
 } from "@projectproject/shared"
 import { ApiClient } from "@/services/ApiClient"
+import {
+  ticketSyncPrototypeEnabled,
+  readTicketSyncPrototype
+} from "./ticketSyncPrototype"
 
 export const usesTicketReplicaPrototype = (orgSlug: string, slug: string) =>
   import.meta.env.VITE_TICKET_REPLICA_PROTOTYPE === "true" &&
@@ -86,7 +90,9 @@ export const replicaListPrototype = Effect.fn(function* (
     return yield* Effect.die(
       "Prototype supports default sort and no sprint filter"
     )
-  const all = yield* snapshot
+  const all = yield* ticketSyncPrototypeEnabled
+    ? readTicketSyncPrototype
+    : snapshot
   return {
     items: all.filter((ticket) =>
       matchesTicketQuery(ticket, query, "measure-user")
@@ -100,7 +106,9 @@ export const replicaCountPrototype = Effect.fn(function* (
 ) {
   if (query.filter?.groupId)
     return yield* Effect.die("Prototype does not support sprint filters")
-  const all = yield* snapshot
+  const all = yield* ticketSyncPrototypeEnabled
+    ? readTicketSyncPrototype
+    : snapshot
   const counts: { total: number; byStatus: Record<string, number> } = {
     total: 0,
     byStatus: {}
