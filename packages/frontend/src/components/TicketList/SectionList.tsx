@@ -236,15 +236,16 @@ interface RowState {
   readonly pending: boolean
 }
 
-function useStableTicketKeys(
-  items: ReadonlyArray<Ticket>,
+export function useStableTicketKeys(
+  items: ReadonlyArray<Pick<Ticket, "id">>,
   waiting: boolean
 ): ReadonlyArray<RowState> {
   const entriesRef = useRef<
     Map<TicketId, { key: string; bornWaiting: boolean }>
   >(new Map())
-  const prevItemsRef = useRef<ReadonlyArray<Ticket>>(items)
+  const prevItemsRef = useRef<ReadonlyArray<Pick<Ticket, "id">>>(items)
   const prevWaitingRef = useRef<boolean>(waiting)
+  const keySequenceRef = useRef(0)
 
   const justSettled = prevWaitingRef.current && !waiting
   const prevItems = prevItemsRef.current
@@ -264,6 +265,7 @@ function useStableTicketKeys(
       if (prevAtIdx && !currIds.has(prevAtIdx.id)) {
         const prevEntry = entriesRef.current.get(prevAtIdx.id)
         const inheritedKey = prevEntry?.key ?? prevAtIdx.id
+        entriesRef.current.delete(prevAtIdx.id)
         entriesRef.current.set(t.id, {
           key: inheritedKey,
           bornWaiting: false
@@ -271,8 +273,14 @@ function useStableTicketKeys(
         return { key: inheritedKey, pending: false }
       }
     }
-    entriesRef.current.set(t.id, { key: t.id, bornWaiting: waiting })
-    return { key: t.id, pending: waiting }
+    const usedKeys = new Set(
+      [...entriesRef.current.values()].map(({ key }) => key)
+    )
+    const key = usedKeys.has(t.id)
+      ? `${t.id}:${++keySequenceRef.current}`
+      : t.id
+    entriesRef.current.set(t.id, { key, bornWaiting: waiting })
+    return { key, pending: waiting }
   })
 
   useEffect(() => {
