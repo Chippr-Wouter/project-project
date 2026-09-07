@@ -72,6 +72,17 @@ function makeTicketDocument(
   }
 }
 
+function ticketIndexEntryFromDocument(ticket: TicketDocument) {
+  const { body: _body, commentsRegion: _commentsRegion, ...entry } = ticket
+  return {
+    ...entry,
+    branchDeletedAt: null,
+    checks: null,
+    checksHeadSha: null,
+    checksUpdatedAt: null
+  }
+}
+
 function makeFakeDocs(initial?: {
   ticketIds?: ReadonlyArray<string>
   ticketStatuses?: Record<string, TicketStatus>
@@ -135,8 +146,9 @@ function makeFakeDocs(initial?: {
     readRaw: () => Effect.die(new Error("unexpected GroupDocs.readRaw call"))
   } satisfies GroupDocsShape
 
-  const ticketService = {
-    listIds: () => Effect.succeed(ticketIds.map((id) => ticketId(id))),
+  const ticketService: TicketDocsShape = {
+    listIds: () =>
+      Effect.succeed([...ticketsById.keys()].map((id) => ticketId(id))),
     read: (_org: string, _slug: string, id: string) => {
       const ticket = ticketsById.get(id)
       return ticket ? Effect.succeed(ticket) : Effect.fail(new NotFound())
@@ -151,10 +163,19 @@ function makeFakeDocs(initial?: {
       ticketsById.set(id, document)
       return Effect.void
     },
+    update: (org: string, slug: string, id: string, transform, onPersist) =>
+      ticketService.read(org, slug, id).pipe(
+        Effect.flatMap(transform),
+        Effect.tap((document) =>
+          Effect.sync(() => ticketsById.set(id, document))
+        ),
+        Effect.tap((document) =>
+          onPersist ? onPersist(document) : Effect.void
+        )
+      ),
     remove: () => unexpectedTicketDocsCall("remove"),
-    update: () => unexpectedTicketDocsCall("update"),
     readRaw: () => unexpectedTicketDocsCall("readRaw")
-  } satisfies TicketDocsShape
+  }
 
   const indexProject = {
     orgSlug: "org",
@@ -165,17 +186,34 @@ function makeFakeDocs(initial?: {
 
   const ticketIndexService = {
     projectFor: () => Effect.succeed(indexProject),
-    list: () => Effect.succeed([]),
-    query: () => Effect.succeed([]),
-    count: () => Effect.succeed({ total: 0, byStatus: {} }),
-    existingIds: () => Effect.succeed(new Set<string>()),
-    reserveTicketNumber: () => Effect.succeed(1),
-    getBranchDeletedAt: () => Effect.succeed(null),
+    list: (_project, requestedIds) =>
+      Effect.sync(() => {
+        const requested =
+          requestedIds === undefined ? null : new Set(requestedIds)
+        return [...ticketsById.values()]
+          .filter((ticket) => requested === null || requested.has(ticket.id))
+          .map(ticketIndexEntryFromDocument)
+      }),
+    query: () => Effect.die(new Error("unexpected TicketIndex.query")),
+    count: () => Effect.die(new Error("unexpected TicketIndex.count")),
     listIds: () => Effect.succeed([...ticketsById.keys()]),
+    existingIds: (_project, ticketIds) =>
+      Effect.succeed(
+        new Set(ticketIds.filter((ticketId) => ticketsById.has(ticketId)))
+      ),
+    reserveTicketNumber: () =>
+      Effect.sync(
+        () =>
+          Math.max(
+            0,
+            ...[...ticketsById.keys()].map((id) => Number(id.slice(2)))
+          ) + 1
+      ),
     tagUsageCounts: () => Effect.succeed({}),
     findTicketIdsByTag: () => Effect.succeed([]),
     findTicketIdsByStatus: () => Effect.succeed([]),
     findTicketsByBranch: () => Effect.succeed([]),
+    getBranchDeletedAt: () => Effect.succeed(null),
     upsertTicket: (_project, document) =>
       Effect.sync(() => {
         ticketsById.set(document.id, document)
