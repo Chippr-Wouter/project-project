@@ -64,13 +64,13 @@ async function assertNotLastOrgOwner(
   if (nextRole !== null && roleList(nextRole).includes("owner")) return
   const target = await db.query.member.findFirst({
     columns: { role: true },
-    where: { organizationId: organizationId, userId: targetUserId }
+    where: { organizationId, userId: targetUserId }
   })
   if (!target || !roleList(target.role).includes("owner")) return
   const others = await db.query.member.findMany({
     columns: { id: true },
     where: {
-      organizationId: organizationId,
+      organizationId,
       role: "owner",
       userId: { ne: targetUserId }
     }
@@ -206,7 +206,6 @@ async function cleanupRemovedOrgMemberProjectAccess(
     )
 }
 
-// TODO: configure and export `auth`.
 export const mcpResource = new URL(
   "/mcp",
   process.env.MCP_RESOURCE_URL ??

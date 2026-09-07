@@ -4,7 +4,7 @@ import * as Effect from "effect/Effect"
 import { runtime } from "@/runtime"
 import { ApiClient } from "@/services/ApiClient"
 import { authClient } from "@/services/AuthClient"
-import type { AssignableRole, OrgDetail, OrgRole } from "@projectproject/shared"
+import type { AssignableRole, OrgRole } from "@projectproject/shared"
 import { authData, meAtom } from "./auth"
 
 export const orgKey = (orgSlug: string) => orgSlug
@@ -251,10 +251,8 @@ export const removeOrgMemberAtom = Atom.family((memberKey: string) => {
           )
         : current,
     fn: runtime.fn(
-      Effect.fn(function* (_input: void, get) {
-        const detail = get(
-          orgDetailBaseAtom(orgSlug)
-        ) as Result.AsyncResult<OrgDetail>
+      Effect.fn(function* (_input: void, get: Atom.FnContext) {
+        const detail = get(orgDetailBaseAtom(orgSlug))
         if (!Result.isSuccess(detail)) {
           return yield* Effect.die(new Error("org detail not loaded"))
         }
@@ -301,10 +299,8 @@ export const cancelOrgInvitationAtom = Atom.family((invitationKey: string) => {
 
 export const leaveOrgAtom = Atom.family((orgSlug: string) =>
   runtime.fn(
-    Effect.fn(function* (_input: void, get) {
-      const detail = get(
-        orgDetailBaseAtom(orgSlug)
-      ) as Result.AsyncResult<OrgDetail>
+    Effect.fn(function* (_input: void, get: Atom.FnContext) {
+      const detail = get(orgDetailBaseAtom(orgSlug))
       if (!Result.isSuccess(detail)) {
         return yield* Effect.die(new Error("org detail not loaded"))
       }

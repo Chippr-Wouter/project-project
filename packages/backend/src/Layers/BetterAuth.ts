@@ -43,7 +43,7 @@ export const BetterAuthLive = Layer.effect(
             try: () =>
               db.query.account.findFirst({
                 columns: { accessToken: true },
-                where: { userId: userId, providerId: "github" }
+                where: { userId, providerId: "github" }
               }),
             catch: (cause) => new BetterAuthError({ cause })
           })
@@ -56,7 +56,7 @@ export const BetterAuthLive = Layer.effect(
             try: () =>
               db.query.account.findFirst({
                 columns: { id: true },
-                where: { userId: userId, providerId: "github" }
+                where: { userId, providerId: "github" }
               }),
             catch: (cause) => new BetterAuthError({ cause })
           })
@@ -76,7 +76,7 @@ export const BetterAuthLive = Layer.effect(
                   lastVerifiedAt: true,
                   lastCheckError: true
                 },
-                where: { userId: userId }
+                where: { userId }
               }),
             catch: (cause) => new BetterAuthError({ cause })
           })

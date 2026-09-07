@@ -44,19 +44,14 @@ const toZod = (
       if (nullIdx === 0) return variants[1]!.nullable()
       if (nullIdx === 1) return variants[0]!.nullable()
     }
-    return z.union(variants as [z.ZodType, z.ZodType, ...Array<z.ZodType>])
+    return z.union(variants)
   }
 
   if (node.enum) {
     if (node.enum.every((v) => typeof v === "string")) {
-      return z.enum(node.enum as Array<string>)
+      return z.enum(node.enum)
     }
-    const variants = node.enum.map((v) =>
-      z.literal(v as z.core.util.Literal)
-    ) as Array<z.ZodType>
-    return z.union(
-      variants as unknown as [z.ZodType, z.ZodType, ...Array<z.ZodType>]
-    )
+    return z.union(node.enum.map((value) => z.literal(value)))
   }
 
   switch (node.type) {

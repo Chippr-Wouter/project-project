@@ -12,6 +12,7 @@ import {
   TicketId,
   TicketListQuery,
   ticketListQueryToSearch,
+  type GroupId,
   type QuickCreateTicketInput,
   type Ticket,
   type TicketStatus,
@@ -410,7 +411,7 @@ export const ticketsInSprintAtom = Atom.family((key: string) => {
       Effect.gen(function* () {
         const client = yield* ApiClient
         return yield* client.groups.listTickets({
-          params: { orgSlug, slug, id: groupId as never }
+          params: { orgSlug, slug, id: groupId as GroupId }
         })
       })
     )
