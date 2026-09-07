@@ -12,6 +12,8 @@ Real Tickets, Projects authorization/configuration, TicketDocs, Markdown, Ticket
 
 ## Results
 
+These numbers were measured before the stack was rebased onto Effect v4, on Bun 1.3.13. They are retained with their original measured revisions; see [post-rebase re-measurement](#post-rebase-re-measurement) for the current code.
+
 | Role | Operation | Concurrency | p50 ms before → after | p95 ms before → after | p95 change | requests/s before → after |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
 | owner | detail | 1 | 3.82 → 2.38 | 6.35 → 3.83 | -39.7% | 235.80 → 385.53 |
@@ -34,6 +36,44 @@ Real Tickets, Projects authorization/configuration, TicketDocs, Markdown, Ticket
 | member | update-body | 32 | 134.56 → 92.96 | 196.42 → 113.62 | -42.2% | 230.42 → 337.57 |
 
 Detail reads and concurrent edits improve in this experiment. Single-request writes have substantial tail variability: owner metadata p95 regresses, and large body-edit improvements should not be assumed to repeat in production. The raw rounds retain these outliers; no runs were discarded. Lower database work is independently covered by the operation-count tests in [request work](t118-request-work.md).
+
+## Post-rebase re-measurement
+
+The stack was rebased onto `main` after Effect v4 / Drizzle Relations v2 (#138), Better Auth 1.7 (#140), and Vite Plus (#137) landed, which also moved Bun from 1.3.13 to 1.4.2. The comparison above therefore describes code and a runtime that no longer exist. This section re-measures the rebased stack to confirm the dependency migration did not regress the write and read paths.
+
+Measured on 2026-09-07 at the top of the rebased stack, Bun 1.4.2, Effect 4.0.0-rc.112, `drizzle-orm` 1.0.0-rc.5, local Apple arm64, 10 logical CPUs, disposable PostgreSQL 16 Alpine migrated with the current migrations. Identical configuration to the run above and the same harness patch: 10,000 tickets, 300 samples, concurrency 1/8/32, three operations, separate owner and member fixtures, three rounds each. 16,200 measured requests, zero failures. Values are medians of three per-round statistics.
+
+This is a **single-sided** measurement: the "before" column is the previously recorded post-change number from the table above, not a fresh baseline. The delta therefore mixes the dependency migration with machine state, and `benchmark-ticket-compare.ts` deliberately refuses this pairing because the recorded `bunVersion` differs. That guard was not overridden — the table below is computed with the same median-of-per-round-statistics method, and should be read as a regression check rather than a controlled experiment.
+
+| Role | Operation | Concurrency | p50 ms recorded → now | p95 ms recorded → now | p95 change | requests/s recorded → now |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| owner | detail | 1 | 2.38 → 2.55 | 3.83 → 4.30 | +12.3% | 385.53 → 345.31 |
+| owner | detail | 8 | 8.09 → 5.91 | 12.78 → 8.91 | -30.3% | 973.11 → 1278.06 |
+| owner | detail | 32 | 32.27 → 25.46 | 38.72 → 34.38 | -11.2% | 969.76 → 1204.15 |
+| owner | update-metadata | 1 | 6.15 → 5.39 | 35.25 → 7.55 | -78.6% | 66.58 → 179.03 |
+| owner | update-metadata | 8 | 15.04 → 11.52 | 19.71 → 16.93 | -14.1% | 526.73 → 650.72 |
+| owner | update-metadata | 32 | 57.92 → 39.72 | 73.40 → 48.40 | -34.1% | 510.47 → 778.39 |
+| owner | update-body | 1 | 5.05 → 5.03 | 7.03 → 7.52 | +7.0% | 192.40 → 183.34 |
+| owner | update-body | 8 | 15.94 → 11.55 | 26.39 → 15.29 | -42.1% | 483.66 → 675.52 |
+| owner | update-body | 32 | 78.95 → 39.50 | 89.33 → 56.43 | -36.8% | 399.22 → 776.07 |
+| member | detail | 1 | 3.64 → 2.60 | 6.27 → 3.92 | -37.5% | 242.19 → 364.03 |
+| member | detail | 8 | 10.98 → 6.64 | 15.31 → 10.38 | -32.2% | 700.30 → 1126.03 |
+| member | detail | 32 | 48.72 → 22.50 | 53.55 → 30.03 | -43.9% | 652.27 → 1352.70 |
+| member | update-metadata | 1 | 6.48 → 4.91 | 9.81 → 6.64 | -32.3% | 144.57 → 195.54 |
+| member | update-metadata | 8 | 19.53 → 11.96 | 27.95 → 16.63 | -40.5% | 388.71 → 646.14 |
+| member | update-metadata | 32 | 84.01 → 42.47 | 93.60 → 54.52 | -41.8% | 375.22 → 721.54 |
+| member | update-body | 1 | 6.53 → 4.95 | 9.53 → 8.12 | -14.8% | 140.68 → 176.14 |
+| member | update-body | 8 | 19.40 → 11.67 | 25.39 → 15.84 | -37.6% | 403.82 → 664.12 |
+| member | update-body | 32 | 92.96 → 47.39 | 113.62 → 56.54 | -50.2% | 337.57 → 666.75 |
+
+Sixteen of eighteen configurations improved, several by 30-50%. Two are higher, both at concurrency 1:
+
+- **owner detail, concurrency 1**: 3.83 → 4.30 ms p95 (+12.3%). Per-round p95 4.23, 4.30, 4.44 (spread 0.21 ms) — consistent across rounds, so this is a real difference rather than variance.
+- **owner update-body, concurrency 1**: 7.03 → 7.52 ms p95 (+7.0%). Per-round p95 6.13, 7.52, 10.18 (spread 4.05 ms) — within run-to-run variance: the spread is larger than the difference.
+
+The single-request owner metadata outlier from the original run did not reproduce. It was recorded at 35.25 ms p95 (+203.1%) and is now 7.55 ms, below the 11.63 ms pre-change baseline, supporting the earlier conclusion that no repeatable code regression was established for it.
+
+Raw rounds are local artifacts in the gitignored `.benchmark-results/` directory and are not committed.
 
 ## Reproduce
 
