@@ -8,7 +8,6 @@ import { paraglideVitePlugin } from "@inlang/paraglide-js"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-
 export default defineConfig(({ mode }) => ({
   root: __dirname,
   resolve: {
