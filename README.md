@@ -49,6 +49,10 @@ installation is optional. With the [Vite Plus CLI](https://viteplus.dev/guide/)
 installed, `vp install` uses Bun and `vp run <script>` runs the same scripts.
 Use `vp run dev` for the full app: bare `vp dev` starts only Vite.
 
+Development waits for Postgres to become healthy, then Vite Plus runs the
+frontend and backend dev scripts in parallel. The backend uses Bun's watcher.
+Postgres stays running when development exits; use `bun run dev:stop` to stop it.
+
 ## Tooling
 
 Root `vite.config.ts` owns linting, formatting, and the three test projects.

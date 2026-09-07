@@ -9,8 +9,9 @@
   "scripts": {
     "dev:backend": "vp run --filter @projectproject/backend dev",
     "dev:frontend": "vp run --filter @projectproject/frontend dev",
-    "dev:db": "docker compose up -d postgres",
-    "dev": "bun --env-file=.env scripts/dev.ts",
+    "dev:db": "docker compose up --wait --wait-timeout 60 postgres",
+    "dev:stop": "docker compose stop postgres",
+    "dev": "vp run dev:db && vp run --filter @projectproject/backend --filter @projectproject/frontend --parallel dev",
     "build": "vp run --filter @projectproject/frontend build",
     "test": "vp test run",
     "typecheck": "vp run -r typecheck",
