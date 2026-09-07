@@ -394,7 +394,13 @@ const FakeAttachments = Layer.succeed(Attachments, {
   commit: () => unexpected("Attachments.commit"),
   resolveForServing: () => unexpected("Attachments.resolveForServing"),
   reconcileTicket: () => Effect.void,
-  reapOnce: () => unexpected("Attachments.reapOnce")
+  orphanProject: () => unexpected("Attachments.orphanProject"),
+  listForOrg: () => unexpected("Attachments.listForOrg"),
+  summarizeForOrg: () => unexpected("Attachments.summarizeForOrg"),
+  deleteForOrg: () => unexpected("Attachments.deleteForOrg"),
+  missingIds: () => Effect.succeed([]),
+  reapOnce: () => unexpected("Attachments.reapOnce"),
+  dedupeOnce: () => unexpected("Attachments.dedupeOnce")
 } satisfies AttachmentsShape)
 
 const DocsLive = TicketDocsLive.pipe(

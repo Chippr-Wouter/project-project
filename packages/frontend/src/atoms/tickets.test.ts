@@ -9,6 +9,7 @@ import {
   hydrateTicketAtom,
   ticketAtom,
   ticketKey,
+  ticketsCountKey,
   ticketsListKeyForStatus,
   ticketUpdatePreviewAtom,
   updateTicketAtom,
@@ -92,6 +93,8 @@ describe("applyOptimisticTicketUpdate", () => {
     const dispose = registry.mount(preview)
 
     registry.set(updateTicketStatusAtom(key), {
+      ticket,
+      countKey: ticketsCountKey("org", "project", {}),
       status: Schema.decodeUnknownSync(TicketStatus)("in_progress"),
       sourceSectionKey: "source",
       destSectionKey: "destination"
@@ -137,13 +140,31 @@ describe("applyOptimisticTicketUpdate", () => {
         Response.json(Schema.encodeSync(TicketDetail)(server))
       vi.stubGlobal(
         "fetch",
-        vi.fn((_input: RequestInfo | URL, init?: RequestInit) =>
-          init?.method === "PATCH"
-            ? new Promise<Response>((resolve) => {
-                finishUpdate = resolve
+        vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+          if (init?.method === "PATCH") {
+            return new Promise<Response>((resolve) => {
+              finishUpdate = resolve
+            })
+          }
+          const url = new URL(
+            input instanceof Request ? input.url : String(input)
+          )
+          if (url.pathname.endsWith("/count")) {
+            return Promise.resolve(
+              Response.json({ total: 1, byStatus: { [server.status]: 1 } })
+            )
+          }
+          if (url.pathname.endsWith("/tickets")) {
+            const matches = url.searchParams.get("status") === server.status
+            return Promise.resolve(
+              Response.json({
+                items: matches ? [Schema.encodeSync(TicketDetail)(server)] : [],
+                nextCursor: null
               })
-            : Promise.resolve(response())
-        )
+            )
+          }
+          return Promise.resolve(response())
+        })
       )
       registry.mount(detail)
       registry.mount(preview)
@@ -166,6 +187,8 @@ describe("applyOptimisticTicketUpdate", () => {
         } else {
           const query = { sort: { key: "id", dir: "asc" } } as const
           registry.set(updateTicketStatusAtom(key), {
+            ticket,
+            countKey: ticketsCountKey("org", "project", {}),
             status,
             sourceSectionKey: ticketsListKeyForStatus(
               "org",
