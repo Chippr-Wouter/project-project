@@ -166,14 +166,18 @@ SELECT
   "id", "client_id",
   CASE WHEN "client_secret" IS NULL THEN NULL
     ELSE rtrim(translate(encode(sha256(convert_to("client_secret", 'UTF8')), 'base64'), '+/', '-_'), '=') END,
-  "name", "icon", NULLIF("metadata", '')::jsonb,
-  string_to_array(COALESCE("redirect_urls", ''), ','),
+  "name", "icon",
+  CASE WHEN NULLIF("metadata", '') IS NULL THEN NULL
+    WHEN pg_input_is_valid("metadata", 'jsonb') THEN "metadata"::jsonb
+    ELSE jsonb_build_object('legacy', "metadata") END,
+  string_to_array("redirect_urls", ','),
   CASE WHEN "type" = 'native' THEN 'native' ELSE 'web' END,
   CASE WHEN "client_secret" IS NULL THEN 'none' ELSE 'client_secret_basic' END,
   ARRAY['authorization_code', 'refresh_token'], ARRAY['code'], true, ARRAY[]::text[],
   "disabled", "user_id", "created_at", "updated_at"
 FROM "oauth_application"
-WHERE "client_id" IS NOT NULL;
+WHERE "client_id" IS NOT NULL
+  AND NULLIF(btrim("redirect_urls"), '') IS NOT NULL;
 --> statement-breakpoint
 UPDATE "oauth_access_token"
 SET "access_token_expires_at" = LEAST(COALESCE("access_token_expires_at", CURRENT_TIMESTAMP), CURRENT_TIMESTAMP),

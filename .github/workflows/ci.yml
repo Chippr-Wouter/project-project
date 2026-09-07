@@ -9,6 +9,8 @@ on:
 
 jobs:
   check:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     services:
       postgres:

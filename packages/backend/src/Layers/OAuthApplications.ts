@@ -1,7 +1,7 @@
 import * as SqlClient from "@effect/sql/SqlClient"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import { and, desc, eq, max } from "drizzle-orm"
+import { and, eq, max } from "drizzle-orm"
 import { NotFound, type OAuthApplication } from "@projectproject/shared"
 import {
   oauthAccessToken,
@@ -24,66 +24,79 @@ export const OAuthApplicationsLive = Layer.effect(
     const listForUser = (
       userId: string
     ): Effect.Effect<ReadonlyArray<OAuthApplication>> =>
-      Effect.tryPromise(() =>
-        db
+      Effect.tryPromise(() => {
+        const access = db
+          .select({
+            clientId: oauthAccessToken.clientId,
+            lastUsedAt: max(oauthAccessToken.createdAt).as("last_access_at")
+          })
+          .from(oauthAccessToken)
+          .where(eq(oauthAccessToken.userId, userId))
+          .groupBy(oauthAccessToken.clientId)
+          .as("access")
+        const refresh = db
+          .select({
+            clientId: oauthRefreshToken.clientId,
+            lastUsedAt: max(oauthRefreshToken.createdAt).as("last_refresh_at")
+          })
+          .from(oauthRefreshToken)
+          .where(eq(oauthRefreshToken.userId, userId))
+          .groupBy(oauthRefreshToken.clientId)
+          .as("refresh")
+        return db
           .select({
             id: oauthClient.id,
             name: oauthClient.name,
             clientId: oauthClient.clientId,
             createdAt: oauthClient.createdAt,
-            lastAccessAt: max(oauthAccessToken.createdAt),
-            lastRefreshAt: max(oauthRefreshToken.createdAt)
+            lastAccessAt: access.lastUsedAt,
+            lastRefreshAt: refresh.lastUsedAt
           })
           .from(oauthConsent)
           .innerJoin(
             oauthClient,
             eq(oauthConsent.clientId, oauthClient.clientId)
           )
-          .leftJoin(
-            oauthAccessToken,
-            and(
-              eq(oauthAccessToken.clientId, oauthClient.clientId),
-              eq(oauthAccessToken.userId, userId)
-            )
-          )
-          .leftJoin(
-            oauthRefreshToken,
-            and(
-              eq(oauthRefreshToken.clientId, oauthClient.clientId),
-              eq(oauthRefreshToken.userId, userId)
-            )
-          )
+          .leftJoin(access, eq(access.clientId, oauthClient.clientId))
+          .leftJoin(refresh, eq(refresh.clientId, oauthClient.clientId))
           .where(eq(oauthConsent.userId, userId))
           .groupBy(
             oauthClient.id,
             oauthClient.name,
             oauthClient.clientId,
-            oauthClient.createdAt
+            oauthClient.createdAt,
+            access.lastUsedAt,
+            refresh.lastUsedAt
           )
-          .orderBy(desc(max(oauthAccessToken.createdAt)))
-      ).pipe(
+      }).pipe(
         Effect.orDie,
         Effect.map((rows) =>
-          rows.flatMap((row): ReadonlyArray<OAuthApplication> => {
-            if (!row.createdAt) return []
-            const timestamps = [row.lastAccessAt, row.lastRefreshAt].filter(
-              (value): value is Date => value instanceof Date
+          rows
+            .flatMap((row): ReadonlyArray<OAuthApplication> => {
+              if (!row.createdAt) return []
+              const timestamps = [row.lastAccessAt, row.lastRefreshAt].filter(
+                (value): value is Date => value instanceof Date
+              )
+              const lastUsedAt = timestamps.reduce<Date | null>(
+                (latest, value) =>
+                  latest === null || value > latest ? value : latest,
+                null
+              )
+              return [
+                {
+                  id: row.id,
+                  name: row.name ?? row.clientId,
+                  clientId: row.clientId,
+                  createdAt: row.createdAt,
+                  lastUsedAt
+                }
+              ]
+            })
+            .sort(
+              (a, b) =>
+                (b.lastUsedAt?.getTime() ?? -Infinity) -
+                (a.lastUsedAt?.getTime() ?? -Infinity)
             )
-            const lastUsedAt = timestamps.reduce<Date | null>(
-              (latest, value) =>
-                latest === null || value > latest ? value : latest,
-              null
-            )
-            return [
-              {
-                id: row.id,
-                name: row.name ?? row.clientId,
-                clientId: row.clientId,
-                createdAt: row.createdAt,
-                lastUsedAt
-              }
-            ]
-          })
         )
       )
 

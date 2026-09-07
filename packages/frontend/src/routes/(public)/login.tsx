@@ -85,7 +85,7 @@ function LoginPage() {
     try {
       const { error } = await authClient.signIn.magicLink({
         email,
-        callbackURL: redirectTarget
+        callbackURL: oauthContinuationTarget ?? redirectTarget
       })
       if (error) {
         setAuthError(m.auth_magic_link_error())
@@ -104,7 +104,7 @@ function LoginPage() {
     try {
       await authClient.signIn.social({
         provider: "google",
-        callbackURL: redirectTarget
+        callbackURL: oauthContinuationTarget ?? redirectTarget
       })
     } catch {
       setAuthError(m.auth_google_sign_in_error())

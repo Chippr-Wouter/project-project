@@ -67,7 +67,7 @@ import { mcp } from "@better-auth/mcp"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { APIError } from "better-auth/api"
 import { drizzle } from "drizzle-orm/node-postgres"
-import { and, eq, inArray, ne } from "drizzle-orm"
+import { and, eq, inArray, ne, sql } from "drizzle-orm"
 import { FileSystem, Path } from "@effect/platform"
 import { BunContext } from "@effect/platform-bun"
 import * as DateTime from "effect/DateTime"
@@ -508,17 +508,41 @@ export const auth = betterAuth({
       allowDynamicClientRegistration: true,
       allowUnauthenticatedClientRegistration: true,
       refreshTokenReuseInterval: 0,
-      customAccessTokenClaims: async ({ user }) => ({
-        pp_consent_ids: user
-          ? (
-              await db
-                .select({ id: authSchema.oauthConsent.id })
-                .from(authSchema.oauthConsent)
-                .where(eq(authSchema.oauthConsent.userId, user.id))
-            ).map((consent) => consent.id)
-          : []
-      })
-    })
+      extensions: [
+        {
+          claims: {
+            accessToken: async ({ user, client }) => ({
+              pp_consent_ids: user
+                ? (
+                    await db
+                      .select({ id: authSchema.oauthConsent.id })
+                      .from(authSchema.oauthConsent)
+                      .where(
+                        and(
+                          eq(authSchema.oauthConsent.userId, user.id),
+                          eq(authSchema.oauthConsent.clientId, client.clientId)
+                        )
+                      )
+                  ).map((consent) => consent.id)
+                : []
+            })
+          }
+        }
+      ]
+    }),
+    {
+      id: "legacy-mcp-resources",
+      init: async () => {
+        await db.execute(sql`
+          INSERT INTO oauth_client_resource (id, client_id, resource_id, created_at)
+          SELECT gen_random_uuid()::text, client.client_id, ${mcpResource}, now()
+          FROM oauth_client AS client
+          INNER JOIN oauth_application AS legacy
+            ON legacy.id = client.id AND legacy.client_id = client.client_id
+          ON CONFLICT (client_id, resource_id) DO NOTHING
+        `)
+      }
+    }
   ]
 })
 

@@ -140,6 +140,46 @@ describe.skipIf(!databaseUrl)("OAuth application service", () => {
     )
   })
 
+  it("orders refresh-only applications by last use and puts unused clients last", async () => {
+    const older = randomUUID()
+    const unused = randomUUID()
+    try {
+      for (const id of [older, unused]) {
+        await pool.query(
+          "INSERT INTO oauth_client (id, client_id, redirect_uris, created_at) VALUES ($1, $1, $2, now())",
+          [id, ["http://localhost/callback"]]
+        )
+        await pool.query(
+          "INSERT INTO oauth_provider_consent (id, client_id, user_id, scopes, created_at, updated_at) VALUES ($1, $1, $2, $3, now(), now())",
+          [id, userA, ["openid"]]
+        )
+      }
+      await pool.query(
+        "INSERT INTO oauth_refresh_token (id, token, client_id, user_id, expires_at, created_at, scopes) VALUES ($1, $1, $1, $2, now(), $3, $4)",
+        [older, userA, date("2026-09-07T12:03:00.000Z"), ["openid"]]
+      )
+      const applications = await runtime!.runPromise(
+        Effect.flatMap(OAuthApplications, (service) =>
+          service.listForUser(userA)
+        )
+      )
+      expect(applications.map((application) => application.id)).toEqual([
+        clientRowId,
+        older,
+        unused
+      ])
+      expect(applications[1]?.lastUsedAt).toEqual(
+        date("2026-09-07T12:03:00.000Z")
+      )
+      expect(applications[2]?.lastUsedAt).toBeNull()
+    } finally {
+      await pool.query("DELETE FROM oauth_client WHERE id IN ($1, $2)", [
+        older,
+        unused
+      ])
+    }
+  })
+
   it("revokes only the requesting user's consent and tokens", async () => {
     await runtime!.runPromise(
       Effect.gen(function* () {

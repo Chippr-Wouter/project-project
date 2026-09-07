@@ -39,6 +39,14 @@ export const McpHttpLive = Layer.scoped(
       })
     )
 
+    const unauthorized = () =>
+      new Response("Unauthorized", {
+        status: 401,
+        headers: {
+          "www-authenticate": `Bearer resource_metadata="${new URL("/.well-known/oauth-protected-resource/mcp", mcpResource).href}"`
+        }
+      })
+
     const resolveTransport = async (
       req: Request,
       body: unknown,
@@ -50,7 +58,7 @@ export const McpHttpLive = Layer.scoped(
       if (sessionId && sessions.has(sessionId)) {
         const session = sessions.get(sessionId)!
         if (session.userId !== userId || session.clientId !== clientId) {
-          return new Response("Unauthorized", { status: 401 })
+          return unauthorized()
         }
         return session.transport
       }
@@ -102,7 +110,7 @@ export const McpHttpLive = Layer.scoped(
           !Schema.is(Schema.Array(Schema.String))(consentIds) ||
           consentIds.length === 0
         ) {
-          return new Response("Unauthorized", { status: 401 })
+          return unauthorized()
         }
 
         const exit = await runtime.runPromiseExit(
@@ -135,7 +143,7 @@ export const McpHttpLive = Layer.scoped(
           return new Response("Internal error", { status: 500 })
         }
         const user = exit.value
-        if (!user) return new Response("Unauthorized", { status: 401 })
+        if (!user) return unauthorized()
 
         let body: unknown
         if (req.method === "POST") {

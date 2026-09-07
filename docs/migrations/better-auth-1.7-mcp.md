@@ -6,11 +6,13 @@ This deployment moves the MCP authorization provider from the old Better Auth MC
 
 The migration `0029_better_auth_17` creates the provider tables (`oauth_client`, `oauth_client_resource`, `oauth_provider_access_token`, `oauth_provider_consent`, `oauth_refresh_token`, `oauth_resource`, and supporting JWKS/assertion tables). It copies legacy `oauth_application` records into `oauth_client` records. Existing client secrets are copied as the provider's hashed secret; a legacy application without a secret is copied with the `none` token endpoint authentication method. Redirect URLs, client metadata, timestamps, and disabled state are preserved. The new records enable authorization-code and refresh-token grants, code responses, and mandatory PKCE.
 
+After the provider seeds the configured MCP resource, auth initialization links migrated clients to it. The backfill matches both the legacy row ID and client ID and leaves existing mappings unchanged, so repeated starts are safe. Per-client resource enforcement stays enabled.
+
 Legacy OAuth tables are retained. They are not dropped by this migration, so rollback inspection and historical data remain possible. New runtime reads and revocation operate on the new provider tables.
 
 Existing access and refresh tokens are expired during the migration. Legacy consent rows are not migrated into the new provider consent records. Users must authorize each MCP client again after deployment. Revocation removes the new user's refresh tokens, access tokens, and consent for that client while retaining the registered client record.
 
-Tokens carry the consent record IDs present when they were issued. The MCP handler requires a matching persisted consent for the authenticated user and client on every request. Reconnecting creates a new consent, so it cannot restore access to an old revoked token.
+Tokens carry only the authenticated client’s consent record IDs present when they were issued. The MCP handler requires a matching persisted consent for the authenticated user and client on every request. Reconnecting creates a new consent, so it cannot restore access to an old revoked token.
 
 ## Client impact
 
