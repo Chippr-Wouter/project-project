@@ -118,10 +118,9 @@ function ArchiveForm({
     const trimmed = reason.trim()
     void archive({ reason: trimmed.length > 0 ? trimmed : undefined }).then(
       (exit) => {
-        if (Exit.isSuccess(exit)) {
-          onReasonChange("")
-          onClose()
-        }
+        if (!Exit.isSuccess(exit)) return
+        onReasonChange("")
+        onClose()
       }
     )
   }
@@ -148,12 +147,7 @@ function ArchiveForm({
       </label>
       {error && <p className="text-xs text-destructive">{error}</p>}
       <div className="flex items-center justify-end gap-2">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => onClose()}
-        >
+        <Button type="button" variant="ghost" size="sm" onClick={onClose}>
           {m.tickets_archive_cancel()}
         </Button>
         <Button type="button" size="sm" disabled={submitting} onClick={submit}>
