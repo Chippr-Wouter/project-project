@@ -2,7 +2,7 @@ import { mkdir, rm, writeFile } from "node:fs/promises"
 import { arch, cpus, platform } from "node:os"
 import { join, resolve } from "node:path"
 import { randomUUID } from "node:crypto"
-import { BunContext } from "@effect/platform-bun"
+import * as BunServices from "@effect/platform-bun/BunServices"
 import * as Cause from "effect/Cause"
 import * as Clock from "effect/Clock"
 import * as Effect from "effect/Effect"
@@ -133,11 +133,13 @@ const parseOptions = (): Options => {
     "--tickets"
   )
   if (ticketCount < 20) throw new Error("--tickets must be at least 20")
+  const projectsDir = process.env.PROJECTS_DIR
+  if (!projectsDir) throw new Error("PROJECTS_DIR is not set")
   return {
     ticketCount,
     sampleCount: positiveInteger(argumentValue("--samples"), 100, "--samples"),
     concurrencies: parseConcurrencies(argumentValue("--concurrency")),
-    projectsRoot: resolve(process.env.PROJECTS_DIR ?? "/data"),
+    projectsRoot: resolve(projectsDir),
     operation: argumentValue("--operation"),
     variant: argumentValue("--variant") ?? "working-tree",
     round: positiveInteger(argumentValue("--round"), 1, "--round"),
@@ -407,7 +409,7 @@ const FakeAttachments = Layer.succeed(Attachments, {
 
 const DocsLive = TicketDocsLive.pipe(
   Layer.provide(MarkdownLive),
-  Layer.provideMerge(BunContext.layer)
+  Layer.provideMerge(BunServices.layer)
 )
 const DatabaseLive = DbLive.pipe(Layer.provideMerge(PgLive))
 const IndexLive = TicketIndexLive.pipe(

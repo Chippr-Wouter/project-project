@@ -16,13 +16,13 @@ The detail handler previously resolved the index project, then loaded and decode
 
 Before: `ae627531bbe33d1031fe7fd34da5aa351fd6a57c` (original PR). After: `6a626535d3437f91bca965078e3a7fdf27c5a36b` (review fixes and narrow detail query).
 
-Raw comparison rounds: [before](t118-detail-before.jsonl), [after](t118-detail-after.jsonl). The after variant is named `narrow` in the raw reports. Each variant has 4,500 measured requests: 500 samples × 3 concurrency levels × 3 rounds. Metrics in the table are the median of the three per-round values; percentiles are not pooled.
+Raw comparison rounds are local artifacts and are not committed. The after variant is named `narrow` in the raw reports. Each variant has 4,500 measured requests: 500 samples × 3 concurrency levels × 3 rounds. Metrics in the table are the median of the three per-round values; percentiles are not pooled.
 
 ## Was the earlier slowdown repeatable?
 
 The original mixed-workload run showed detail p95 at concurrency 8 increasing from 6.08 to 12.94 ms. A fresh detail-only comparison of its exact `main` revision (`bde242ecc`) and original PR did not reproduce that increase: median round p95 was 5.94 ms on main and 4.87 ms on the PR. The detail handler itself was unchanged between those revisions.
 
-Raw diagnosis rounds: [main](t118-detail-main.jsonl), [original PR](t118-detail-original-pr.jsonl). These establish that the original 2× increase was not stable in the isolated workload; they do not identify the cause of the earlier result. Workload order, different sampled tickets, runtime state, and workstation variability differ from the mixed-workload run. The optimization comparison above uses its own alternating control rounds.
+The local diagnosis rounds comparing main and the original PR establish that the original 2× increase was not stable in the isolated workload; they do not identify the cause of the earlier result. Workload order, different sampled tickets, runtime state, and workstation variability differ from the mixed-workload run. The optimization comparison above uses its own alternating control rounds.
 
 A probe that skipped index reads on tickets without a branch or with an existing PR improved throughput but worsened tail latency under the saturated mixed-ticket workload. The final implementation uses one narrow query on every detail read and improves p95 at all tested concurrency levels.
 
@@ -42,11 +42,12 @@ These are short, closed-loop service benchmarks on a shared development workstat
 Use a disposable database with the candidate migrations applied, and an empty temporary projects root. Run from `packages/backend` in each checkout, using the candidate harness in both:
 
 ```sh
+mkdir -p ../../.benchmark-results
 DATABASE_URL="$BENCHMARK_DATABASE_URL" \
 PROJECTS_DIR="$BENCHMARK_PROJECTS_DIR" \
 bun scripts/benchmark-ticket-request-paths.ts \
   --operation detail --tickets 10000 --samples 500 --concurrency 1,8,32 \
-  --variant before --round 1 --json >> before.jsonl
+  --variant before --round 1 --json >> ../../.benchmark-results/before.jsonl
 ```
 
 Use `--variant after` and a separate output file for the candidate; repeat with rounds 2 and 3 in alternating order. Both checkouts must use the same `benchmark-ticket-request-paths.ts` and `ticket-benchmark-report.ts`. The harness seeds and cleans its own fixture. Omitting `--operation` retains the full benchmark workload.

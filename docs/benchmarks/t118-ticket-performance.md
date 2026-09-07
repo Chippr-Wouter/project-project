@@ -104,12 +104,9 @@ Point paths regress in this fixture: at concurrency 8, detail p95 is 6.08 → 12
 | update-body-with-ticket-mentions | 563.35 | 61.51 | 58.28 | 567.17 | 0 / 0 |
 | create | 8,532.61 | 80.83 | 2.06 | 464.53 | 150 / 0 |
 
-## Raw evidence
+## Raw output
 
-- [Before: three JSONL round reports](t118-before.jsonl)
-- [After: three JSONL round reports](t118-after.jsonl)
-
-Reports contain every workload, p50/p95/p99, throughput, wall time, sample count, failure count, and first failure. The baseline allocation errors are retained verbatim.
+Raw JSON/JSONL results are local artifacts and are not committed. Keep new runs in the gitignored `.benchmark-results/` directory; retain all rounds and failures when comparing results.
 
 ## Reproduce
 
@@ -118,10 +115,11 @@ Use a disposable PostgreSQL database migrated with this branch, plus an empty te
 Create a detached worktree at the before commit and copy `benchmark-ticket-request-paths.ts` and `ticket-benchmark-report.ts` from this branch into its `packages/backend/scripts/`. Make the same installed dependencies available to both checkouts. Run from each checkout's `packages/backend`:
 
 ```sh
+mkdir -p ../../.benchmark-results
 DATABASE_URL="$BENCH_DATABASE_URL" PROJECTS_DIR="$BENCH_PROJECTS_DIR" \
   bun scripts/benchmark-ticket-request-paths.ts \
   --tickets 10000 --samples 100 --concurrency 1,8,32 \
-  --variant before --round 1 --json >> before.jsonl
+  --variant before --round 1 --json >> ../../.benchmark-results/before.jsonl
 ```
 
-Use `--variant after` in the candidate checkout. Repeat for rounds 2 and 3, alternating order as described above. Aggregate each operation/concurrency's p95 and throughput with the median; sum failures. If both variants have no failed samples, `benchmark-ticket-compare.ts --before before.jsonl --after after.jsonl` provides the comparison directly. With failed samples it intentionally stops, so retain and inspect the raw failure evidence instead of suppressing it.
+Use `--variant after` in the candidate checkout. Repeat for rounds 2 and 3, alternating order as described above. Aggregate each operation/concurrency's p95 and throughput with the median; sum failures. If both variants have no failed samples, `benchmark-ticket-compare.ts --before ../../.benchmark-results/before.jsonl --after ../../.benchmark-results/after.jsonl` provides the comparison directly. With failed samples it intentionally stops, so retain and inspect the raw failure evidence instead of suppressing it.

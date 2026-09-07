@@ -9,7 +9,7 @@ import {
 } from "node:fs/promises"
 import { arch, cpus, platform, tmpdir } from "node:os"
 import { join, resolve } from "node:path"
-import { BunContext } from "@effect/platform-bun"
+import * as BunServices from "@effect/platform-bun/BunServices"
 import * as Cause from "effect/Cause"
 import * as Clock from "effect/Clock"
 import * as ConfigProvider from "effect/ConfigProvider"
@@ -329,17 +329,17 @@ const benchmarkProgram = (options: Options, scratchRoot: string) =>
       TicketDocsLive.pipe(
         Layer.provide(MarkdownLive),
         Layer.provideMerge(
-          Layer.setConfigProvider(
-            ConfigProvider.fromMap(new Map([["PROJECTS_DIR", scratchRoot]]))
+          ConfigProvider.layer(
+            ConfigProvider.fromUnknown({ PROJECTS_DIR: scratchRoot })
           )
         ),
-        Layer.provideMerge(BunContext.layer)
+        Layer.provideMerge(BunServices.layer)
       )
     )
   )
 
 const printReport = (
-  report: Effect.Effect.Success<ReturnType<typeof benchmarkProgram>>
+  report: Effect.Success<ReturnType<typeof benchmarkProgram>>
 ) => {
   console.log("Ticket filesystem benchmark")
   console.log(`Scratch parent: ${report.environment.scratchParent}`)

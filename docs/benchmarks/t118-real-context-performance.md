@@ -40,18 +40,19 @@ Detail reads and concurrent edits improve in this experiment. Single-request wri
 Apply [the harness patch](t118-real-context-harness.patch) to `packages/backend/scripts/benchmark-ticket-request-paths.ts` in each revision. Install the existing dependencies, create a disposable PostgreSQL database, and migrate it with the current migrations. Run from `packages/backend`, serially, using the order above and both roles:
 
 ```sh
+mkdir -p ../../.benchmark-results
 DATABASE_URL="$BENCHMARK_DATABASE_URL" PROJECTS_DIR="$BENCHMARK_FIXTURES" BENCHMARK_ROLE=owner \
   bun scripts/benchmark-ticket-request-paths.ts --tickets 10000 --samples 300 \
   --concurrency 1,8,32 --operation detail,update-metadata,update-body \
-  --variant before-owner --round 1 --json
+  --variant before-owner --round 1 --json >> ../../.benchmark-results/before-owner.jsonl
 ```
 
 Use a dedicated empty database and fixture directory: the harness seeds and cleans its benchmark organization/user. The fixed benchmark user makes concurrent runs inappropriate.
 
-Raw rounds: [before owner](t118-real-context-before-owner.jsonl), [after owner](t118-real-context-after-owner.jsonl), [before member](t118-real-context-before-member.jsonl), [after member](t118-real-context-after-member.jsonl).
+Raw owner/member rounds are local artifacts and are not committed. Store new runs in the gitignored `.benchmark-results/` directory.
 
 ## Frontend save request fanout
 
 Ten independent mounted-cache trials per revision, using real Effect atoms with immediate mocked HTTP responses. Each trial mounts three ticket details (two projects) and two project lists, waits for initial reads, edits one ticket, then records requests after mutation completion and 100 ms settling. Every trial made one PATCH; follow-up GETs fell from **14 to 2 (86% fewer)**. Afterward only the edited detail and its project list reload. This measures requests issued, including requests the runtime may supersede; it does not imply every old request would finish at the server.
 
-This is a deterministic work measurement, not browser/save latency. Network delay and rendering are excluded; one authoritative detail GET is deliberately retained. [Raw requests](t118-frontend-request-counts.json), [measurement fixture](t118-frontend-measurement.test.ts.txt). Copy the fixture to `packages/frontend/src/atoms/measurement.test.ts` in each revision, generate the existing Paraglide sources, and run `NODE_OPTIONS=--no-experimental-webstorage ../../node_modules/.bin/vitest run src/atoms/measurement.test.ts` from `packages/frontend`. All 20 trials passed.
+This is a deterministic work measurement, not browser/save latency. Network delay and rendering are excluded; one authoritative detail GET is deliberately retained. Raw request recordings are local artifacts; the [measurement fixture](t118-frontend-measurement.test.ts.txt) remains versioned. Copy the fixture to `packages/frontend/src/atoms/measurement.test.ts` in each revision, generate the existing Paraglide sources, and run `NODE_OPTIONS=--no-experimental-webstorage ../../node_modules/.bin/vitest run src/atoms/measurement.test.ts` from `packages/frontend`. All 20 trials passed.
