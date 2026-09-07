@@ -8,6 +8,11 @@ import * as Schema from "effect/Schema"
 import { runtime } from "@/runtime"
 import { ApiClient } from "@/services/ApiClient"
 import {
+  usesTicketReplicaPrototype,
+  replicaListPrototype,
+  replicaCountPrototype
+} from "./ticketReplicaPrototype"
+import {
   TicketCountQuery,
   TicketId,
   TicketListQuery,
@@ -109,6 +114,8 @@ const ticketsListBaseAtom = Atom.family((key: string) => {
     .atom(
       Effect.gen(function* () {
         const query = yield* decodeListQuery(queryJson)
+        if (usesTicketReplicaPrototype(orgSlug, slug))
+          return yield* replicaListPrototype(query)
         const client = yield* ApiClient
         const page = yield* client.tickets.list({
           params: { orgSlug, slug },
@@ -252,6 +259,8 @@ const ticketsCountBaseAtom = Atom.family((key: string) => {
     .atom(
       Effect.gen(function* () {
         const query = yield* decodeCountQuery(queryJson)
+        if (usesTicketReplicaPrototype(orgSlug, slug))
+          return yield* replicaCountPrototype(query)
         const client = yield* ApiClient
         return yield* client.tickets.count({
           params: { orgSlug, slug },

@@ -1,0 +1,102 @@
+import * as IndexedDb from "@effect/platform-browser/IndexedDb"
+import * as IndexedDbDatabase from "@effect/platform-browser/IndexedDbDatabase"
+import * as IndexedDbTable from "@effect/platform-browser/IndexedDbTable"
+import * as IndexedDbVersion from "@effect/platform-browser/IndexedDbVersion"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Schema from "effect/Schema"
+import {
+  Ticket,
+  matchesTicketQuery,
+  type TicketCountQuery,
+  type TicketCounts,
+  type TicketListQuery
+} from "@projectproject/shared"
+import { ApiClient } from "@/services/ApiClient"
+
+export const usesTicketReplicaPrototype = (orgSlug: string, slug: string) =>
+  import.meta.env.VITE_TICKET_REPLICA_PROTOTYPE === "true" &&
+  location.hostname === "localhost" &&
+  orgSlug === "measure" &&
+  slug === "ten-thousand"
+
+const table = IndexedDbTable.make({
+  name: "snapshot",
+  schema: Schema.Struct({ id: Schema.String, items: Schema.Array(Ticket) }),
+  keyPath: "id"
+})
+const database = IndexedDbDatabase.make(
+  IndexedDbVersion.make(table),
+  Effect.fn(function* (migration) {
+    yield* migration.createObjectStore("snapshot")
+  })
+)
+const layer = database
+  .layer("PROTOTYPE-overview-comparison-v1")
+  .pipe(Layer.provide(IndexedDb.layerWindow))
+
+const hydrate = Effect.gen(function* () {
+  const started = performance.now()
+  const db = yield* database
+  const snapshot = yield* db.from("snapshot").select().equals("fixture")
+  if (snapshot.length > 0) {
+    performance.measure("replica-hydrate", { start: started })
+    return snapshot[0].items
+  }
+  const client = yield* ApiClient
+  const items: Array<Ticket> = []
+  let cursor: string | undefined
+  do {
+    const page = yield* client.tickets.list({
+      params: { orgSlug: "measure", slug: "ten-thousand" },
+      query: cursor ? { cursor } : {}
+    })
+    items.push(...page.items)
+    cursor = page.nextCursor ?? undefined
+  } while (cursor)
+  if (items.length !== 10000)
+    return yield* Effect.die("Expected 10,000 fixture tickets")
+  yield* db.from("snapshot").upsert({ id: "fixture", items })
+  performance.measure("replica-bootstrap", { start: started })
+  return items
+}).pipe(Effect.provide(layer), Effect.scoped)
+
+const snapshot = Effect.runSync(Effect.cached(hydrate))
+
+export const replicaListPrototype = Effect.fn(function* (
+  query: TicketListQuery
+) {
+  if (
+    query.sort.key !== "created" ||
+    query.sort.dir !== "desc" ||
+    query.filter?.groupId
+  )
+    return yield* Effect.die(
+      "Prototype supports default sort and no sprint filter"
+    )
+  const all = yield* snapshot
+  return {
+    items: all.filter((ticket) =>
+      matchesTicketQuery(ticket, query, "measure-user")
+    ),
+    nextCursor: null
+  }
+})
+
+export const replicaCountPrototype = Effect.fn(function* (
+  query: TicketCountQuery
+) {
+  if (query.filter?.groupId)
+    return yield* Effect.die("Prototype does not support sprint filters")
+  const all = yield* snapshot
+  const counts: { total: number; byStatus: Record<string, number> } = {
+    total: 0,
+    byStatus: {}
+  }
+  for (const ticket of all) {
+    if (!matchesTicketQuery(ticket, query, "measure-user")) continue
+    counts.total++
+    counts.byStatus[ticket.status] = (counts.byStatus[ticket.status] ?? 0) + 1
+  }
+  return counts satisfies TicketCounts
+})
