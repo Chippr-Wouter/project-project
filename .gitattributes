@@ -1,0 +1,2 @@
+packages/backend/src/db/migrations/meta/*_snapshot.json linguist-generated=true
+packages/backend/src/db/migrations/**/snapshot.json linguist-generated=true

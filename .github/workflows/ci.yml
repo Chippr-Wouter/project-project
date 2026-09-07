@@ -3,7 +3,6 @@ name: ci
 on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
-    branches: [main]
   push:
     branches: [main]
   workflow_dispatch:
@@ -11,6 +10,19 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: effect-v4-test
+          POSTGRES_DB: projectproject_effect_v4_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -28,6 +40,11 @@ jobs:
 
       - name: Test
         run: vp run test
+
+      - name: Database compatibility
+        run: bun run test:db
+        env:
+          PROJECTPROJECT_TEST_DATABASE_URL: postgres://postgres:effect-v4-test@127.0.0.1:5432/projectproject_effect_v4_test
 
       - name: Build
         run: vp run build

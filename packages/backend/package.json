@@ -31,7 +31,7 @@
     "@octokit/auth-app": "^8.2.0",
     "@octokit/graphql": "^9.0.3",
     "@projectproject/shared": "workspace:*",
-    "better-auth": "^1.6.10",
+    "better-auth": "1.7.3",
     "drizzle-orm": "^0.45.2",
     "effect": "3.21.2",
     "fractional-indexing": "^3.2.0",
@@ -39,7 +39,8 @@
     "octokit": "^5.0.5",
     "pg": "^8.20.0",
     "ulid": "^3.0.2",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "@better-auth/mcp": "1.7.3"
   },
   "devDependencies": {
     "@effect/vitest": "0.29.0",

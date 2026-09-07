@@ -380,6 +380,7 @@ const everhourIntegrationRoutes = HttpRouter.empty.pipe(
 const ServerLive = HttpApiBuilder.serve((apiApp) =>
   HttpRouter.empty.pipe(
     HttpRouter.mountApp("/api/auth", betterAuthApp),
+    HttpRouter.all("/.well-known/*", betterAuthApp),
     HttpRouter.mountApp("/api/integrations/github", githubIntegrationRoutes),
     HttpRouter.mountApp(
       "/api/integrations/everhour/webhook",

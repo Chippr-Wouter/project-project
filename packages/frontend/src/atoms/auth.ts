@@ -143,8 +143,15 @@ export const connectPersonalGithubAtom = runtime.fn(
 
 export const disconnectPersonalGithubAtom = runtime.fn(
   Effect.fn(function* (_: void, get) {
+    const accounts = yield* Effect.tryPromise(() =>
+      authData(authClient.listAccounts())
+    )
+    const githubAccount = accounts?.find(
+      (account) => account.providerId === "github"
+    )
+    if (githubAccount === undefined) return
     yield* Effect.tryPromise(() =>
-      authData(authClient.unlinkAccount({ providerId: "github" }))
+      authData(authClient.unlinkAccount({ accountId: githubAccount.id }))
     )
     get.set(githubAuthEpochAtom, get(githubAuthEpochAtom) + 1)
     get.refresh(meAtom)

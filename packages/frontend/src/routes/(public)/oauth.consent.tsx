@@ -8,27 +8,16 @@ import { m } from "@/paraglide/messages"
 import { Button } from "@/components/ui/button"
 import { DitherShell } from "@/components/ui/dither-shell"
 import { Logo, Wordmark } from "@/components/Logo"
+import { rawQueryFromSearch } from "@/lib/oauthQuery"
 
 type Search = {
-  consent_code?: string
   client_id?: string
   scope?: string
-}
-
-const consentRedirect = (search: Search): string => {
-  const params = new URLSearchParams()
-  if (search.consent_code) params.set("consent_code", search.consent_code)
-  if (search.client_id) params.set("client_id", search.client_id)
-  if (search.scope) params.set("scope", search.scope)
-  const query = params.toString()
-  return query ? `/oauth/consent?${query}` : "/oauth/consent"
 }
 
 export const Route = createFileRoute("/(public)/oauth/consent")({
   component: OauthConsentPage,
   validateSearch: (raw): Search => ({
-    consent_code:
-      typeof raw.consent_code === "string" ? raw.consent_code : undefined,
     client_id: typeof raw.client_id === "string" ? raw.client_id : undefined,
     scope: typeof raw.scope === "string" ? raw.scope : undefined
   })
@@ -37,38 +26,48 @@ export const Route = createFileRoute("/(public)/oauth/consent")({
 function OauthConsentPage() {
   const me = useAtomValue(meAtom)
   const search = Route.useSearch()
-  const { consent_code, client_id } = search
+  const oauthQuery =
+    typeof window === "undefined"
+      ? ""
+      : rawQueryFromSearch(window.location.search)
+  const clientId =
+    search.client_id ??
+    new URLSearchParams(oauthQuery).get("client_id") ??
+    undefined
 
   if (Result.isFailure(me)) {
     return (
-      <Navigate to="/login" search={{ redirect: consentRedirect(search) }} />
+      <Navigate
+        to="/login"
+        search={{ redirect: `/oauth/consent?${oauthQuery}` }}
+      />
     )
   }
 
-  if (!consent_code) {
+  if (!oauthQuery) {
     return <ConsentShell title={m.auth_oauth_consent_title()} />
   }
 
-  return <ConsentForm consentCode={consent_code} clientId={client_id} />
+  return <ConsentForm oauthQuery={oauthQuery} clientId={clientId} />
 }
 
 function ConsentForm({
-  consentCode,
+  oauthQuery,
   clientId
 }: {
-  consentCode: string
+  oauthQuery: string
   clientId: string | undefined
 }) {
-  const submit = useAtomSet(submitConsentAtom(consentCode), {
+  const submit = useAtomSet(submitConsentAtom(oauthQuery), {
     mode: "promiseExit"
   })
-  const submitState = useAtomValue(submitConsentAtom(consentCode))
+  const submitState = useAtomValue(submitConsentAtom(oauthQuery))
   const [pending, setPending] = useState<"accept" | "deny" | null>(null)
   const error = Result.isFailure(submitState) ? m.error_unknown() : null
 
   const onSubmit = async (accept: boolean) => {
     setPending(accept ? "accept" : "deny")
-    const exit = await submit({ accept, consentCode })
+    const exit = await submit({ accept, oauthQuery })
     if (Exit.isSuccess(exit)) {
       window.location.replace(exit.value.redirectURI)
       return

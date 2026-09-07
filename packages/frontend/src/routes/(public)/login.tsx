@@ -1,7 +1,7 @@
 import { Result, useAtomValue } from "@effect-atom/atom-react"
 import { createFileRoute, Navigate } from "@tanstack/react-router"
 import { Mail } from "lucide-react"
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { FormEvent } from "react"
 import { meAtom } from "@/atoms/auth"
 import { Logo, Wordmark } from "@/components/Logo"
@@ -9,6 +9,11 @@ import { Button } from "@/components/ui/button"
 import { Dither, type TimeWarpZone } from "@/components/ui/dither"
 import { Input } from "@/components/ui/input"
 import { safeInternalPath } from "@/lib/safeRedirect"
+import {
+  hasSignedOAuthQuery,
+  oauthAuthorizeUrl,
+  rawQueryFromSearch
+} from "@/lib/oauthQuery"
 import { m } from "@/paraglide/messages"
 import { authClient } from "@/services/AuthClient"
 
@@ -35,14 +40,31 @@ export const Route = createFileRoute("/(public)/login")({
 function LoginPage() {
   const me = useAtomValue(meAtom)
   const { redirect } = Route.useSearch()
+  const signedOauthQuery =
+    typeof window === "undefined"
+      ? ""
+      : rawQueryFromSearch(window.location.search)
+  const oauthAuthorizeTarget = hasSignedOAuthQuery(signedOauthQuery)
+    ? oauthAuthorizeUrl(signedOauthQuery)
+    : null
   const redirectTarget = safeInternalPath(redirect)
+  const oauthContinuationTarget =
+    oauthAuthorizeTarget ??
+    (redirectTarget.startsWith("/oauth/consent?") ? redirectTarget : null)
   const [email, setEmail] = useState("")
   const [magicLinkSent, setMagicLinkSent] = useState(false)
   const [magicLinkPending, setMagicLinkPending] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
   const cardRef = useRef<HTMLDivElement | null>(null)
 
+  useEffect(() => {
+    if (Result.isSuccess(me) && oauthContinuationTarget) {
+      window.location.replace(oauthContinuationTarget)
+    }
+  }, [me, oauthContinuationTarget])
+
   if (Result.isSuccess(me)) {
+    if (oauthContinuationTarget) return null
     const queryIndex = redirectTarget.indexOf("?")
     const pathname =
       queryIndex === -1 ? redirectTarget : redirectTarget.slice(0, queryIndex)
