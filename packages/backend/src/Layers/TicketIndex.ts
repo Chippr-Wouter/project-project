@@ -86,7 +86,6 @@ const ticketSortExpression = (sort: TicketSort): SQL => {
     case "priority":
       return ticketPrioritySortExpression
   }
-  throw new Error("unsupported ticket sort key")
 }
 
 const cursorSortValue = (
@@ -173,7 +172,7 @@ const ticketWhereConditions = (
       assignee === "mine" ? options.viewerId : assignee
     )
     const requestedIds = assignees.filter(
-      (assignee): assignee is string => assignee !== null
+      (assignee) => assignee !== null
     )
     const assigneeConditions: Array<SQL> = []
     if (assignees.includes(null)) {
@@ -469,7 +468,7 @@ export const TicketIndexLive = Layer.effect(
       const conditions = [
         ...ticketWhereConditions(project, ticketQuery, options),
         cursorCondition(ticketQuery, expression)
-      ].filter((condition): condition is SQL => condition !== undefined)
+      ].filter((condition) => condition !== undefined)
       return db
         .select({
           ...getTableColumns(ticketIndex),
