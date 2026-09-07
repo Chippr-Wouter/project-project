@@ -2,12 +2,8 @@ import { Link } from "@tanstack/react-router"
 import * as Schema from "effect/Schema"
 import { Badge } from "@/components/ui/badge"
 import { MemberAvatar } from "@/components/MemberAvatar"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger
-} from "@/components/ui/popover"
-import { TicketMentionCard } from "@/components/Lexical/TicketMentionCard"
+import { Popover, PopoverTrigger } from "@/components/ui/popover"
+import { TicketHoverCard } from "@/components/TicketHoverCard"
 import { useMentionScope } from "@/mentions/scope"
 import { TicketId, type MentionType } from "@projectproject/shared"
 
@@ -84,9 +80,7 @@ export function MentionChip({
           {id}
         </Badge>
       </PopoverTrigger>
-      <PopoverContent className="w-80" align="start">
-        <TicketMentionCard ticketId={makeTicketId(id)} />
-      </PopoverContent>
+      <TicketHoverCard ticketId={makeTicketId(id)} scope={scope} />
     </Popover>
   )
 }

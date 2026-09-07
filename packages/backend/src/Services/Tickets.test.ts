@@ -627,6 +627,7 @@ it.effect("create allocates the next id from the project key", () => {
     })
 
     expect(created.id).toBe("FOO-4")
+    expect(created.body).toBe("")
     expect(documents.has("FOO-4")).toBe(true)
   }).pipe(Effect.provide(layer))
 })
