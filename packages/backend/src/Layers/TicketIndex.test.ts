@@ -2,7 +2,7 @@ import { it } from "@effect/vitest"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
-import { describe, expect } from "vitest"
+import { describe, expect } from "vite-plus/test"
 import { TicketId, TicketStatus } from "@projectproject/shared"
 import {
   detectTicketIndexDrift,

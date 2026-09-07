@@ -3,7 +3,7 @@ import { PgDialect } from "drizzle-orm/pg-core"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import { describe, expect } from "vitest"
+import { describe, expect } from "vite-plus/test"
 import {
   ATTACHMENT_MAX_BYTES,
   isAttachmentDeletable,
@@ -537,14 +537,16 @@ describe("deleteForOrg", () => {
     })
   )
 
-  it.effect("deletes a live attachment, breaking the reference in its ticket", () =>
-    Effect.gen(function* () {
-      const harness = deletionHarness({ status: "live", role: "owner" })
-      const result = yield* harness.run
-      expect(result._tag).toBe("Right")
-      expect(harness.deletedKeys).toEqual([servingRow.objectKey])
-      expect(harness.deletedRows).toHaveLength(1)
-    })
+  it.effect(
+    "deletes a live attachment, breaking the reference in its ticket",
+    () =>
+      Effect.gen(function* () {
+        const harness = deletionHarness({ status: "live", role: "owner" })
+        const result = yield* harness.run
+        expect(result._tag).toBe("Right")
+        expect(harness.deletedKeys).toEqual([servingRow.objectKey])
+        expect(harness.deletedRows).toHaveLength(1)
+      })
   )
 
   it.effect("refuses a pending attachment whose upload may still land", () =>
@@ -1178,16 +1180,18 @@ describe("missingIds", () => {
     })
   )
 
-  it.effect("only counts a servable status, so a pending upload reads as missing", () =>
-    Effect.gen(function* () {
-      const { layer, capture } = resolvableHarness([{ id: "a" }])
-      yield* Attachments.pipe(
-        Effect.flatMap((a) => a.missingIds("acme", ["a"])),
-        Effect.provide(layer)
-      )
-      const where = sqlOf(capture.where)
-      expect(where).toContain("status")
-      expect(where).toContain("org_slug")
-    })
+  it.effect(
+    "only counts a servable status, so a pending upload reads as missing",
+    () =>
+      Effect.gen(function* () {
+        const { layer, capture } = resolvableHarness([{ id: "a" }])
+        yield* Attachments.pipe(
+          Effect.flatMap((a) => a.missingIds("acme", ["a"])),
+          Effect.provide(layer)
+        )
+        const where = sqlOf(capture.where)
+        expect(where).toContain("status")
+        expect(where).toContain("org_slug")
+      })
   )
 })

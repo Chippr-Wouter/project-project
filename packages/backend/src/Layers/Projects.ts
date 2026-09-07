@@ -215,16 +215,14 @@ export const ProjectsLive = Layer.effect(
         })
         .pipe(
           Effect.map((rows) =>
-            rows.map(
-              (r): Member => ({
-                id: r.user.id,
-                username: r.user.username,
-                name: r.user.name,
-                email: r.user.email,
-                image: r.user.image,
-                role: makeRole(r.role)
-              })
-            )
+            rows.map((r): Member => ({
+              id: r.user.id,
+              username: r.user.username,
+              name: r.user.name,
+              email: r.user.email,
+              image: r.user.image,
+              role: makeRole(r.role)
+            }))
           ),
           Effect.orDie
         )
@@ -996,22 +994,22 @@ export const ProjectsLive = Layer.effect(
           ids,
           (id) =>
             Effect.gen(function* () {
-              const ticket = yield* ticketDocs
-                .read(orgSlug, slug, id)
-                .pipe(
-                  Effect.catchTag("NotFound", () => Effect.succeed(null)),
-                  Effect.catchTag("MalformedTicketDocument", (error) =>
-                    Effect.logWarning("Skipping unreadable ticket pr metadata").pipe(
-                      Effect.annotateLogs({
-                        orgSlug,
-                        slug,
-                        ticketId: id,
-                        error
-                      }),
-                      Effect.as(null)
-                    )
+              const ticket = yield* ticketDocs.read(orgSlug, slug, id).pipe(
+                Effect.catchTag("NotFound", () => Effect.succeed(null)),
+                Effect.catchTag("MalformedTicketDocument", (error) =>
+                  Effect.logWarning(
+                    "Skipping unreadable ticket pr metadata"
+                  ).pipe(
+                    Effect.annotateLogs({
+                      orgSlug,
+                      slug,
+                      ticketId: id,
+                      error
+                    }),
+                    Effect.as(null)
                   )
                 )
+              )
               if (
                 ticket === null ||
                 (ticket.pr === null &&

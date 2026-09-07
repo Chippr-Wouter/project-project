@@ -33,7 +33,10 @@ export interface MarkdownShape {
   readonly readProjectFileRaw: (
     orgSlug: string,
     slug: string
-  ) => Effect.Effect<{ path: string; content: string }, NotFound | MarkdownError>
+  ) => Effect.Effect<
+    { path: string; content: string },
+    NotFound | MarkdownError
+  >
   readonly writeProjectFile: (
     orgSlug: string,
     slug: string,
@@ -58,7 +61,10 @@ export interface MarkdownShape {
     orgSlug: string,
     slug: string,
     id: string
-  ) => Effect.Effect<{ path: string; content: string }, NotFound | MarkdownError>
+  ) => Effect.Effect<
+    { path: string; content: string },
+    NotFound | MarkdownError
+  >
   readonly createTicketFile: (
     orgSlug: string,
     slug: string,
@@ -99,7 +105,10 @@ export interface MarkdownShape {
     orgSlug: string,
     slug: string,
     id: string
-  ) => Effect.Effect<{ path: string; content: string }, NotFound | MarkdownError>
+  ) => Effect.Effect<
+    { path: string; content: string },
+    NotFound | MarkdownError
+  >
   readonly createGroupFile: (
     orgSlug: string,
     slug: string,

@@ -27,7 +27,9 @@ export const requireOrgAdmin = (
     .resolve(orgSlug, userId)
     .pipe(
       Effect.flatMap((org) =>
-        isOrgAdminRole(org.role) ? Effect.succeed(org) : Effect.fail(new Forbidden())
+        isOrgAdminRole(org.role)
+          ? Effect.succeed(org)
+          : Effect.fail(new Forbidden())
       )
     )
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "vite-plus/test"
 import { STATE_COLORS } from "./colors"
 
 describe("STATE_COLORS.warning", () => {

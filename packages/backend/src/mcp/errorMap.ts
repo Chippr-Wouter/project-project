@@ -1,13 +1,16 @@
 import * as ParseResult from "effect/ParseResult"
 
 export interface McpToolErrorResult {
-  readonly content: ReadonlyArray<{ readonly type: "text"; readonly text: string }>
+  readonly content: ReadonlyArray<{
+    readonly type: "text"
+    readonly text: string
+  }>
   readonly isError: true
 }
 
 const text = (s: string): McpToolErrorResult => ({
   content: [{ type: "text", text: s }],
-  isError: true,
+  isError: true
 })
 
 const reasonOf = (e: unknown): string | undefined => {
@@ -75,7 +78,9 @@ export const mapToolError = (e: unknown): McpToolErrorResult => {
           ? String((e as { name?: unknown }).name)
           : undefined
       return text(
-        name ? `Branch not found on remote: ${name}.` : "Branch not found on remote."
+        name
+          ? `Branch not found on remote: ${name}.`
+          : "Branch not found on remote."
       )
     }
     case "BranchExists": {
@@ -83,7 +88,9 @@ export const mapToolError = (e: unknown): McpToolErrorResult => {
         typeof e === "object" && e !== null && "branch" in e
           ? String((e as { branch?: unknown }).branch)
           : undefined
-      return text(name ? `Branch already exists: ${name}.` : "Branch already exists.")
+      return text(
+        name ? `Branch already exists: ${name}.` : "Branch already exists."
+      )
     }
     case "BranchProtected":
       return text("Branch is protected.")

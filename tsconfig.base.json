@@ -1,4 +1,5 @@
 {
+  "$schema": "./node_modules/@effect/tsgo/schema.json",
   "compilerOptions": {
     "target": "ES2023",
     "module": "ESNext",
@@ -21,7 +22,6 @@
         "name": "@effect/language-service",
         "namespaceImportPackages": ["@effect/platform-node", "effect"],
         "diagnosticSeverity": {
-          "importFromBarrel": "error",
           "anyUnknownInErrorContext": "error",
           "unsafeEffectTypeAssertion": "error",
           "instanceOfSchema": "error",

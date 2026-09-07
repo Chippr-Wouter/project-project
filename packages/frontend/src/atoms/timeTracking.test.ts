@@ -1,7 +1,7 @@
 import { Result } from "@effect-atom/atom-react"
 import * as DateTime from "effect/DateTime"
 import * as Schema from "effect/Schema"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "vite-plus/test"
 import { GroupId, TicketId, type ActiveTimer } from "@projectproject/shared"
 import { optimisticStopTimer, ticketTimeKeysForTimers } from "./timeTracking"
 

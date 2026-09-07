@@ -8,13 +8,13 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vp test run"
   },
   "dependencies": {
     "@effect/platform": "0.96.1",
     "effect": "3.21.2"
   },
   "devDependencies": {
-    "vitest": "^3.2.0"
+    "vite-plus": "0.3.0"
   }
 }

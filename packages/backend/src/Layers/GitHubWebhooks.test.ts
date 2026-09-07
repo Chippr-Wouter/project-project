@@ -2,7 +2,7 @@ import { it } from "@effect/vitest"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
-import { expect } from "vitest"
+import { expect } from "vite-plus/test"
 import {
   applyPullRequestWebhookToTicket,
   makeGitHubWebhooks,
@@ -294,35 +294,37 @@ it.effect("logs and ignores malformed handled payloads", () =>
   })
 )
 
-it.effect("dispatches repository.renamed with metadata matched by repo id", () =>
-  Effect.gen(function* () {
-    const calls: Array<Call> = []
-    const webhooks = makeGitHubWebhooks(makeSink(calls))
-    yield* webhooks.handle(
-      delivery("repository", {
-        action: "renamed",
-        installation: { id: "123" },
-        repository: {
-          id: 456,
-          name: "new-name",
-          owner: { login: "acme" },
-          default_branch: "main"
+it.effect(
+  "dispatches repository.renamed with metadata matched by repo id",
+  () =>
+    Effect.gen(function* () {
+      const calls: Array<Call> = []
+      const webhooks = makeGitHubWebhooks(makeSink(calls))
+      yield* webhooks.handle(
+        delivery("repository", {
+          action: "renamed",
+          installation: { id: "123" },
+          repository: {
+            id: 456,
+            name: "new-name",
+            owner: { login: "acme" },
+            default_branch: "main"
+          }
+        })
+      )
+      expect(calls).toEqual([
+        {
+          type: "repositoryRenamed",
+          change: {
+            installationId: "123",
+            repoId: "456",
+            owner: "acme",
+            name: "new-name",
+            defaultBranch: "main"
+          }
         }
-      })
-    )
-    expect(calls).toEqual([
-      {
-        type: "repositoryRenamed",
-        change: {
-          installationId: "123",
-          repoId: "456",
-          owner: "acme",
-          name: "new-name",
-          defaultBranch: "main"
-        }
-      }
-    ])
-  })
+      ])
+    })
 )
 
 it.effect("dispatches repository.transferred with metadata", () =>
@@ -547,7 +549,9 @@ it.effect("maps check_suite status and conclusion to check state", () =>
           branch: "feat/T-83-check-status-webhooks",
           headSha: "sha-1",
           checks: input.checks,
-          updatedAt: DateTime.toDate(DateTime.unsafeMake("2026-07-04T10:00:00.000Z"))
+          updatedAt: DateTime.toDate(
+            DateTime.unsafeMake("2026-07-04T10:00:00.000Z")
+          )
         }
       }))
     )
@@ -576,45 +580,52 @@ it.effect("ignores check_suite deliveries without a head branch", () =>
   })
 )
 
-it.effect("dispatches commit status state as check state for branch heads", () =>
-  Effect.gen(function* () {
-    const calls: Array<Call> = []
-    const webhooks = makeGitHubWebhooks(makeSink(calls))
-    const cases = [
-      { state: "success", checks: "passing" },
-      { state: "failure", checks: "failing" },
-      { state: "error", checks: "failing" },
-      { state: "pending", checks: "pending" }
-    ] as const
-    for (const input of cases) {
-      yield* webhooks.handle(
-        delivery("status", {
-          installation: { id: "123" },
-          repository: { id: "456" },
-          sha: "sha-1",
-          state: input.state,
-          updated_at: "2026-07-04T10:00:00.000Z",
-          branches: [
-            { name: "feat/T-83-check-status-webhooks", commit: { sha: "sha-1" } },
-            { name: "main", commit: { sha: "other-sha" } }
-          ]
-        })
+it.effect(
+  "dispatches commit status state as check state for branch heads",
+  () =>
+    Effect.gen(function* () {
+      const calls: Array<Call> = []
+      const webhooks = makeGitHubWebhooks(makeSink(calls))
+      const cases = [
+        { state: "success", checks: "passing" },
+        { state: "failure", checks: "failing" },
+        { state: "error", checks: "failing" },
+        { state: "pending", checks: "pending" }
+      ] as const
+      for (const input of cases) {
+        yield* webhooks.handle(
+          delivery("status", {
+            installation: { id: "123" },
+            repository: { id: "456" },
+            sha: "sha-1",
+            state: input.state,
+            updated_at: "2026-07-04T10:00:00.000Z",
+            branches: [
+              {
+                name: "feat/T-83-check-status-webhooks",
+                commit: { sha: "sha-1" }
+              },
+              { name: "main", commit: { sha: "other-sha" } }
+            ]
+          })
+        )
+      }
+      expect(calls).toEqual(
+        cases.map((input) => ({
+          type: "checkStateChanged",
+          change: {
+            installationId: "123",
+            repositoryId: "456",
+            branch: "feat/T-83-check-status-webhooks",
+            headSha: "sha-1",
+            checks: input.checks,
+            updatedAt: DateTime.toDate(
+              DateTime.unsafeMake("2026-07-04T10:00:00.000Z")
+            )
+          }
+        }))
       )
-    }
-    expect(calls).toEqual(
-      cases.map((input) => ({
-        type: "checkStateChanged",
-        change: {
-          installationId: "123",
-          repositoryId: "456",
-          branch: "feat/T-83-check-status-webhooks",
-          headSha: "sha-1",
-          checks: input.checks,
-          updatedAt: DateTime.toDate(DateTime.unsafeMake("2026-07-04T10:00:00.000Z"))
-        }
-      }))
-    )
-  })
+    })
 )
 
 it.effect("ignores commit status for commits that are not a branch head", () =>
@@ -687,7 +698,9 @@ it.effect("logs and ignores malformed check payloads", () =>
 const ticketId = Schema.decodeUnknownSync(TicketId)
 const ticketStatus = Schema.decodeUnknownSync(TicketStatus)
 
-const baseDocument = (overrides: Partial<TicketDocument> = {}): TicketDocument => ({
+const baseDocument = (
+  overrides: Partial<TicketDocument> = {}
+): TicketDocument => ({
   id: ticketId("T-1"),
   title: "first",
   status: ticketStatus("in_progress"),
@@ -707,7 +720,9 @@ const baseDocument = (overrides: Partial<TicketDocument> = {}): TicketDocument =
   ...overrides
 })
 
-const baseMatch = (overrides: Partial<PullRequestWebhookMatch> = {}): PullRequestWebhookMatch => ({
+const baseMatch = (
+  overrides: Partial<PullRequestWebhookMatch> = {}
+): PullRequestWebhookMatch => ({
   orgSlug: "org",
   organizationId: "org-1",
   projectId: "project-1",
@@ -722,7 +737,8 @@ const makeFakeDocs = (initial: ReadonlyArray<TicketDocument>) => {
   const writes: Array<{ id: string; document: TicketDocument }> = []
   const reads: Array<string> = []
   const shape: TicketDocsShape = {
-    listIds: () => Effect.succeed([...documents.keys()].map((id) => ticketId(id))),
+    listIds: () =>
+      Effect.succeed([...documents.keys()].map((id) => ticketId(id))),
     read: (_org, _slug, id) => {
       reads.push(id)
       const doc = documents.get(id)
@@ -743,7 +759,8 @@ const makeFakeDocs = (initial: ReadonlyArray<TicketDocument>) => {
 const makeFakeIndex = (overrides: Partial<TicketIndexShape> = {}) => {
   const upserts: Array<{ projectId: string; ticketId: string }> = []
   const shape: TicketIndexShape = {
-    projectFor: () => Effect.die(new Error("unexpected TicketIndex.projectFor call")),
+    projectFor: () =>
+      Effect.die(new Error("unexpected TicketIndex.projectFor call")),
     list: () => Effect.succeed([]),
     listIds: () => Effect.succeed([]),
     tagUsageCounts: () => Effect.succeed({}),
@@ -765,9 +782,7 @@ const makeFakeIndex = (overrides: Partial<TicketIndexShape> = {}) => {
     reconcileProject: () =>
       Effect.die(new Error("unexpected TicketIndex.reconcileProject call")),
     reconcileAllProjects: () =>
-      Effect.die(
-        new Error("unexpected TicketIndex.reconcileAllProjects call")
-      ),
+      Effect.die(new Error("unexpected TicketIndex.reconcileAllProjects call")),
     ...overrides
   }
   return { upserts, shape }
@@ -781,184 +796,198 @@ const openChange: GitHubPullRequestWebhookChange = {
   state: "open"
 }
 
-it.effect("applyPullRequestWebhookToTicket writes markdown and upserts the index on opened", () =>
-  Effect.gen(function* () {
-    const docs = makeFakeDocs([baseDocument()])
-    const index = makeFakeIndex()
+it.effect(
+  "applyPullRequestWebhookToTicket writes markdown and upserts the index on opened",
+  () =>
+    Effect.gen(function* () {
+      const docs = makeFakeDocs([baseDocument()])
+      const index = makeFakeIndex()
 
-    yield* applyPullRequestWebhookToTicket(
-      { ticketDocs: docs.shape, ticketIndex: index.shape },
-      baseMatch(),
-      openChange,
-      "delivery-1"
-    )
+      yield* applyPullRequestWebhookToTicket(
+        { ticketDocs: docs.shape, ticketIndex: index.shape },
+        baseMatch(),
+        openChange,
+        "delivery-1"
+      )
 
-    expect(docs.writes).toHaveLength(1)
-    expect(docs.writes[0].document.pr).toBe(80)
-    expect(docs.writes[0].document.prState).toBe("open")
-    expect(docs.writes[0].document.status).toBe("in_progress")
-    expect(index.upserts).toEqual([{ projectId: "project-1", ticketId: "T-1" }])
-  })
-)
-
-it.effect("applyPullRequestWebhookToTicket propagates index write failures", () =>
-  Effect.gen(function* () {
-    const docs = makeFakeDocs([baseDocument()])
-    const index = makeFakeIndex({
-      upsertTicket: () => Effect.die(new Error("index failed"))
+      expect(docs.writes).toHaveLength(1)
+      expect(docs.writes[0].document.pr).toBe(80)
+      expect(docs.writes[0].document.prState).toBe("open")
+      expect(docs.writes[0].document.status).toBe("in_progress")
+      expect(index.upserts).toEqual([
+        { projectId: "project-1", ticketId: "T-1" }
+      ])
     })
-
-    const exit = yield* applyPullRequestWebhookToTicket(
-      { ticketDocs: docs.shape, ticketIndex: index.shape },
-      baseMatch(),
-      openChange,
-      "delivery-1"
-    ).pipe(Effect.exit)
-
-    expect(exit._tag).toBe("Failure")
-    expect(docs.writes).toHaveLength(1)
-  })
 )
 
-it.effect("applyPullRequestWebhookToTicket serializes same-ticket deliveries", () =>
-  Effect.gen(function* () {
-    const docs = makeFakeDocs([baseDocument()])
-    const index = makeFakeIndex()
-    let activeReads = 0
-    let maxActiveReads = 0
-    const serialDocs: TicketDocsShape = {
-      ...docs.shape,
-      read: (org, slug, id) =>
-        Effect.gen(function* () {
-          activeReads += 1
-          maxActiveReads = Math.max(maxActiveReads, activeReads)
-          yield* Effect.yieldNow()
-          return yield* docs.shape.read(org, slug, id)
-        }).pipe(
-          Effect.ensuring(
-            Effect.sync(() => {
-              activeReads -= 1
+it.effect(
+  "applyPullRequestWebhookToTicket propagates index write failures",
+  () =>
+    Effect.gen(function* () {
+      const docs = makeFakeDocs([baseDocument()])
+      const index = makeFakeIndex({
+        upsertTicket: () => Effect.die(new Error("index failed"))
+      })
+
+      const exit = yield* applyPullRequestWebhookToTicket(
+        { ticketDocs: docs.shape, ticketIndex: index.shape },
+        baseMatch(),
+        openChange,
+        "delivery-1"
+      ).pipe(Effect.exit)
+
+      expect(exit._tag).toBe("Failure")
+      expect(docs.writes).toHaveLength(1)
+    })
+)
+
+it.effect(
+  "applyPullRequestWebhookToTicket serializes same-ticket deliveries",
+  () =>
+    Effect.gen(function* () {
+      const docs = makeFakeDocs([baseDocument()])
+      const index = makeFakeIndex()
+      let activeReads = 0
+      let maxActiveReads = 0
+      const serialDocs: TicketDocsShape = {
+        ...docs.shape,
+        read: (org, slug, id) =>
+          Effect.gen(function* () {
+            activeReads += 1
+            maxActiveReads = Math.max(maxActiveReads, activeReads)
+            yield* Effect.yieldNow()
+            return yield* docs.shape.read(org, slug, id)
+          }).pipe(
+            Effect.ensuring(
+              Effect.sync(() => {
+                activeReads -= 1
+              })
+            )
+          )
+      }
+
+      yield* Effect.all(
+        [
+          applyPullRequestWebhookToTicket(
+            { ticketDocs: serialDocs, ticketIndex: index.shape },
+            baseMatch(),
+            openChange,
+            "delivery-1"
+          ),
+          applyPullRequestWebhookToTicket(
+            { ticketDocs: serialDocs, ticketIndex: index.shape },
+            baseMatch(),
+            openChange,
+            "delivery-2"
+          )
+        ],
+        { concurrency: "unbounded" }
+      )
+
+      expect(maxActiveReads).toBe(1)
+      expect(docs.writes).toHaveLength(1)
+      expect(index.upserts).toHaveLength(1)
+    })
+)
+
+it.effect(
+  "applyPullRequestWebhookToTicket skips when ticket markdown branch no longer matches the index row",
+  () =>
+    Effect.gen(function* () {
+      const docs = makeFakeDocs([baseDocument({ branch: "feat/T-1-renamed" })])
+      const index = makeFakeIndex()
+
+      yield* applyPullRequestWebhookToTicket(
+        { ticketDocs: docs.shape, ticketIndex: index.shape },
+        baseMatch({ branch: "feat/T-1" }),
+        openChange,
+        "delivery-1"
+      )
+
+      expect(docs.writes).toEqual([])
+      expect(index.upserts).toEqual([])
+    })
+)
+
+it.effect(
+  "applyPullRequestWebhookToTicket skips when markdown is malformed",
+  () =>
+    Effect.gen(function* () {
+      const docs = makeFakeDocs([])
+      const index = makeFakeIndex()
+      const malformedDocs: TicketDocsShape = {
+        ...docs.shape,
+        read: () =>
+          Effect.fail(
+            new MalformedTicketDocument({
+              orgSlug: "org",
+              slug: "p",
+              ticketId: "T-1",
+              path: "orgs/org/projects/p/tickets/T-1.md",
+              reason: "invalid_frontmatter",
+              cause: "boom"
             })
           )
-        )
-    }
+      }
 
-    yield* Effect.all(
-      [
-        applyPullRequestWebhookToTicket(
-          { ticketDocs: serialDocs, ticketIndex: index.shape },
-          baseMatch(),
-          openChange,
-          "delivery-1"
-        ),
-        applyPullRequestWebhookToTicket(
-          { ticketDocs: serialDocs, ticketIndex: index.shape },
-          baseMatch(),
-          openChange,
-          "delivery-2"
-        )
-      ],
-      { concurrency: "unbounded" }
-    )
+      yield* applyPullRequestWebhookToTicket(
+        { ticketDocs: malformedDocs, ticketIndex: index.shape },
+        baseMatch(),
+        openChange,
+        "delivery-1"
+      )
 
-    expect(maxActiveReads).toBe(1)
-    expect(docs.writes).toHaveLength(1)
-    expect(index.upserts).toHaveLength(1)
-  })
+      expect(docs.writes).toEqual([])
+      expect(index.upserts).toEqual([])
+    })
 )
 
-it.effect("applyPullRequestWebhookToTicket skips when ticket markdown branch no longer matches the index row", () =>
-  Effect.gen(function* () {
-    const docs = makeFakeDocs([baseDocument({ branch: "feat/T-1-renamed" })])
-    const index = makeFakeIndex()
+it.effect(
+  "applyPullRequestWebhookToTicket drops a webhook for an older PR number",
+  () =>
+    Effect.gen(function* () {
+      const docs = makeFakeDocs([baseDocument({ pr: 81, prState: "open" })])
+      const index = makeFakeIndex()
 
-    yield* applyPullRequestWebhookToTicket(
-      { ticketDocs: docs.shape, ticketIndex: index.shape },
-      baseMatch({ branch: "feat/T-1" }),
-      openChange,
-      "delivery-1"
-    )
+      yield* applyPullRequestWebhookToTicket(
+        { ticketDocs: docs.shape, ticketIndex: index.shape },
+        baseMatch(),
+        { ...openChange, number: 80 },
+        "delivery-1"
+      )
 
-    expect(docs.writes).toEqual([])
-    expect(index.upserts).toEqual([])
-  })
+      expect(docs.writes).toEqual([])
+      expect(index.upserts).toEqual([])
+    })
 )
 
-it.effect("applyPullRequestWebhookToTicket skips when markdown is malformed", () =>
-  Effect.gen(function* () {
-    const docs = makeFakeDocs([])
-    const index = makeFakeIndex()
-    const malformedDocs: TicketDocsShape = {
-      ...docs.shape,
-      read: () =>
-        Effect.fail(
-          new MalformedTicketDocument({
-            orgSlug: "org",
-            slug: "p",
-            ticketId: "T-1",
-            path: "orgs/org/projects/p/tickets/T-1.md",
-            reason: "invalid_frontmatter",
-            cause: "boom"
-          })
-        )
-    }
+it.effect(
+  "applyPullRequestWebhookToTicket transitions to done once on merged",
+  () =>
+    Effect.gen(function* () {
+      const docs = makeFakeDocs([baseDocument()])
+      const index = makeFakeIndex()
 
-    yield* applyPullRequestWebhookToTicket(
-      { ticketDocs: malformedDocs, ticketIndex: index.shape },
-      baseMatch(),
-      openChange,
-      "delivery-1"
-    )
+      yield* applyPullRequestWebhookToTicket(
+        { ticketDocs: docs.shape, ticketIndex: index.shape },
+        baseMatch(),
+        { ...openChange, state: "merged" },
+        "delivery-1"
+      )
 
-    expect(docs.writes).toEqual([])
-    expect(index.upserts).toEqual([])
-  })
-)
+      expect(docs.writes).toHaveLength(1)
+      expect(docs.writes[0].document.status).toBe("done")
+      expect(docs.writes[0].document.prState).toBe("merged")
+      expect(docs.writes[0].document.lastTransitionedPr).toBe(80)
 
-it.effect("applyPullRequestWebhookToTicket drops a webhook for an older PR number", () =>
-  Effect.gen(function* () {
-    const docs = makeFakeDocs([
-      baseDocument({ pr: 81, prState: "open" })
-    ])
-    const index = makeFakeIndex()
+      yield* applyPullRequestWebhookToTicket(
+        { ticketDocs: docs.shape, ticketIndex: index.shape },
+        baseMatch(),
+        { ...openChange, state: "merged" },
+        "delivery-2"
+      )
 
-    yield* applyPullRequestWebhookToTicket(
-      { ticketDocs: docs.shape, ticketIndex: index.shape },
-      baseMatch(),
-      { ...openChange, number: 80 },
-      "delivery-1"
-    )
-
-    expect(docs.writes).toEqual([])
-    expect(index.upserts).toEqual([])
-  })
-)
-
-it.effect("applyPullRequestWebhookToTicket transitions to done once on merged", () =>
-  Effect.gen(function* () {
-    const docs = makeFakeDocs([baseDocument()])
-    const index = makeFakeIndex()
-
-    yield* applyPullRequestWebhookToTicket(
-      { ticketDocs: docs.shape, ticketIndex: index.shape },
-      baseMatch(),
-      { ...openChange, state: "merged" },
-      "delivery-1"
-    )
-
-    expect(docs.writes).toHaveLength(1)
-    expect(docs.writes[0].document.status).toBe("done")
-    expect(docs.writes[0].document.prState).toBe("merged")
-    expect(docs.writes[0].document.lastTransitionedPr).toBe(80)
-
-    yield* applyPullRequestWebhookToTicket(
-      { ticketDocs: docs.shape, ticketIndex: index.shape },
-      baseMatch(),
-      { ...openChange, state: "merged" },
-      "delivery-2"
-    )
-
-    expect(docs.writes).toHaveLength(1)
-    expect(index.upserts).toHaveLength(1)
-  })
+      expect(docs.writes).toHaveLength(1)
+      expect(index.upserts).toHaveLength(1)
+    })
 )

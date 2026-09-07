@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "vite-plus/test"
 import * as Schema from "effect/Schema"
 import { reconcilePendingSprintAssignments } from "./pendingSprintAssignment"
 import type { GroupId, TicketId } from "@projectproject/shared"
@@ -22,9 +22,9 @@ describe("reconcilePendingSprintAssignments", () => {
     const t1 = ticketId("T-1")
     const pending = new Map<TicketId, GroupId | null>([[t1, a]])
 
-    expect(
-      reconcilePendingSprintAssignments(pending, [sprint(a, [])])
-    ).toBe(pending)
+    expect(reconcilePendingSprintAssignments(pending, [sprint(a, [])])).toBe(
+      pending
+    )
   })
 
   it("clears a pending assignment once the sprint membership matches", () => {
@@ -59,9 +59,9 @@ describe("reconcilePendingSprintAssignments", () => {
     const t1 = ticketId("T-1")
     const pending = new Map<TicketId, GroupId | null>([[t1, null]])
 
-    expect(
-      reconcilePendingSprintAssignments(pending, [sprint(a, [t1])])
-    ).toBe(pending)
+    expect(reconcilePendingSprintAssignments(pending, [sprint(a, [t1])])).toBe(
+      pending
+    )
   })
 
   it("ignores completed sprints when reading server membership", () => {

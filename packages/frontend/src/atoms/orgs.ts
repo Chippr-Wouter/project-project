@@ -139,25 +139,21 @@ const orgMembersBaseAtom = Atom.family((orgSlug: string) =>
             query: { organizationSlug: orgSlug }
           })
         )
-        const members = (full?.members ?? []).map(
-          (member): OrgMember => ({
-            id: member.id,
-            userId: member.userId,
-            role: toOrgRole(member.role),
-            name: member.user?.name ?? member.user?.email ?? "",
-            email: member.user?.email ?? "",
-            image: member.user?.image ?? null
-          })
-        )
+        const members = (full?.members ?? []).map((member): OrgMember => ({
+          id: member.id,
+          userId: member.userId,
+          role: toOrgRole(member.role),
+          name: member.user?.name ?? member.user?.email ?? "",
+          email: member.user?.email ?? "",
+          image: member.user?.image ?? null
+        }))
         const invitations = (full?.invitations ?? [])
           .filter((invitation) => invitation.status === "pending")
-          .map(
-            (invitation): OrgInvitation => ({
-              id: invitation.id,
-              email: invitation.email,
-              role: toOrgRole(invitation.role)
-            })
-          )
+          .map((invitation): OrgInvitation => ({
+            id: invitation.id,
+            email: invitation.email,
+            role: toOrgRole(invitation.role)
+          }))
         return { members, invitations }
       })
     )

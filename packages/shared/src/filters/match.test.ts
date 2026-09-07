@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "vite-plus/test"
 import * as DateTime from "effect/DateTime"
 import * as Schema from "effect/Schema"
 import type { Ticket } from "../schemas/Ticket"
@@ -50,7 +50,9 @@ describe("matchesTicketFilter", () => {
     const t = baseTicket({ status: s("in_progress") })
     const f: TicketFilter = { status: [s("in_progress"), s("done")] }
     expect(matchesTicketFilter(t, f)).toBe(true)
-    expect(matchesTicketFilter(baseTicket({ status: s("todo") }), f)).toBe(false)
+    expect(matchesTicketFilter(baseTicket({ status: s("todo") }), f)).toBe(
+      false
+    )
   })
 
   it("empty status array matches nothing", () => {
@@ -153,13 +155,17 @@ describe("matchesTicketQuery", () => {
   })
 
   it("hides archived tickets by default", () => {
-    const archived = baseTicket({ archivedAt: isoDate("2026-05-11T00:00:00.000Z") })
+    const archived = baseTicket({
+      archivedAt: isoDate("2026-05-11T00:00:00.000Z")
+    })
     expect(matchesTicketQuery(archived, {}, "user-a")).toBe(false)
     expect(matchesTicketQuery(baseTicket(), {}, "user-a")).toBe(true)
   })
 
   it("shows only archived tickets when archived filter is set", () => {
-    const archived = baseTicket({ archivedAt: isoDate("2026-05-11T00:00:00.000Z") })
+    const archived = baseTicket({
+      archivedAt: isoDate("2026-05-11T00:00:00.000Z")
+    })
     const active = baseTicket()
     expect(
       matchesTicketQuery(archived, { filter: { archived: true } }, "user-a")
@@ -252,10 +258,18 @@ describe("matchesTicketQuery", () => {
       updatedAt: isoDate("2026-05-10T00:00:00.000Z")
     }
     expect(
-      matchesTicketQuery(predicted, { filter: { status: [s("todo")] } }, "user-a")
+      matchesTicketQuery(
+        predicted,
+        { filter: { status: [s("todo")] } },
+        "user-a"
+      )
     ).toBe(true)
     expect(
-      matchesTicketQuery(predicted, { filter: { status: [s("done")] } }, "user-a")
+      matchesTicketQuery(
+        predicted,
+        { filter: { status: [s("done")] } },
+        "user-a"
+      )
     ).toBe(false)
     expect(matchesTicketQuery(predicted, { q: "anything" }, "user-a")).toBe(
       false

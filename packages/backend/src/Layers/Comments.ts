@@ -48,7 +48,12 @@ export const CommentsLive = Layer.effect(
     const ensureMember = (orgSlug: string, userId: string, slug: string) =>
       projects.requireMember(orgSlug, userId, slug)
 
-    const validateBody = (orgSlug: string, userId: string, slug: string, body: string) =>
+    const validateBody = (
+      orgSlug: string,
+      userId: string,
+      slug: string,
+      body: string
+    ) =>
       Effect.gen(function* () {
         if (!body.includes("](mention:")) return
         const project = yield* projects.get(orgSlug, userId, slug)

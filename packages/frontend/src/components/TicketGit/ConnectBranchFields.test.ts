@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "vite-plus/test"
 import { type BranchItemsCache, branchItemsView } from "./ConnectBranchFields"
 import type { BranchListItem } from "@projectproject/shared"
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "vite-plus/test"
 import { Conflict, Forbidden, NotFound } from "@projectproject/shared"
 import { statusCreateErrorMessage } from "./errorMessage"
 

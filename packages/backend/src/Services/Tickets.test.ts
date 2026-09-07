@@ -3,7 +3,7 @@ import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import { expect } from "vitest"
+import { expect } from "vite-plus/test"
 import {
   DEFAULT_TICKET_SORT,
   NotFound,

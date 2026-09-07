@@ -54,7 +54,10 @@ export type HandlersMap<R> = {
 }
 
 type JsonContentResult = {
-  readonly content: ReadonlyArray<{ readonly type: "text"; readonly text: string }>
+  readonly content: ReadonlyArray<{
+    readonly type: "text"
+    readonly text: string
+  }>
 }
 
 const asJsonContent = (value: unknown): JsonContentResult => ({

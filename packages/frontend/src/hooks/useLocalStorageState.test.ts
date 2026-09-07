@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from "vitest"
+import { describe, expect, it, beforeEach } from "vite-plus/test"
 import { renderHook, act } from "@testing-library/react"
 import * as Schema from "effect/Schema"
 import { useLocalStorageState } from "./useLocalStorageState"

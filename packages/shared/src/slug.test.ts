@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "vite-plus/test"
 import { BASELINE_STATUS_SLUGS } from "./schemas/Status"
 import { deriveStatusSlug, isReservedStatusSlug } from "./slug"
 

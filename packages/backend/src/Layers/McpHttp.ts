@@ -103,9 +103,7 @@ export const McpHttpLive = Layer.scoped(
       )
       if (Exit.isFailure(exit)) {
         runtime.runSync(
-          Effect.logError(
-            `mcp user lookup failed: ${Cause.pretty(exit.cause)}`
-          )
+          Effect.logError(`mcp user lookup failed: ${Cause.pretty(exit.cause)}`)
         )
         return new Response("Internal error", { status: 500 })
       }

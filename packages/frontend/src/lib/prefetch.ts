@@ -4,10 +4,7 @@ import {
   projectStatusesAtom
 } from "@/atoms/projectStatuses"
 import { projectAtom, projectKey } from "@/atoms/projects"
-import {
-  projectKey as sprintsKey,
-  sprintsListAtom
-} from "@/atoms/sprints"
+import { projectKey as sprintsKey, sprintsListAtom } from "@/atoms/sprints"
 import { ticketsCountAtom, ticketsCountKey } from "@/atoms/tickets"
 
 export function projectPrefetchAtoms(

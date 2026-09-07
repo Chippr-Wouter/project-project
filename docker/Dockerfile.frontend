@@ -5,7 +5,10 @@
 # folder copied in plus our nginx config that handles SPA fallback and
 # the /api/* proxy.
 
-FROM oven/bun:1.2.13-alpine AS build
+FROM oven/bun:1.3.13-slim AS bun
+
+FROM node:24.15.0-bookworm-slim AS build
+COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 WORKDIR /app
 
 COPY package.json bun.lock* bun.lockb* tsconfig.base.json ./
@@ -14,6 +17,8 @@ COPY packages/backend/package.json ./packages/backend/
 COPY packages/frontend/package.json ./packages/frontend/
 RUN bun install --frozen-lockfile
 
+COPY vite.config.ts ./
+COPY tools ./tools
 COPY packages/shared ./packages/shared
 COPY packages/frontend ./packages/frontend
 

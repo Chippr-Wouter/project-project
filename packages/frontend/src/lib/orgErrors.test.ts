@@ -1,5 +1,5 @@
 import * as Exit from "effect/Exit"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "vite-plus/test"
 import { orgActionError, orgActionErrorFromExit } from "./orgErrors"
 
 describe("orgActionError", () => {

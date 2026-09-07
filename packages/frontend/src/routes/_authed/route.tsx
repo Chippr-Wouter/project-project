@@ -516,4 +516,3 @@ function UserMenu({ user }: { user: User }) {
     </DropdownMenu>
   )
 }
-

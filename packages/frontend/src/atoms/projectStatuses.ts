@@ -145,7 +145,9 @@ export const reorderStatusAtom = Atom.family((key: string) => {
             slug,
             statusSlug: input.statusSlug as StatusSlug
           },
-          payload: { orderKey: input.orderKey as ReorderStatusInput["orderKey"] }
+          payload: {
+            orderKey: input.orderKey as ReorderStatusInput["orderKey"]
+          }
         })
         get.refresh(projectStatusesBaseAtom(key))
         return reordered

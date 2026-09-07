@@ -83,7 +83,9 @@ export const TagsLive = Layer.effect(
           if (rewritten.has(id)) continue
           const ticket = yield* ticketDocs.read(orgSlug, slug, id).pipe(
             Effect.catchTag("NotFound", () => Effect.succeed(null)),
-            Effect.catchTag("MalformedTicketDocument", () => Effect.succeed(null))
+            Effect.catchTag("MalformedTicketDocument", () =>
+              Effect.succeed(null)
+            )
           )
           if (ticket === null || !ticket.tags.some((tag) => tag === oldName)) {
             continue
@@ -108,14 +110,12 @@ export const TagsLive = Layer.effect(
         const rows = yield* db.query.projectTag
           .findMany({ where: eq(projectTag.projectId, projectId) })
           .pipe(Effect.orDie)
-        return rows.map(
-          (r): Tag => ({
-            name: makeTagName(r.name),
-            color: makeTagColor(r.color),
-            createdBy: r.createdBy,
-            createdAt: r.createdAt
-          })
-        )
+        return rows.map((r): Tag => ({
+          name: makeTagName(r.name),
+          color: makeTagColor(r.color),
+          createdBy: r.createdBy,
+          createdAt: r.createdAt
+        }))
       })
 
     const listPaged = (

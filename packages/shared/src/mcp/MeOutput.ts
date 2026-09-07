@@ -10,12 +10,12 @@ import { User } from "../schemas/User"
 
 export const MeRole = Schema.Struct({
   orgSlug: Schema.String,
-  role: Role,
+  role: Role
 })
 export type MeRole = typeof MeRole.Type
 
 export const MeOutput = Schema.Struct({
   user: User,
-  roles: Schema.Array(MeRole),
+  roles: Schema.Array(MeRole)
 })
 export type MeOutput = typeof MeOutput.Type
