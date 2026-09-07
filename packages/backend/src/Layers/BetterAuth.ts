@@ -206,13 +206,15 @@ export const BetterAuthLive = Layer.effect(
           })
           return row?.slug ?? null
         }),
-      submitConsent: (headers, input) =>
+      submitConsent: (request, input) =>
         Effect.tryPromise({
           try: () =>
             auth.api
               .oauth2Consent({
+                asResponse: false,
                 body: input,
-                headers
+                headers: request.headers,
+                request
               })
               .then((result) => ({ redirectURI: result.url })),
           catch: (cause) => new BetterAuthError({ cause })

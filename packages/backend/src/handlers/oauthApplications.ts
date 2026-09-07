@@ -1,27 +1,30 @@
+import { isAPIError } from "better-auth/api"
 import { HttpServerRequest } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { AppApi, CurrentUser, Validation } from "@projectproject/shared"
 import * as Effect from "effect/Effect"
-import { toWebHeaders } from "../http/toWebHeaders"
 import { BetterAuth, type BetterAuthError } from "../Services/BetterAuth"
 import { OAuthApplications } from "../Services/OAuthApplications"
 
-const consentErrorToFailure = (e: BetterAuthError) => {
-  const cause = e.cause as
-    | { statusCode?: unknown; body?: { message?: unknown; code?: unknown } }
-    | undefined
-  const status =
-    cause && typeof cause.statusCode === "number" ? cause.statusCode : undefined
-  if (status !== undefined && status >= 400 && status < 500) {
-    const message =
-      cause?.body && typeof cause.body.message === "string"
-        ? cause.body.message
-        : typeof cause?.body?.code === "string"
-          ? cause.body.code
-          : "consent_failed"
-    return Effect.fail(new Validation({ reason: message }))
+export const consentErrorToFailure = (error: BetterAuthError) => {
+  const { cause } = error
+
+  if (!isAPIError(cause) || cause.statusCode < 400 || cause.statusCode >= 500) {
+    return Effect.die(error)
   }
-  return Effect.die(e)
+
+  const body = cause.body
+  const oauthError: unknown = body?.error
+  const reason =
+    body?.message ??
+    body?.code ??
+    (typeof oauthError === "string" ? oauthError : "consent_failed")
+
+  return Effect.logWarning("OAuth consent rejected", {
+    status: cause.statusCode,
+    code: body?.code,
+    oauthError: typeof oauthError === "string" ? oauthError : undefined
+  }).pipe(Effect.andThen(Effect.fail(new Validation({ reason }))))
 }
 
 export const OAuthApplicationsHandlerLive = HttpApiBuilder.group(
@@ -49,8 +52,9 @@ export const OAuthApplicationsHandlerLive = HttpApiBuilder.group(
           yield* CurrentUser
           const ba = yield* BetterAuth
           const req = yield* HttpServerRequest.HttpServerRequest
+          const request = yield* HttpServerRequest.toWeb(req).pipe(Effect.orDie)
           const result = yield* ba
-            .submitConsent(toWebHeaders(req.headers), payload)
+            .submitConsent(request, payload)
             .pipe(Effect.catchTag("BetterAuthError", consentErrorToFailure))
           return { redirectURI: result.redirectURI }
         })
