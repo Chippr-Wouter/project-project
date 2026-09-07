@@ -215,19 +215,33 @@ export const TicketDocsLive = Layer.effect(
     const create = (
       orgSlug: string,
       slug: string,
-      document: TicketDocument
+      document: TicketDocument,
+      onPersist?: (document: TicketDocument) => Effect.Effect<void>
     ): Effect.Effect<void, MarkdownError | TicketIdTaken> =>
       withTicketDocTelemetry(
         "create",
         orgSlug,
         slug,
         { ticketId: document.id },
-        markdown.createTicketFile(
+        withMutationLock(
           orgSlug,
           slug,
           document.id,
-          frontmatterToDisk(document),
-          bodyWithCommentsRegion(document.body, document.commentsRegion)
+          markdown
+            .createTicketFile(
+              orgSlug,
+              slug,
+              document.id,
+              frontmatterToDisk(document),
+              bodyWithCommentsRegion(document.body, document.commentsRegion)
+            )
+            .pipe(
+              Effect.zipRight(
+                Effect.suspend(() =>
+                  onPersist ? onPersist(document) : Effect.void
+                )
+              )
+            )
         )
       )
 
@@ -258,7 +272,8 @@ export const TicketDocsLive = Layer.effect(
       id: string,
       transform: (
         document: TicketDocument
-      ) => Effect.Effect<TicketDocument, E, R>
+      ) => Effect.Effect<TicketDocument, E, R>,
+      onPersist?: (document: TicketDocument) => Effect.Effect<void, E, R>
     ): Effect.Effect<
       TicketDocument,
       NotFound | MarkdownError | MalformedTicketDocument | E,
@@ -277,6 +292,7 @@ export const TicketDocsLive = Layer.effect(
             const current = yield* read(orgSlug, slug, id)
             const next = yield* transform(current)
             if (next !== current) yield* write(orgSlug, slug, id, next)
+            if (onPersist) yield* onPersist(next)
             return next
           })
         )
@@ -285,14 +301,22 @@ export const TicketDocsLive = Layer.effect(
     const remove = (
       orgSlug: string,
       slug: string,
-      id: string
+      id: string,
+      onPersist: Effect.Effect<void> = Effect.void
     ): Effect.Effect<void, NotFound | MarkdownError> =>
       withTicketDocTelemetry(
         "remove",
         orgSlug,
         slug,
         { ticketId: id },
-        markdown.removeTicketFile(orgSlug, slug, id)
+        withMutationLock(
+          orgSlug,
+          slug,
+          id,
+          markdown
+            .removeTicketFile(orgSlug, slug, id)
+            .pipe(Effect.zipRight(onPersist))
+        )
       )
 
     const readRaw = (

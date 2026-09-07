@@ -72,6 +72,10 @@ describe("applyOptimisticTicketUpdate", () => {
   })
 
   it("publishes list-visible updates synchronously", () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => new Promise<Response>(() => {}))
+    )
     const registry = Registry.make()
     const key = ticketKey("org", "project", ticket.id)
     const preview = ticketUpdatePreviewAtom(key)
@@ -84,9 +88,14 @@ describe("applyOptimisticTicketUpdate", () => {
       waiting: true
     })
     dispose()
+    registry.dispose()
   })
 
   it("publishes status updates through the same optimistic preview", () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => new Promise<Response>(() => {}))
+    )
     const registry = Registry.make()
     const key = ticketKey("org", "project", ticket.id)
     const preview = ticketUpdatePreviewAtom(key)
@@ -105,6 +114,7 @@ describe("applyOptimisticTicketUpdate", () => {
       waiting: true
     })
     dispose()
+    registry.dispose()
   })
 
   it("publishes a created ticket into the detail atom synchronously", () => {

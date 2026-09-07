@@ -83,6 +83,7 @@ interface Options {
   readonly projectsRoot: string
   readonly variant: string
   readonly round: number
+  readonly operation: string | undefined
   readonly json: boolean
 }
 
@@ -137,6 +138,7 @@ const parseOptions = (): Options => {
     sampleCount: positiveInteger(argumentValue("--samples"), 100, "--samples"),
     concurrencies: parseConcurrencies(argumentValue("--concurrency")),
     projectsRoot: resolve(process.env.PROJECTS_DIR ?? "/data"),
+    operation: argumentValue("--operation"),
     variant: argumentValue("--variant") ?? "working-tree",
     round: positiveInteger(argumentValue("--round"), 1, "--round"),
     json: process.argv.includes("--json")
@@ -611,25 +613,27 @@ const benchmarkProgram = (options: Options, projectSlug: string) =>
       operation: string,
       effectFor: (sample: number) => Effect.Effect<A, E>
     ) =>
-      Effect.forEach(
-        options.concurrencies,
-        (concurrency) =>
-          runWorkload(
-            operation,
-            concurrency,
-            options.sampleCount,
-            effectFor
-          ).pipe(
-            Effect.tap((result) =>
-              Effect.sync(() => {
-                results.push(result)
-                targetOffset +=
-                  options.sampleCount + Math.min(10, options.sampleCount)
-              })
-            )
-          ),
-        { concurrency: 1, discard: true }
-      )
+      options.operation !== undefined && options.operation !== operation
+        ? Effect.void
+        : Effect.forEach(
+            options.concurrencies,
+            (concurrency) =>
+              runWorkload(
+                operation,
+                concurrency,
+                options.sampleCount,
+                effectFor
+              ).pipe(
+                Effect.tap((result) =>
+                  Effect.sync(() => {
+                    results.push(result)
+                    targetOffset +=
+                      options.sampleCount + Math.min(10, options.sampleCount)
+                  })
+                )
+              ),
+            { concurrency: 1, discard: true }
+          )
 
     yield* measure("list-default", () =>
       verify(
@@ -861,13 +865,15 @@ async function main() {
   const projectSlug = `bench-${suffix}`
   const organizationId = `bench-org-${suffix}`
   const projectId = randomUUID()
-  const seedStartedAt = performance.now()
-  await seedFixture(options, projectSlug, organizationId, projectId)
-  const seedTimeMs = round(performance.now() - seedStartedAt)
   try {
+    const seedStartedAt = performance.now()
+    await seedFixture(options, projectSlug, organizationId, projectId)
+    const seedTimeMs = round(performance.now() - seedStartedAt)
     const results = await Effect.runPromise(
       benchmarkProgram(options, projectSlug)
     )
+    if (results.length === 0)
+      throw new Error(`Unknown operation: ${options.operation}`)
     const report: BenchmarkReport = {
       generatedAt: new Date().toISOString(),
       environment: {

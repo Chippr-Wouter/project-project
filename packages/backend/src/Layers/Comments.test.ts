@@ -1,13 +1,17 @@
+import { randomUUID } from "node:crypto"
+import pg from "pg"
+import { DbLive, PgLive } from "./Db"
 import { it } from "@effect/vitest"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import { expect } from "vitest"
-import { TicketId, TicketStatus } from "@projectproject/shared"
+import { describe, expect } from "vitest"
+import { CommentId, TicketId, TicketStatus } from "@projectproject/shared"
 import { parseCommentsRegion } from "../comments-region"
 import { Comments } from "../Services/Comments"
 import { Db } from "../Services/Db"
+import { MarkdownError } from "../Services/Markdown"
 import { Projects, type ProjectsShape } from "../Services/Projects"
 import { TicketIndex, type TicketIndexShape } from "../Services/TicketIndex"
 import {
@@ -82,6 +86,7 @@ const FakeTicketIndex = Layer.succeed(TicketIndex, {
   findTicketIdsByTag: () => unexpected("TicketIndex.findTicketIdsByTag"),
   findTicketIdsByStatus: () => unexpected("TicketIndex.findTicketIdsByStatus"),
   findTicketsByBranch: () => unexpected("TicketIndex.findTicketsByBranch"),
+  getBranchDeletedAt: () => Effect.succeed(null),
   upsertTicket: () => unexpected("TicketIndex.upsertTicket"),
   markBranchStale: () => unexpected("TicketIndex.markBranchStale"),
   clearBranchStale: () => unexpected("TicketIndex.clearBranchStale"),
@@ -124,7 +129,7 @@ const FakeDb = Layer.succeed(Db, {
   delete: () => ({ where: () => Effect.void })
 } as never)
 
-const makeLayer = (ticketDocs: TicketDocsShape) =>
+const makeLayer = (ticketDocs: TicketDocsShape, database = FakeDb) =>
   CommentsLive.pipe(
     Layer.provide(
       Layer.mergeAll(
@@ -132,7 +137,7 @@ const makeLayer = (ticketDocs: TicketDocsShape) =>
         FakeProjects,
         FakeTicketIndex,
         FakeUsers,
-        FakeDb
+        database
       )
     )
   )
@@ -145,8 +150,11 @@ const makeTicketDocs = (
     read: () => Effect.succeed(document),
     create: () => unexpected("TicketDocs.create"),
     write: () => unexpected("TicketDocs.write"),
-    update: (orgSlug, slug, id, transform) =>
-      service.read(orgSlug, slug, id).pipe(Effect.flatMap(transform)),
+    update: (orgSlug, slug, id, transform, onPersist) =>
+      service.read(orgSlug, slug, id).pipe(
+        Effect.flatMap(transform),
+        Effect.tap((next) => (onPersist ? onPersist(next) : Effect.void))
+      ),
     remove: () => unexpected("TicketDocs.remove"),
     readRaw: () => unexpected("TicketDocs.readRaw"),
     ...overrides
@@ -165,7 +173,7 @@ it.effect("creates comments through TicketDocs", () => {
               written = next
             })
           )
-        ),
+        )
     })
   )
 
@@ -213,3 +221,86 @@ it.effect("keeps malformed ticket documents in the typed error channel", () => {
     expect(error).toBe(malformed)
   }).pipe(Effect.provide(layer))
 })
+
+describe.runIf(process.env.DATABASE_URL !== undefined)(
+  "comment persistence failure",
+  () => {
+    for (const operation of ["edit", "remove"] as const) {
+      it.scoped(
+        `preserves ${operation} metadata when the markdown write fails`,
+        () =>
+          Effect.gen(function* () {
+            const client = yield* Effect.acquireRelease(
+              Effect.promise(async () => {
+                const client = new pg.Client({
+                  connectionString: process.env.DATABASE_URL
+                })
+                await client.connect()
+                return client
+              }),
+              (client) => Effect.promise(() => client.end())
+            )
+            const userId = randomUUID()
+            const id = yield* Schema.decodeUnknown(CommentId)(
+              `c_${randomUUID()}`
+            )
+            const previousEdit = at("2026-01-01T01:00:00.000Z")
+            yield* Effect.promise(() =>
+              client.query(
+                `insert into "user" (id, name, email, created_at, updated_at) values ($1, 'Test', $2, now(), now())`,
+                [userId, `${userId}@example.com`]
+              )
+            )
+            yield* Effect.addFinalizer(() =>
+              Effect.promise(async () => {
+                await client.query("delete from comment_index where id = $1", [
+                  id
+                ])
+                await client.query('delete from "user" where id = $1', [userId])
+              })
+            )
+            yield* Effect.promise(() =>
+              client.query(
+                "insert into comment_index (id, project_slug, ticket_id, author_id, created_at, edited_at) values ($1, 'project', 'T-1', $2, now(), $3)",
+                [id, userId, previousEdit]
+              )
+            )
+            const failure = new MarkdownError({
+              message: "fixture write failed",
+              cause: new Error("write failed")
+            })
+            const layer = makeLayer(
+              makeTicketDocs({ update: () => Effect.fail(failure) }),
+              DbLive.pipe(Layer.provideMerge(PgLive), Layer.orDie)
+            )
+            const result = yield* Effect.gen(function* () {
+              const comments = yield* Comments
+              return yield* Effect.flip(
+                operation === "edit"
+                  ? comments
+                      .edit("org", userId, "project", ticketId("T-1"), id, {
+                        body: "Changed"
+                      })
+                      .pipe(Effect.asVoid)
+                  : comments.remove(
+                      "org",
+                      userId,
+                      "project",
+                      ticketId("T-1"),
+                      id
+                    )
+              )
+            }).pipe(Effect.provide(layer))
+            expect(result._tag).toBe("MarkdownError")
+            const rows = yield* Effect.promise(() =>
+              client.query<{ edited_at: Date }>(
+                "select edited_at from comment_index where id = $1",
+                [id]
+              )
+            )
+            expect(rows.rows).toEqual([{ edited_at: previousEdit }])
+          })
+      )
+    }
+  }
+)

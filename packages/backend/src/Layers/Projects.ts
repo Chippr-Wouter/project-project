@@ -966,9 +966,12 @@ export const ProjectsLive = Layer.effect(
         yield* Effect.forEach(
           ids,
           (id) =>
-            Effect.gen(function* () {
-              const next = yield* ticketDocs
-                .update(orgSlug, slug, id, (ticket) => {
+            ticketDocs
+              .update(
+                orgSlug,
+                slug,
+                id,
+                (ticket) => {
                   if (
                     ticket.status === "done" ||
                     !ticket.assignees.includes(userId)
@@ -978,17 +981,14 @@ export const ProjectsLive = Layer.effect(
                   return DateTime.nowAsDate.pipe(
                     Effect.map((updatedAt) => ({
                       ...ticket,
-                      assignees: ticket.assignees.filter(
-                        (id) => id !== userId
-                      ),
+                      assignees: ticket.assignees.filter((id) => id !== userId),
                       updatedAt
                     }))
                   )
-                })
-                .pipe(Effect.catchTag("NotFound", () => Effect.succeed(null)))
-              if (next === null) return
-              yield* ticketIndex.upsertTicket(project, next)
-            }),
+                },
+                (next) => ticketIndex.upsertTicket(project, next)
+              )
+              .pipe(Effect.catchTag("NotFound", () => Effect.succeed(null))),
           { concurrency: 8 }
         )
       })
@@ -1013,9 +1013,12 @@ export const ProjectsLive = Layer.effect(
         yield* Effect.forEach(
           ids,
           (id) =>
-            Effect.gen(function* () {
-              const next = yield* ticketDocs
-                .update(orgSlug, slug, id, (ticket) => {
+            ticketDocs
+              .update(
+                orgSlug,
+                slug,
+                id,
+                (ticket) => {
                   if (
                     ticket.pr === null &&
                     ticket.prState === null &&
@@ -1032,24 +1035,25 @@ export const ProjectsLive = Layer.effect(
                       updatedAt
                     }))
                   )
-                })
-                .pipe(
-                  Effect.catchTag("NotFound", () => Effect.succeed(null)),
-                  Effect.catchTag("MalformedTicketDocument", (error) =>
-                    Effect.logWarning("Skipping unreadable ticket pr metadata").pipe(
-                      Effect.annotateLogs({
-                        orgSlug,
-                        slug,
-                        ticketId: id,
-                        error
-                      }),
-                      Effect.as(null)
-                    )
+                },
+                (next) => ticketIndex.upsertTicket(project, next)
+              )
+              .pipe(
+                Effect.catchTag("NotFound", () => Effect.succeed(null)),
+                Effect.catchTag("MalformedTicketDocument", (error) =>
+                  Effect.logWarning(
+                    "Skipping unreadable ticket pr metadata"
+                  ).pipe(
+                    Effect.annotateLogs({
+                      orgSlug,
+                      slug,
+                      ticketId: id,
+                      error
+                    }),
+                    Effect.as(null)
                   )
                 )
-              if (next === null) return
-              yield* ticketIndex.upsertTicket(project, next)
-            }),
+              ),
           { concurrency: 8 }
         )
       })

@@ -279,13 +279,11 @@ const benchmarkProgram = (options: Options, scratchRoot: string) =>
     )
     yield* measure("ticket-docs-update-atomic", (sample) => {
       const id = `T-${(sample % options.ticketCount) + 1}`
-      return ticketDocs.read(orgSlug, projectSlug, id).pipe(
-        Effect.flatMap((document) =>
-          ticketDocs.write(orgSlug, projectSlug, id, {
-            ...document,
-            updatedAt: new Date(document.updatedAt.getTime() + 1)
-          })
-        )
+      return ticketDocs.update(orgSlug, projectSlug, id, (document) =>
+        Effect.succeed({
+          ...document,
+          updatedAt: new Date(document.updatedAt.getTime() + 1)
+        })
       )
     })
     yield* measure("raw-direct-write", (sample) => {

@@ -160,15 +160,16 @@ function makeFakeDocs(initial?: {
       ticketsById.set(id, document)
       return Effect.void
     },
-    update: (org: string, slug: string, id: string, transform) =>
-      ticketService
-        .read(org, slug, id)
-        .pipe(
-          Effect.flatMap(transform),
-          Effect.tap((document) =>
-            Effect.sync(() => ticketsById.set(id, document))
-          )
+    update: (org: string, slug: string, id: string, transform, onPersist) =>
+      ticketService.read(org, slug, id).pipe(
+        Effect.flatMap(transform),
+        Effect.tap((document) =>
+          Effect.sync(() => ticketsById.set(id, document))
         ),
+        Effect.tap((document) =>
+          onPersist ? onPersist(document) : Effect.void
+        )
+      ),
     remove: () => unexpectedTicketDocsCall("remove"),
     readRaw: () => unexpectedTicketDocsCall("readRaw")
   }
@@ -209,6 +210,7 @@ function makeFakeDocs(initial?: {
     findTicketIdsByTag: () => Effect.succeed([]),
     findTicketIdsByStatus: () => Effect.succeed([]),
     findTicketsByBranch: () => Effect.succeed([]),
+    getBranchDeletedAt: () => Effect.succeed(null),
     upsertTicket: (_project, document) =>
       Effect.sync(() => {
         ticketsById.set(document.id, document)

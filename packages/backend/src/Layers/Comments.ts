@@ -84,15 +84,21 @@ export const CommentsLive = Layer.effect(
       ticketId: string,
       transform: (
         blocks: ReadonlyArray<CommentBlock>
-      ) => ReadonlyArray<CommentBlock>
+      ) => ReadonlyArray<CommentBlock>,
+      onPersist?: Effect.Effect<void>
     ) =>
-      ticketDocs.update(orgSlug, slug, ticketId, (document) =>
-        Effect.succeed({
-          ...document,
-          commentsRegion: serializeCommentsRegion(
-            transform(parseCommentsRegion(document.commentsRegion))
-          )
-        })
+      ticketDocs.update(
+        orgSlug,
+        slug,
+        ticketId,
+        (document) =>
+          Effect.succeed({
+            ...document,
+            commentsRegion: serializeCommentsRegion(
+              transform(parseCommentsRegion(document.commentsRegion))
+            )
+          }),
+        () => onPersist ?? Effect.void
       )
 
     const list = (
@@ -256,17 +262,21 @@ export const CommentsLive = Layer.effect(
         const meta = yield* requireAuthor(slug, ticketId, commentId, userId)
         yield* validateBody(orgSlug, userId, slug, input.body)
         const editedAt = yield* DateTime.nowAsDate
-        yield* db
-          .update(commentIndex)
-          .set({ editedAt })
-          .where(eq(commentIndex.id, commentId))
-          .pipe(Effect.orDie)
-        yield* updateBlocks(orgSlug, slug, ticketId, (blocks) =>
-          blocks.map((block) =>
-            block.id === commentId
-              ? { ...block, body: input.body, editedAt }
-              : block
-          )
+        yield* updateBlocks(
+          orgSlug,
+          slug,
+          ticketId,
+          (blocks) =>
+            blocks.map((block) =>
+              block.id === commentId
+                ? { ...block, body: input.body, editedAt }
+                : block
+            ),
+          db
+            .update(commentIndex)
+            .set({ editedAt })
+            .where(eq(commentIndex.id, commentId))
+            .pipe(Effect.asVoid, Effect.orDie)
         )
         const author = yield* users
           .fullByIds([userId])
@@ -295,12 +305,15 @@ export const CommentsLive = Layer.effect(
       Effect.gen(function* () {
         yield* ensureMember(orgSlug, userId, slug)
         yield* requireAuthor(slug, ticketId, commentId, userId)
-        yield* db
-          .delete(commentIndex)
-          .where(eq(commentIndex.id, commentId))
-          .pipe(Effect.orDie)
-        yield* updateBlocks(orgSlug, slug, ticketId, (blocks) =>
-          blocks.filter((block) => block.id !== commentId)
+        yield* updateBlocks(
+          orgSlug,
+          slug,
+          ticketId,
+          (blocks) => blocks.filter((block) => block.id !== commentId),
+          db
+            .delete(commentIndex)
+            .where(eq(commentIndex.id, commentId))
+            .pipe(Effect.asVoid, Effect.orDie)
         )
       })
 

@@ -337,6 +337,111 @@ it.effect("TicketDocs serializes concurrent document updates", () => {
   )
 })
 
+it.effect(
+  "TicketDocs keeps delayed publication inside the mutation lock",
+  () => {
+    let stored: {
+      data: Record<string, unknown>
+      description: string
+      region: string
+    } = {
+      data: {
+        id: "T-1",
+        title: "Concurrent updates",
+        status: "todo",
+        type: "chore",
+        priority: "med",
+        tags: [],
+        branch: null,
+        pr: null,
+        prState: null,
+        lastTransitionedPr: null,
+        assignees: [],
+        archivedAt: null,
+        createdBy: "user-1",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z"
+      },
+      description: "# Before\n",
+      region: ""
+    }
+
+    return Effect.gen(function* () {
+      const docs = yield* TicketDocs
+      const published: string[] = []
+      const firstEntered = yield* Deferred.make<void>()
+      const releaseFirst = yield* Deferred.make<void>()
+
+      const first = yield* docs
+        .update(
+          "org",
+          "project",
+          "T-1",
+          (document) =>
+            Effect.succeed({ ...document, body: "# Updated body\n" }),
+          (document) =>
+            Effect.gen(function* () {
+              yield* Deferred.succeed(firstEntered, undefined)
+              yield* Deferred.await(releaseFirst)
+              published.push(document.body)
+            })
+        )
+        .pipe(Effect.fork)
+      yield* Deferred.await(firstEntered)
+      const second = yield* docs
+        .update(
+          "org",
+          "project",
+          "T-1",
+          (document) =>
+            Effect.succeed({
+              ...document,
+              body: "# Second update\n",
+              commentsRegion:
+                "<!-- pp:comments:start -->\ncomment\n<!-- pp:comments:end -->"
+            }),
+          (document) =>
+            Effect.sync(() => {
+              published.push(document.body)
+            })
+        )
+        .pipe(Effect.fork)
+
+      yield* Effect.yieldNow()
+      expect(published).toEqual([])
+      yield* Deferred.succeed(releaseFirst, undefined)
+      yield* Fiber.join(first)
+      yield* Fiber.join(second)
+
+      const document = yield* docs.read("org", "project", "T-1")
+      expect(document.body).toBe("# Second update\n")
+      expect(published).toEqual(["# Updated body\n", "# Second update\n"])
+      expect(document.commentsRegion).toContain("comment")
+    }).pipe(
+      Effect.provide(
+        TicketDocsLive.pipe(
+          Layer.provide(
+            makeMarkdown({
+              readTicketParts: () => Effect.succeed(stored),
+              writeTicketWithRegion: (
+                _org,
+                _slug,
+                _id,
+                data,
+                description,
+                region
+              ) =>
+                Effect.sync(() => {
+                  stored = { data, description, region }
+                })
+            })
+          )
+        )
+      )
+    )
+  }
+)
+
 it.effect("GroupDocs reads missing optional fields as typed defaults", () =>
   Effect.gen(function* () {
     const docs = yield* GroupDocs

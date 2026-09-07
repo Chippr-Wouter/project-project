@@ -148,6 +148,11 @@ export interface TicketIndexShape {
     projectId: string,
     branch: string
   ) => Effect.Effect<ReadonlyArray<TicketIndexMatch>>
+  readonly getBranchDeletedAt: (
+    orgSlug: string,
+    slug: string,
+    ticketId: string
+  ) => Effect.Effect<Date | null>
   readonly upsertTicket: (
     project: TicketIndexProject,
     document: TicketDocument

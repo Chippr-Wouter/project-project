@@ -70,6 +70,12 @@ export const applyPullRequestWebhookToTicket = (
   deliveryId: string | null
 ): Effect.Effect<void, MarkdownError> =>
   withPullRequestTicketLock(match, Effect.gen(function* () {
+    const indexProject = {
+      orgSlug: match.orgSlug,
+      organizationId: match.organizationId,
+      projectId: match.projectId,
+      projectSlug: match.projectSlug
+    }
     let changed = false
     const next = yield* deps.ticketDocs
       .update(match.orgSlug, match.projectSlug, match.ticketId, (ticket) =>
@@ -119,7 +125,10 @@ export const applyPullRequestWebhookToTicket = (
             status: write.patch.status ?? ticket.status,
             updatedAt: yield* DateTime.nowAsDate
           }
-        })
+        }),
+        (next) => changed
+          ? deps.ticketIndex.upsertTicket(indexProject, next)
+          : Effect.void
       )
       .pipe(
         Effect.catchTag("NotFound", (error) =>
@@ -162,13 +171,6 @@ export const applyPullRequestWebhookToTicket = (
         )
       )
     if (next === null || !changed) return
-    const indexProject = {
-      orgSlug: match.orgSlug,
-      organizationId: match.organizationId,
-      projectId: match.projectId,
-      projectSlug: match.projectSlug
-    }
-    yield* deps.ticketIndex.upsertTicket(indexProject, next)
     yield* Effect.logInfo("github pull_request ticket updated").pipe(
       Effect.annotateLogs({
         module: "GitHubWebhooks",

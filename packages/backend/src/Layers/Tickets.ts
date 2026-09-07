@@ -304,12 +304,12 @@ export const TicketsLive = Layer.effect(
         const project = yield* ticketIndex.projectFor(orgSlug, slug)
         const excludedTicketIds = options.excludeGroupId
           ? (yield* groups
-                .get(orgSlug, userId, slug, options.excludeGroupId)
-                .pipe(
-                  Effect.catchTag("NotFound", () =>
-                    Effect.succeed({ tickets: [] as ReadonlyArray<string> })
-                  )
-                )).tickets
+              .get(orgSlug, userId, slug, options.excludeGroupId)
+              .pipe(
+                Effect.catchTag("NotFound", () =>
+                  Effect.succeed({ tickets: [] as ReadonlyArray<string> })
+                )
+              )).tickets
           : undefined
         const limit = Math.min(
           Math.max(1, options.limit ?? SEARCH_DEFAULT_LIMIT),
@@ -395,13 +395,11 @@ export const TicketsLive = Layer.effect(
           slug
         )
         const ticket = yield* readTicket(orgSlug, slug, id)
-        const indexProject = yield* ticketIndex
-          .projectFor(orgSlug, slug)
-          .pipe(Effect.catchTag("NotFound", () => Effect.succeed(null)))
-        const branchDeletedAt = indexProject
-          ? ((yield* ticketIndex.list(indexProject, [id]))[0]
-              ?.branchDeletedAt ?? null)
-          : null
+        const branchDeletedAt = yield* ticketIndex.getBranchDeletedAt(
+          orgSlug,
+          slug,
+          id
+        )
         return yield* withMissingAttachments(
           orgSlug,
           documentToDetail(ticket, projectGithub, branchDeletedAt)
@@ -536,12 +534,22 @@ export const TicketsLive = Layer.effect(
             `${projectKey}-${yield* ticketIndex.reserveTicketNumber(indexProject)}`
           )
           const document = buildDocument(candidate)
-          const result = yield* ticketDocs.create(orgSlug, slug, document).pipe(
-            Effect.map(() => "ok" as const),
-            Effect.catchTag("TicketIdTaken", () =>
-              Effect.succeed("retry" as const)
+          const result = yield* ticketDocs
+            .create(orgSlug, slug, document, (created) =>
+              attachments
+                .reconcileTicket(orgSlug, slug, created.id, created.body)
+                .pipe(
+                  Effect.zipRight(
+                    ticketIndex.upsertTicket(indexProject, created)
+                  )
+                )
             )
-          )
+            .pipe(
+              Effect.map(() => "ok" as const),
+              Effect.catchTag("TicketIdTaken", () =>
+                Effect.succeed("retry" as const)
+              )
+            )
           if (result === "ok") return document
         }
       })
@@ -585,13 +593,6 @@ export const TicketsLive = Layer.effect(
             commentsRegion: ""
           })
         )
-        yield* attachments.reconcileTicket(
-          orgSlug,
-          slug,
-          document.id,
-          document.body
-        )
-        yield* ticketIndex.upsertTicket(indexProject, document)
         const projectGithub = yield* projects.getGithubIntegration(
           orgSlug,
           ownerId,
@@ -649,13 +650,6 @@ export const TicketsLive = Layer.effect(
             commentsRegion: ""
           })
         )
-        yield* attachments.reconcileTicket(
-          orgSlug,
-          slug,
-          document.id,
-          document.body
-        )
-        yield* ticketIndex.upsertTicket(indexProject, document)
         const projectGithub = yield* projects.getGithubIntegration(
           orgSlug,
           ownerId,
@@ -698,11 +692,7 @@ export const TicketsLive = Layer.effect(
                   (assigneeId) => !existingSet.has(assigneeId)
                 )
                 if (newcomers.length > 0) {
-                  yield* validateAssigneesAreMembers(
-                    orgSlug,
-                    slug,
-                    newcomers
-                  )
+                  yield* validateAssigneesAreMembers(orgSlug, slug, newcomers)
                 }
               }
               return {
@@ -720,10 +710,14 @@ export const TicketsLive = Layer.effect(
                 updatedAt: yield* DateTime.nowAsDate,
                 body: input.body ?? existing.body
               }
-            })
+            }),
+          (next) =>
+            attachments
+              .reconcileTicket(orgSlug, slug, id, next.body)
+              .pipe(
+                Effect.zipRight(ticketIndex.upsertTicket(indexProject, next))
+              )
         )
-        yield* attachments.reconcileTicket(orgSlug, slug, id, next.body)
-        yield* ticketIndex.upsertTicket(indexProject, next)
 
         const projectGithub = yield* projects.getGithubIntegration(
           orgSlug,
@@ -746,9 +740,14 @@ export const TicketsLive = Layer.effect(
         yield* ensureAccess(orgSlug, ownerId, slug)
         const indexProject = yield* ticketIndex.projectFor(orgSlug, slug)
         yield* groups.removeTicketFromAllGroups(orgSlug, slug, id)
-        yield* attachments.reconcileTicket(orgSlug, slug, id, "")
-        yield* ticketDocs.remove(orgSlug, slug, id)
-        yield* ticketIndex.deleteTicket(indexProject, id)
+        yield* ticketDocs.remove(
+          orgSlug,
+          slug,
+          id,
+          attachments
+            .reconcileTicket(orgSlug, slug, id, "")
+            .pipe(Effect.zipRight(ticketIndex.deleteTicket(indexProject, id)))
+        )
       })
 
     const archive = (
@@ -781,9 +780,9 @@ export const TicketsLive = Layer.effect(
                 archivedAt: existing.archivedAt ?? now,
                 updatedAt: now
               }))
-            )
+            ),
+          (next) => ticketIndex.upsertTicket(indexProject, next)
         )
-        yield* ticketIndex.upsertTicket(indexProject, next)
         const projectGithub = yield* projects.getGithubIntegration(
           orgSlug,
           userId,
@@ -801,16 +800,20 @@ export const TicketsLive = Layer.effect(
       Effect.gen(function* () {
         yield* ensureAccess(orgSlug, userId, slug)
         const indexProject = yield* ticketIndex.projectFor(orgSlug, slug)
-        const next = yield* ticketDocs.update(orgSlug, slug, id, (existing) =>
-          DateTime.nowAsDate.pipe(
-            Effect.map((updatedAt) => ({
-              ...existing,
-              archivedAt: null,
-              updatedAt
-            }))
-          )
+        const next = yield* ticketDocs.update(
+          orgSlug,
+          slug,
+          id,
+          (existing) =>
+            DateTime.nowAsDate.pipe(
+              Effect.map((updatedAt) => ({
+                ...existing,
+                archivedAt: null,
+                updatedAt
+              }))
+            ),
+          (next) => ticketIndex.upsertTicket(indexProject, next)
         )
-        yield* ticketIndex.upsertTicket(indexProject, next)
         const projectGithub = yield* projects.getGithubIntegration(
           orgSlug,
           userId,
@@ -829,7 +832,7 @@ export const TicketsLive = Layer.effect(
       Effect.gen(function* () {
         const indexProject = yield* ticketIndex.projectFor(orgSlug, slug)
         let replaced = false
-        const next = yield* ticketDocs.update(
+        yield* ticketDocs.update(
           orgSlug,
           slug,
           id,
@@ -847,10 +850,13 @@ export const TicketsLive = Layer.effect(
             return DateTime.nowAsDate.pipe(
               Effect.map((updatedAt) => ({ ...existing, tags, updatedAt }))
             )
-          }
+          },
+          (next) =>
+            replaced
+              ? ticketIndex.upsertTicket(indexProject, next)
+              : Effect.void
         )
         if (!replaced) return false
-        yield* ticketIndex.upsertTicket(indexProject, next)
         return true
       })
 
@@ -863,7 +869,7 @@ export const TicketsLive = Layer.effect(
       Effect.gen(function* () {
         const indexProject = yield* ticketIndex.projectFor(orgSlug, slug)
         let replaced = false
-        const next = yield* ticketDocs.update(
+        yield* ticketDocs.update(
           orgSlug,
           slug,
           id,
@@ -879,10 +885,13 @@ export const TicketsLive = Layer.effect(
                 updatedAt
               }))
             )
-          }
+          },
+          (next) =>
+            replaced
+              ? ticketIndex.upsertTicket(indexProject, next)
+              : Effect.void
         )
         if (!replaced) return false
-        yield* ticketIndex.upsertTicket(indexProject, next)
         return true
       })
 
@@ -923,9 +932,9 @@ export const TicketsLive = Layer.effect(
                 status: patch.status ?? existing.status,
                 updatedAt
               }))
-            )
+            ),
+          (next) => ticketIndex.upsertTicket(indexProject, next)
         )
-        yield* ticketIndex.upsertTicket(indexProject, next)
         return next
       })
 
@@ -1097,18 +1106,11 @@ export const TicketsLive = Layer.effect(
           userId
         )
 
-        yield* writeGitFields(
-          orgSlug,
-          slug,
-          id,
-          indexProject,
-          projectGithub,
-          {
-            pr: result.number,
-            prState: "open",
-            lastTransitionedPr: null
-          }
-        )
+        yield* writeGitFields(orgSlug, slug, id, indexProject, projectGithub, {
+          pr: result.number,
+          prState: "open",
+          lastTransitionedPr: null
+        })
         return result
       })
 
@@ -1230,24 +1232,6 @@ export const TicketsLive = Layer.effect(
         yield* ticketIndex.clearBranchStale(indexProject, resurrected)
 
         for (const write of plan.writes) {
-          const ticket = yield* readTicket(orgSlug, slug, write.ticketId).pipe(
-            Effect.catchTag("MalformedTicketDocument", (error) =>
-              Effect.logWarning("Skipping unreadable ticket for git state", {
-                orgSlug,
-                slug,
-                ticketId: write.ticketId,
-                error
-              }).pipe(Effect.as(null))
-            ),
-            Effect.catchTag("NotFound", () =>
-              Effect.logDebug("Skipping vanished indexed ticket", {
-                orgSlug,
-                slug,
-                ticketId: write.ticketId
-              }).pipe(Effect.as(null))
-            )
-          )
-          if (ticket === null) continue
           yield* writeGitFields(
             orgSlug,
             slug,

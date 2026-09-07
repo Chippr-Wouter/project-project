@@ -106,10 +106,15 @@ function makeFakeTicketDocs(initialIds: ReadonlyArray<string>) {
       const document = documents.get(id)
       return document ? Effect.succeed(document) : Effect.fail(new NotFound())
     },
-    create: (_org: string, _slug: string, document: TicketDocument) => {
+    create: (
+      _org: string,
+      _slug: string,
+      document: TicketDocument,
+      onPersist
+    ) => {
       if (documents.has(document.id)) return Effect.fail(new TicketIdTaken())
       documents.set(document.id, document)
-      return Effect.void
+      return onPersist ? onPersist(document) : Effect.void
     },
     write: (
       _org: string,
@@ -120,18 +125,24 @@ function makeFakeTicketDocs(initialIds: ReadonlyArray<string>) {
       documents.set(id, document)
       return Effect.void
     },
-    update: (org: string, slug: string, id: string, transform) =>
-      service
-        .read(org, slug, id)
-        .pipe(
-          Effect.flatMap(transform),
-          Effect.tap((document) =>
-            Effect.sync(() => documents.set(id, document))
-          )
+    update: (org: string, slug: string, id: string, transform, onPersist) =>
+      service.read(org, slug, id).pipe(
+        Effect.flatMap(transform),
+        Effect.tap((document) =>
+          Effect.sync(() => documents.set(id, document))
         ),
-    remove: (_org: string, _slug: string, id: string) => {
+        Effect.tap((document) =>
+          onPersist ? onPersist(document) : Effect.void
+        )
+      ),
+    remove: (
+      _org: string,
+      _slug: string,
+      id: string,
+      onPersist = Effect.void
+    ) => {
       documents.delete(id)
-      return Effect.void
+      return onPersist
     },
     readRaw: () => unexpected("TicketDocs.readRaw")
   }
@@ -414,6 +425,7 @@ const makeFakeTicketIndex = (
             : []
         )
       ),
+    getBranchDeletedAt: () => Effect.succeed(null),
     upsertTicket: (_project, document) =>
       Effect.sync(() => {
         documents.set(document.id, document)
@@ -472,6 +484,7 @@ const makeRecordingTicketIndex = (documents: Map<string, TicketDocument>) => {
   return {
     calls,
     layer: makeFakeTicketIndex(documents, {
+      getBranchDeletedAt: () => Effect.succeed(null),
       upsertTicket: (_project, document) =>
         Effect.sync(() => {
           documents.set(document.id, document)
@@ -648,6 +661,7 @@ it.effect("create propagates ticket index write failures", () => {
   const docs = makeFakeTicketDocs([])
   const layer = makeTicketsLayer("T", docs.layer, {
     ticketIndex: makeFakeTicketIndex(docs.documents, {
+      getBranchDeletedAt: () => Effect.succeed(null),
       upsertTicket: () => Effect.die(new Error("index failed"))
     })
   })
@@ -1156,3 +1170,44 @@ it.effect("count substitutes mine to viewerId like list", () => {
     })
   }).pipe(Effect.provide(layer))
 })
+
+for (const scenario of [
+  { branch: null, pr: null, tag: "no_branch", indexReads: 1 },
+  { branch: "feat/T-1", pr: 80, tag: "pr_pending", indexReads: 1 },
+  { branch: "feat/T-1", pr: null, tag: "stale_branch", indexReads: 1 }
+] as const) {
+  it.effect(
+    `detail preserves git state with one index lookup for ${scenario.tag}`,
+    () => {
+      const docs = makeFakeTicketDocs(["T-1"])
+      const document = makeTicketDocument("T-1", {
+        branch: scenario.branch,
+        pr: scenario.pr
+      })
+      docs.documents.set("T-1", document)
+      let projectReads = 0
+      let indexReads = 0
+      const layer = makeTicketsLayer("T", docs.layer, {
+        ticketIndex: makeFakeTicketIndex(docs.documents, {
+          projectFor: () =>
+            Effect.sync(() => {
+              projectReads++
+              return ticketIndexProject
+            }),
+          getBranchDeletedAt: () =>
+            Effect.sync(() => {
+              indexReads++
+              return isoDate("2026-01-02T00:00:00.000Z")
+            })
+        })
+      })
+      return Effect.gen(function* () {
+        const tickets = yield* Tickets
+        const detail = yield* tickets.get("org", "user-1", "p", "T-1")
+        expect(detail.gitState.tag).toBe(scenario.tag)
+        expect(projectReads).toBe(0)
+        expect(indexReads).toBe(scenario.indexReads)
+      }).pipe(Effect.provide(layer))
+    }
+  )
+}

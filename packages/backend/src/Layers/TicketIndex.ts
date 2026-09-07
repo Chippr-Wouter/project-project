@@ -672,6 +672,32 @@ export const TicketIndexLive = Layer.effect(
           Effect.orDie
         )
 
+    const getBranchDeletedAt = (
+      orgSlug: string,
+      slug: string,
+      id: string
+    ): Effect.Effect<Date | null> =>
+      db
+        .select({ branchDeletedAt: ticketIndex.branchDeletedAt })
+        .from(ticketIndex)
+        .innerJoin(projectIndex, eq(projectIndex.id, ticketIndex.projectId))
+        .innerJoin(
+          organization,
+          eq(organization.id, projectIndex.organizationId)
+        )
+        .where(
+          and(
+            eq(organization.slug, orgSlug),
+            eq(projectIndex.slug, slug),
+            eq(ticketIndex.ticketId, id)
+          )
+        )
+        .limit(1)
+        .pipe(
+          Effect.map((rows) => rows[0]?.branchDeletedAt ?? null),
+          Effect.orDie
+        )
+
     const upsertTicket = (
       project: TicketIndexProject,
       document: TicketDocument
@@ -886,6 +912,7 @@ export const TicketIndexLive = Layer.effect(
       findTicketIdsByTag,
       findTicketIdsByStatus,
       findTicketsByBranch,
+      getBranchDeletedAt,
       upsertTicket,
       markBranchStale,
       clearBranchStale,

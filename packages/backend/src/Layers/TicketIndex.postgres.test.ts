@@ -269,6 +269,23 @@ describe.runIf(process.env.DATABASE_URL !== undefined)(
           index.upsertTicket(project, document)
         )
 
+        yield* index.markBranchStale(projectId, "feat/T-2", januaryTwelfth)
+        expect(
+          yield* index.getBranchDeletedAt(orgSlug, projectSlug, "T-2")
+        ).toEqual(januaryTwelfth)
+        expect(
+          yield* index.getBranchDeletedAt(orgSlug, projectSlug, "T-10")
+        ).toBeNull()
+        expect(
+          yield* index.getBranchDeletedAt("wrong-org", projectSlug, "T-2")
+        ).toBeNull()
+        expect(
+          yield* index.getBranchDeletedAt(orgSlug, "wrong-project", "T-2")
+        ).toBeNull()
+        expect(
+          yield* index.getBranchDeletedAt(orgSlug, projectSlug, "T-missing")
+        ).toBeNull()
+
         const firstPage = yield* index.query(
           project,
           { sort: { key: "id", dir: "asc" } },

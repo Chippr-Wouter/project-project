@@ -735,7 +735,7 @@ const makeFakeDocs = (initial: ReadonlyArray<TicketDocument>) => {
         documents.set(id, document)
         writes.push({ id, document })
       }),
-    update: (_org, _slug, id, transform) => {
+    update: (_org, _slug, id, transform, onPersist) => {
       reads.push(id)
       const document = documents.get(id)
       if (!document) return Effect.fail(new NotFound())
@@ -747,7 +747,8 @@ const makeFakeDocs = (initial: ReadonlyArray<TicketDocument>) => {
                 documents.set(id, next)
                 writes.push({ id, document: next })
               })
-        )
+        ),
+        Effect.tap((next) => onPersist ? onPersist(next) : Effect.void)
       )
     },
     remove: () => Effect.die(new Error("unexpected TicketDocs.remove call")),
@@ -770,6 +771,7 @@ const makeFakeIndex = (overrides: Partial<TicketIndexShape> = {}) => {
     findTicketIdsByTag: () => Effect.succeed([]),
     findTicketIdsByStatus: () => Effect.succeed([]),
     findTicketsByBranch: () => Effect.succeed([]),
+    getBranchDeletedAt: () => Effect.succeed(null),
     upsertTicket: (project, document) =>
       Effect.sync(() => {
         upserts.push({ projectId: project.projectId, ticketId: document.id })
@@ -825,6 +827,7 @@ it.effect("applyPullRequestWebhookToTicket propagates index write failures", () 
   Effect.gen(function* () {
     const docs = makeFakeDocs([baseDocument()])
     const index = makeFakeIndex({
+      getBranchDeletedAt: () => Effect.succeed(null),
       upsertTicket: () => Effect.die(new Error("index failed"))
     })
 
@@ -848,12 +851,12 @@ it.effect("applyPullRequestWebhookToTicket serializes same-ticket deliveries", (
     let maxActiveReads = 0
     const serialDocs: TicketDocsShape = {
       ...docs.shape,
-      update: (org, slug, id, transform) =>
+      update: (org, slug, id, transform, onPersist) =>
         Effect.gen(function* () {
           activeReads += 1
           maxActiveReads = Math.max(maxActiveReads, activeReads)
           yield* Effect.yieldNow()
-          return yield* docs.shape.update(org, slug, id, transform)
+          return yield* docs.shape.update(org, slug, id, transform, onPersist)
         }).pipe(
           Effect.ensuring(
             Effect.sync(() => {

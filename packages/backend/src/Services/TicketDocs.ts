@@ -59,7 +59,8 @@ export interface TicketDocsShape {
   readonly create: (
     orgSlug: string,
     slug: string,
-    document: TicketDocument
+    document: TicketDocument,
+    onPersist?: (document: TicketDocument) => Effect.Effect<void>
   ) => Effect.Effect<void, MarkdownError | TicketIdTaken>
   readonly write: (
     orgSlug: string,
@@ -73,7 +74,8 @@ export interface TicketDocsShape {
     id: string,
     transform: (
       document: TicketDocument
-    ) => Effect.Effect<TicketDocument, E, R>
+    ) => Effect.Effect<TicketDocument, E, R>,
+    onPersist?: (document: TicketDocument) => Effect.Effect<void, E, R>
   ) => Effect.Effect<
     TicketDocument,
     NotFound | MarkdownError | MalformedTicketDocument | E,
@@ -82,7 +84,8 @@ export interface TicketDocsShape {
   readonly remove: (
     orgSlug: string,
     slug: string,
-    id: string
+    id: string,
+    onPersist?: Effect.Effect<void>
   ) => Effect.Effect<void, NotFound | MarkdownError>
   readonly readRaw: (
     orgSlug: string,
