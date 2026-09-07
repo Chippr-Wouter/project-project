@@ -1,0 +1,374 @@
+{
+  "firstRun": {
+    "checks": [
+      {
+        "detail": {
+          "persistedTickets": 0
+        },
+        "name": "Database opens",
+        "passed": true
+      },
+      {
+        "name": "Count 1",
+        "passed": true
+      },
+      {
+        "name": "Indexed page 1",
+        "passed": true
+      },
+      {
+        "name": "Schema round trip 1",
+        "passed": true
+      },
+      {
+        "name": "Local filter/sort 1",
+        "passed": true
+      },
+      {
+        "name": "Count 2",
+        "passed": true
+      },
+      {
+        "name": "Indexed page 2",
+        "passed": true
+      },
+      {
+        "name": "Schema round trip 2",
+        "passed": true
+      },
+      {
+        "name": "Local filter/sort 2",
+        "passed": true
+      },
+      {
+        "name": "Count 3",
+        "passed": true
+      },
+      {
+        "name": "Indexed page 3",
+        "passed": true
+      },
+      {
+        "name": "Schema round trip 3",
+        "passed": true
+      },
+      {
+        "name": "Local filter/sort 3",
+        "passed": true
+      },
+      {
+        "name": "Count 4",
+        "passed": true
+      },
+      {
+        "name": "Indexed page 4",
+        "passed": true
+      },
+      {
+        "name": "Schema round trip 4",
+        "passed": true
+      },
+      {
+        "name": "Local filter/sort 4",
+        "passed": true
+      },
+      {
+        "name": "Count 5",
+        "passed": true
+      },
+      {
+        "name": "Indexed page 5",
+        "passed": true
+      },
+      {
+        "name": "Schema round trip 5",
+        "passed": true
+      },
+      {
+        "name": "Local filter/sort 5",
+        "passed": true
+      },
+      {
+        "name": "Count 6",
+        "passed": true
+      },
+      {
+        "name": "Indexed page 6",
+        "passed": true
+      },
+      {
+        "name": "Schema round trip 6",
+        "passed": true
+      },
+      {
+        "name": "Local filter/sort 6",
+        "passed": true
+      },
+      {
+        "name": "Count 7",
+        "passed": true
+      },
+      {
+        "name": "Indexed page 7",
+        "passed": true
+      },
+      {
+        "name": "Schema round trip 7",
+        "passed": true
+      },
+      {
+        "name": "Local filter/sort 7",
+        "passed": true
+      },
+      {
+        "name": "Reactive query observes upsert",
+        "passed": true
+      },
+      {
+        "name": "Ticket and cursor roll back atomically",
+        "passed": true
+      },
+      {
+        "name": "Deletion is reflected locally",
+        "passed": true
+      },
+      {
+        "name": "Fixture restored",
+        "passed": true
+      }
+    ],
+    "complete": true,
+    "timings": {
+      "bootstrap10000": [
+        1164.4
+      ],
+      "count10000": [
+        74.8,
+        56.7,
+        49.9,
+        51.2,
+        51.1,
+        50.7,
+        50.4
+      ],
+      "filterSortInMemory": [
+        1,
+        0.8,
+        0.8,
+        1.4,
+        0.9,
+        0.8,
+        0.7
+      ],
+      "hydrate10000": [
+        164.8,
+        136.5,
+        127.4,
+        131.9,
+        144.4,
+        130.8,
+        131
+      ],
+      "newest50Todo": [
+        3.4,
+        2.2,
+        2.3,
+        1.9,
+        2.6,
+        2.7,
+        3.3
+      ],
+      "reactiveUpsert": [
+        2.2
+      ]
+    },
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) T3Code(Nightly)/0.0.40-nightly.20260907.1359 Chrome/150.0.7871.224 Safari/537.36"
+  },
+  "reload": {
+    "checks": [
+      {
+        "detail": {
+          "cursor": "snapshot-1",
+          "persistedTickets": 10000
+        },
+        "name": "Database opens",
+        "passed": true
+      },
+      {
+        "name": "Reload recovered persisted snapshot",
+        "passed": true
+      },
+      {
+        "name": "Count 1",
+        "passed": true
+      },
+      {
+        "name": "Indexed page 1",
+        "passed": true
+      },
+      {
+        "name": "Schema round trip 1",
+        "passed": true
+      },
+      {
+        "name": "Local filter/sort 1",
+        "passed": true
+      },
+      {
+        "name": "Count 2",
+        "passed": true
+      },
+      {
+        "name": "Indexed page 2",
+        "passed": true
+      },
+      {
+        "name": "Schema round trip 2",
+        "passed": true
+      },
+      {
+        "name": "Local filter/sort 2",
+        "passed": true
+      },
+      {
+        "name": "Count 3",
+        "passed": true
+      },
+      {
+        "name": "Indexed page 3",
+        "passed": true
+      },
+      {
+        "name": "Schema round trip 3",
+        "passed": true
+      },
+      {
+        "name": "Local filter/sort 3",
+        "passed": true
+      },
+      {
+        "name": "Count 4",
+        "passed": true
+      },
+      {
+        "name": "Indexed page 4",
+        "passed": true
+      },
+      {
+        "name": "Schema round trip 4",
+        "passed": true
+      },
+      {
+        "name": "Local filter/sort 4",
+        "passed": true
+      },
+      {
+        "name": "Count 5",
+        "passed": true
+      },
+      {
+        "name": "Indexed page 5",
+        "passed": true
+      },
+      {
+        "name": "Schema round trip 5",
+        "passed": true
+      },
+      {
+        "name": "Local filter/sort 5",
+        "passed": true
+      },
+      {
+        "name": "Count 6",
+        "passed": true
+      },
+      {
+        "name": "Indexed page 6",
+        "passed": true
+      },
+      {
+        "name": "Schema round trip 6",
+        "passed": true
+      },
+      {
+        "name": "Local filter/sort 6",
+        "passed": true
+      },
+      {
+        "name": "Count 7",
+        "passed": true
+      },
+      {
+        "name": "Indexed page 7",
+        "passed": true
+      },
+      {
+        "name": "Schema round trip 7",
+        "passed": true
+      },
+      {
+        "name": "Local filter/sort 7",
+        "passed": true
+      },
+      {
+        "name": "Reactive query observes upsert",
+        "passed": true
+      },
+      {
+        "name": "Ticket and cursor roll back atomically",
+        "passed": true
+      },
+      {
+        "name": "Deletion is reflected locally",
+        "passed": true
+      },
+      {
+        "name": "Fixture restored",
+        "passed": true
+      }
+    ],
+    "complete": true,
+    "timings": {
+      "count10000": [
+        61.5,
+        71.4,
+        69.5,
+        76.3,
+        64.4,
+        51.1,
+        52.1
+      ],
+      "filterSortInMemory": [
+        2.1,
+        2.7,
+        2.1,
+        2.8,
+        1.6,
+        2.9,
+        2.2
+      ],
+      "hydrate10000": [
+        441.3,
+        321.2,
+        286,
+        346.1,
+        263.4,
+        261.9,
+        279.1
+      ],
+      "newest50Todo": [
+        39.5,
+        7.2,
+        52.1,
+        6.9,
+        4.4,
+        3.5,
+        3.6
+      ],
+      "reactiveUpsert": [
+        3
+      ]
+    },
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) T3Code(Nightly)/0.0.40-nightly.20260907.1359 Chrome/150.0.7871.224 Safari/537.36"
+  }
+}
