@@ -1,7 +1,6 @@
 import { TICKET_LIST_LIMIT } from "@projectproject/shared"
 import * as Result from "effect/unstable/reactivity/AsyncResult"
 import { useAtomSet, useAtomValue } from "@effect/atom-react"
-import { AnimatePresence, motion } from "motion/react"
 import { Loader2 } from "lucide-react"
 import {
   useDeferredValue,
@@ -21,7 +20,6 @@ import {
 } from "@/atoms/tickets"
 import { projectKey } from "@/atoms/projects"
 import { cn } from "@/lib/utils"
-import { transitions } from "@/lib/springs"
 import { m } from "@/paraglide/messages"
 import type {
   Group,
@@ -33,6 +31,7 @@ import type {
   TicketStatus
 } from "@projectproject/shared"
 import { Row } from "./Row"
+import { AutoLoadPrototype, VirtualRowsPrototype } from "./VirtualRowsPrototype"
 import { SectionHeader } from "./SectionHeader"
 import { SectionTicketCreator } from "./SectionTicketCreator"
 
@@ -192,65 +191,82 @@ export function SectionList({
                 —
               </div>
             ) : (
-              <ul className={gridCols}>
-                <AnimatePresence initial={false}>
-                  {items.map((t, idx) => {
-                    const membership = sprintMembership?.get(t.id) ?? null
-                    const rowState = itemRowState[idx]
-                    return (
-                      <motion.li
-                        key={rowState.key}
-                        initial={{ opacity: 0, filter: "blur(8px)" }}
-                        animate={{ opacity: 1, filter: "blur(0px)" }}
-                        transition={transitions.presence}
-                        className={cn(
-                          "col-span-full grid grid-cols-subgrid",
-                          pendingStatusChanges.has(t.id) && "animate-pulse"
-                        )}
-                      >
-                        <Row
-                          orgSlug={orgSlug}
-                          slug={slug}
-                          ticket={t}
-                          query={query}
-                          members={members}
-                          showSprintCol={showSprintCol}
-                          showExtraActionsCol={showExtraActionsCol}
-                          sprintMembership={membership}
-                          extraRowActions={extraRowActions}
-                          pending={rowState.pending}
-                          activePreviewId={activePreviewId}
-                          onPreviewOpenChange={onPreviewOpenChange}
-                        />
-                      </motion.li>
-                    )
-                  })}
-                </AnimatePresence>
-              </ul>
+              <VirtualRowsPrototype
+                key={deferredKey}
+                className={gridCols}
+                rowKeys={itemRowState.map((row) => row.key)}
+                activeIndex={items.findIndex(
+                  (ticket) => ticket.id === activePreviewId
+                )}
+              >
+                {(index) => {
+                  const ticket = items[index]
+                  return (
+                    <div
+                      className={cn(
+                        "col-span-full grid grid-cols-subgrid",
+                        pendingStatusChanges.has(ticket.id) && "animate-pulse"
+                      )}
+                    >
+                      <Row
+                        orgSlug={orgSlug}
+                        slug={slug}
+                        ticket={ticket}
+                        query={query}
+                        members={members}
+                        showSprintCol={showSprintCol}
+                        showExtraActionsCol={showExtraActionsCol}
+                        sprintMembership={
+                          sprintMembership?.get(ticket.id) ?? null
+                        }
+                        extraRowActions={extraRowActions}
+                        pending={itemRowState[index].pending}
+                        activePreviewId={activePreviewId}
+                        onPreviewOpenChange={onPreviewOpenChange}
+                      />
+                    </div>
+                  )
+                }}
+              </VirtualRowsPrototype>
             )}
 
             {nextCursor !== null && (
-              <div className="flex justify-center py-2">
-                <Button
-                  type="button"
-                  variant="tertiary"
-                  size="sm"
-                  onClick={() => loadMore()}
-                  disabled={loadingMore}
-                >
-                  {loadingMore ? (
-                    <>
-                      <Loader2
-                        className="size-4 animate-spin"
-                        strokeWidth={1.75}
-                      />
-                      {m.tickets_load_more_loading()}
-                    </>
-                  ) : (
-                    m.tickets_section_load_more_button({ remaining })
-                  )}
-                </Button>
-              </div>
+              <AutoLoadPrototype
+                key={deferredKey}
+                cursor={nextCursor}
+                enabled={
+                  !collapsed &&
+                  !waiting &&
+                  !loadingMore &&
+                  !Result.isFailure(loadMoreState)
+                }
+                loadMore={() => loadMore()}
+              >
+                {Result.isFailure(loadMoreState) ? (
+                  <Button
+                    type="button"
+                    variant="tertiary"
+                    size="sm"
+                    onClick={() => loadMore()}
+                  >
+                    {m.tickets_section_load_more_button({ remaining })}
+                  </Button>
+                ) : (
+                  <div
+                    role="status"
+                    className={cn(
+                      "flex h-7 items-center gap-2 text-xs text-muted-foreground",
+                      !loadingMore && "invisible"
+                    )}
+                  >
+                    <Loader2
+                      className="size-4 animate-spin motion-reduce:animate-none"
+                      strokeWidth={1.75}
+                    />
+                    {m.tickets_load_more_loading()}
+                  </div>
+                )}
+              </AutoLoadPrototype>
             )}
           </div>
         </div>

@@ -207,6 +207,7 @@ export function SegmentedList({
   return (
     <div
       key="sections"
+      style={{ overflowAnchor: "none" }}
       className={cn(
         "flex flex-col gap-1 has-[[data-creating]]:[&>:not([data-creating])]:opacity-35",
         isStale && "animate-pulse"
