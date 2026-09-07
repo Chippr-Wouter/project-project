@@ -33,6 +33,8 @@ services:
   minio:
     image: minio/minio:latest
     container_name: projectproject-minio
+    labels:
+      - dev.orbstack.http-port=9001
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: projectproject
