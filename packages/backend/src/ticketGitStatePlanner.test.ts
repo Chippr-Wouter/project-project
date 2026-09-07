@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "vite-plus/test"
 import * as DateTime from "effect/DateTime"
 import * as Schema from "effect/Schema"
 import { TicketId, TicketStatus } from "@projectproject/shared"
@@ -226,10 +226,13 @@ describe("planPullRequestWebhookTicket", () => {
 
   it("records lastTransitionedPr for already-done merged pull requests", () => {
     expect(
-      planPullRequestWebhookTicket(webhookTicket({ status: ticketStatus("done") }), {
-        number: 80,
-        state: "merged"
-      })
+      planPullRequestWebhookTicket(
+        webhookTicket({ status: ticketStatus("done") }),
+        {
+          number: 80,
+          state: "merged"
+        }
+      )
     ).toEqual({
       ticketId: "T-84",
       patch: { pr: 80, prState: "merged", lastTransitionedPr: 80 }

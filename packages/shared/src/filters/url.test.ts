@@ -1,10 +1,7 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "vite-plus/test"
 import * as Schema from "effect/Schema"
 import { StatusSlug } from "../schemas/Status"
-import {
-  ticketListQueryFromSearch,
-  ticketListQueryToSearch
-} from "./url"
+import { ticketListQueryFromSearch, ticketListQueryToSearch } from "./url"
 
 const s = Schema.decodeUnknownSync(StatusSlug)
 

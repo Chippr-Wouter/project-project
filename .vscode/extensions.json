@@ -1,3 +1,6 @@
 {
-  "recommendations": ["oxc.oxc-vscode"]
+  "recommendations": [
+    "VoidZero.vite-plus-extension-pack",
+    "typescriptteam.native-preview"
+  ]
 }

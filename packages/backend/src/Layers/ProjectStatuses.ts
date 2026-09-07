@@ -84,18 +84,21 @@ export const ProjectStatusesLive = Layer.effect(
       Effect.forEach(
         ids,
         (id) =>
-          tickets
-            .replaceStatus(orgSlug, slug, id, toSlug)
-            .pipe(
-              Effect.catchTag("NotFound", () => Effect.succeed(false)),
-              Effect.catchTag("MalformedTicketDocument", () =>
-                Effect.succeed(false)
-              )
-            ),
+          tickets.replaceStatus(orgSlug, slug, id, toSlug).pipe(
+            Effect.catchTag("NotFound", () => Effect.succeed(false)),
+            Effect.catchTag("MalformedTicketDocument", () =>
+              Effect.succeed(false)
+            )
+          ),
         { concurrency: 8 }
       )
 
-    const create: ProjectStatusesShape["create"] = (orgSlug, userId, slug, input) =>
+    const create: ProjectStatusesShape["create"] = (
+      orgSlug,
+      userId,
+      slug,
+      input
+    ) =>
       Effect.gen(function* () {
         yield* projects.requireRole(orgSlug, userId, slug, ["owner", "admin"])
         const projectId = yield* projectIdFromSlug(slug)
@@ -120,7 +123,8 @@ export const ProjectStatusesLive = Layer.effect(
           existing.length > 0 ? existing[existing.length - 1].orderKey : null
         const nextKey = generateKeyBetween(lastKey, null)
 
-        const color = input.color ?? pickStatusColor(existing.map((s) => s.color))
+        const color =
+          input.color ?? pickStatusColor(existing.map((s) => s.color))
         const icon = input.icon ?? DEFAULT_ICON
 
         const inserted = yield* db
@@ -163,7 +167,9 @@ export const ProjectStatusesLive = Layer.effect(
         if (isReservedStatusSlug(statusSlug)) return yield* new Forbidden()
 
         const newLabel = input.label ?? current.label
-        const newSlug = input.label ? deriveStatusSlug(input.label) : current.slug
+        const newSlug = input.label
+          ? deriveStatusSlug(input.label)
+          : current.slug
 
         if (newSlug.length === 0)
           return yield* new Conflict({ reason: "invalid_label" })

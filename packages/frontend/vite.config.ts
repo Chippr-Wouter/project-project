@@ -1,6 +1,6 @@
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { defineConfig } from "vite"
+import { defineConfig } from "vite-plus"
 import react from "@vitejs/plugin-react"
 import tailwindcss from "@tailwindcss/vite"
 import { tanstackRouter } from "@tanstack/router-plugin/vite"
@@ -19,12 +19,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // itself, so the lessons translate identically. If a future chapter needs
 // Start specifically, we can add it then.
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   // `@/...` resolves to `src/...`. Mirrors the `paths` entry in tsconfig.json
   // so types and runtime agree. Reach for relative imports only when staying
   // inside a tightly co-located module (e.g. a component pulling its sibling
   // styles); reach for `@/` when crossing top-level concerns (atoms, services,
   // routes).
+  root: __dirname,
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src")
@@ -36,18 +37,28 @@ export default defineConfig({
   publicDir: path.resolve(__dirname, "src/public"),
   plugins: [
     // Generates packages/frontend/src/routeTree.gen.ts from files in src/routes/
-    tanstackRouter({ target: "react", autoCodeSplitting: true }),
+    ...(mode === "test"
+      ? []
+      : [tanstackRouter({ target: "react", autoCodeSplitting: true })]),
     react(),
-    tailwindcss(),
+    ...(mode === "test" ? [] : [tailwindcss()]),
     paraglideVitePlugin({
-      project: "./project.inlang",
-      outdir: "./src/paraglide",
+      project: path.resolve(__dirname, "project.inlang"),
+      outdir: path.resolve(__dirname, "src/paraglide"),
       strategy: ["cookie", "preferredLanguage", "baseLocale"],
       cookieName: "pp_locale",
       cookieMaxAge: 60 * 60 * 24 * 365,
       emitTsDeclarations: true
     })
   ],
+  test: {
+    name: "frontend",
+    include: ["src/**/*.test.{ts,tsx}"],
+    environment: "jsdom",
+    pool: "forks",
+    execArgv: ["--no-experimental-webstorage"],
+    environmentOptions: { jsdom: { url: "http://localhost/" } }
+  },
   server: {
     port: 5173,
     // The frontend dev server proxies API calls to the backend so that the
@@ -94,4 +105,4 @@ export default defineConfig({
       }
     }
   }
-})
+}))

@@ -48,7 +48,13 @@ const GROUP_UNASSIGNED_SENTINEL = "unassigned"
 
 const isStatusSlug = Schema.is(StatusSlug)
 const TYPE_VALUES = ["feat", "bug", "chore", "other"] as const
-const SORT_KEY_VALUES = ["id", "created", "updated", "title", "priority"] as const
+const SORT_KEY_VALUES = [
+  "id",
+  "created",
+  "updated",
+  "title",
+  "priority"
+] as const
 const SORT_DIR_VALUES = ["asc", "desc"] as const
 
 const asArray = <T>(value: unknown): ReadonlyArray<T> | undefined => {
@@ -86,7 +92,9 @@ const decodeAssignee = (
   return mapped.length === 0 ? undefined : mapped
 }
 
-const decodeStringArray = (value: unknown): ReadonlyArray<string> | undefined => {
+const decodeStringArray = (
+  value: unknown
+): ReadonlyArray<string> | undefined => {
   const arr = asArray<string>(value)
   if (!arr) return undefined
   const filtered = arr.filter((s) => typeof s === "string" && s.length > 0)

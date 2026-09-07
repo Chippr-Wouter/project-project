@@ -282,21 +282,13 @@
 }
 .prose-md a:hover,
 .prose-md .lexical-link:hover {
-  background-color: color-mix(
-    in oklch,
-    var(--foreground) 6%,
-    transparent
-  );
+  background-color: color-mix(in oklch, var(--foreground) 6%, transparent);
   text-decoration-color: var(--foreground);
 }
 .prose-md a:focus-visible,
 .prose-md .lexical-link:focus-visible {
   outline: none;
-  background-color: color-mix(
-    in oklch,
-    var(--foreground) 8%,
-    transparent
-  );
+  background-color: color-mix(in oklch, var(--foreground) 8%, transparent);
   box-shadow: 0 0 0 2px var(--ring);
   text-decoration-color: var(--foreground);
 }

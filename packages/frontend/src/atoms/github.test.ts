@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "vite-plus/test"
 import * as Schema from "effect/Schema"
 import { StatusSlug } from "@projectproject/shared"
 import { branchesKey, shouldInvalidateTicketsForGitStates } from "./github"
@@ -21,7 +21,9 @@ describe("branchesKey", () => {
 
 describe("shouldInvalidateTicketsForGitStates", () => {
   it("ignores git-state responses without ticket transitions", () => {
-    expect(shouldInvalidateTicketsForGitStates({ transitioned: [] })).toBe(false)
+    expect(shouldInvalidateTicketsForGitStates({ transitioned: [] })).toBe(
+      false
+    )
   })
 
   it("invalidates when a git-state response transitioned tickets", () => {

@@ -50,7 +50,7 @@ import * as ConfigProvider from "effect/ConfigProvider"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import { expect } from "vitest"
+import { afterAll, expect } from "vite-plus/test"
 import { createHmac } from "node:crypto"
 import {
   GITHUB_WEBHOOK_MAX_BODY_BYTES,
@@ -64,14 +64,21 @@ import {
   type GitHubWebhooksShape
 } from "./Services/GitHubWebhooks"
 
-const ApiUnderTestLive = HttpApiBuilder.api(AppApi).pipe(
-  Layer.provide(HealthHandlerLive)
-) as Layer.Layer<HttpApi.Api>
+const healthGroup = Object.values(AppApi.groups).find(
+  (group) => group.identifier === "health"
+)
+if (!healthGroup) throw new Error("Health API group not found")
+
+const ApiUnderTestLive = HttpApiBuilder.api(
+  HttpApi.make(AppApi.identifier).add(healthGroup)
+).pipe(Layer.provide(HealthHandlerLive))
 
 // One shared web handler for the whole suite.
-const { handler } = HttpApiBuilder.toWebHandler(
+const { handler, dispose } = HttpApiBuilder.toWebHandler(
   ApiUnderTestLive.pipe(Layer.provideMerge(HttpServer.layerContext))
 )
+
+afterAll(() => dispose())
 
 // Layer that lets `HttpApiClient.make(AppApi)` reach our in-process handler
 // instead of the network. We override the `FetchHttpClient.Fetch` service —

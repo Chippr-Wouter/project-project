@@ -5,7 +5,7 @@ import * as Config from "effect/Config"
 import * as ConfigProvider from "effect/ConfigProvider"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import { describe, expect } from "vitest"
+import { describe, expect } from "vite-plus/test"
 import { Markdown } from "../Services/Markdown"
 import { MarkdownLive } from "./Markdown"
 

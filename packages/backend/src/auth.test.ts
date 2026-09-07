@@ -3,7 +3,7 @@ import { getTestInstance } from "better-auth/test"
 import { magicLinkClient, organizationClient } from "better-auth/client/plugins"
 import { organization } from "better-auth/plugins"
 import * as DateTime from "effect/DateTime"
-import { describe, expect, it, vi } from "vitest"
+import { describe, expect, it, vi } from "vite-plus/test"
 import { auth, lastOrgOwnerBlocked, projectOwnerRemovalError } from "./auth"
 
 describe("Better Auth plugin wiring", () => {

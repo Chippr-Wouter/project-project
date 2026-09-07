@@ -4,10 +4,7 @@ export const dieOnMarkdown = <A, E, R>(
   eff: Effect.Effect<A, E, R>
 ): Effect.Effect<
   A,
-  Exclude<
-    E,
-    { readonly _tag: "MarkdownError" | "MalformedTicketDocument" }
-  >,
+  Exclude<E, { readonly _tag: "MarkdownError" | "MalformedTicketDocument" }>,
   R
 > =>
   eff.pipe(
@@ -17,9 +14,6 @@ export const dieOnMarkdown = <A, E, R>(
     })
   ) as Effect.Effect<
     A,
-    Exclude<
-      E,
-      { readonly _tag: "MarkdownError" | "MalformedTicketDocument" }
-    >,
+    Exclude<E, { readonly _tag: "MarkdownError" | "MalformedTicketDocument" }>,
     R
   >

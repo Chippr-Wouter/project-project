@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "vite-plus/test"
 import { orgAttachmentsKey, splitOrgAttachmentsKey } from "./orgAttachmentsKey"
 
 describe("orgAttachmentsKey", () => {
@@ -19,7 +19,9 @@ describe("orgAttachmentsKey", () => {
   })
 
   it("keys two different filters apart, so one view cannot serve the other", () => {
-    expect(orgAttachmentsKey({ orgSlug: "acme", status: "live", page: 1 })).not.toBe(
+    expect(
+      orgAttachmentsKey({ orgSlug: "acme", status: "live", page: 1 })
+    ).not.toBe(
       orgAttachmentsKey({ orgSlug: "acme", status: "orphaned", page: 1 })
     )
   })

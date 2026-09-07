@@ -563,11 +563,16 @@ function SprintViewSwitcher({
       search: (prev) => ({ ...prev, view: next })
     })
   }
-  const items: ReadonlyArray<SegmentedItem<"list" | "board" | "description">> = [
-    { key: "list", label: m.sprints_view_list(), icon: Rows3 },
-    { key: "board", label: m.sprints_view_board(), icon: Columns3 },
-    { key: "description", label: m.sprints_view_description(), icon: FileText }
-  ]
+  const items: ReadonlyArray<SegmentedItem<"list" | "board" | "description">> =
+    [
+      { key: "list", label: m.sprints_view_list(), icon: Rows3 },
+      { key: "board", label: m.sprints_view_board(), icon: Columns3 },
+      {
+        key: "description",
+        label: m.sprints_view_description(),
+        icon: FileText
+      }
+    ]
   return (
     <div
       role="group"

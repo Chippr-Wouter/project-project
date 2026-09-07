@@ -69,118 +69,121 @@ export const applyPullRequestWebhookToTicket = (
   change: GitHubPullRequestWebhookChange,
   deliveryId: string | null
 ): Effect.Effect<void, MarkdownError> =>
-  withPullRequestTicketLock(match, Effect.gen(function* () {
-    const ticket = yield* deps.ticketDocs
-      .read(match.orgSlug, match.projectSlug, match.ticketId)
-      .pipe(
-        Effect.catchTag("NotFound", (error) =>
-          Effect.logWarning("github pull_request ticket ignored").pipe(
-            Effect.annotateLogs({
-              module: "GitHubWebhooks",
-              deliveryId,
-              orgSlug: match.orgSlug,
-              slug: match.projectSlug,
-              ticketId: match.ticketId,
-              error
-            }),
-            Effect.as(null)
-          )
-        ),
-        Effect.catchTag("MalformedTicketDocument", (error) =>
-          Effect.logWarning("github pull_request ticket ignored").pipe(
-            Effect.annotateLogs({
-              module: "GitHubWebhooks",
-              deliveryId,
-              orgSlug: match.orgSlug,
-              slug: match.projectSlug,
-              ticketId: match.ticketId,
-              error
-            }),
-            Effect.as(null)
-          )
-        )
-      )
-    if (!ticket) return
-    if (ticket.branch !== match.branch) {
-      yield* Effect.logDebug("github pull_request branch index stale").pipe(
-        Effect.annotateLogs({
-          module: "GitHubWebhooks",
-          deliveryId,
-          orgSlug: match.orgSlug,
-          slug: match.projectSlug,
-          ticketId: match.ticketId,
-          indexedBranch: match.branch,
-          ticketBranch: ticket.branch
-        })
-      )
-      return
-    }
-    if (ticket.pr !== null && change.number < ticket.pr) {
-      yield* Effect.logDebug("github pull_request delivery stale").pipe(
-        Effect.annotateLogs({
-          module: "GitHubWebhooks",
-          deliveryId,
-          orgSlug: match.orgSlug,
-          slug: match.projectSlug,
-          ticketId: match.ticketId,
-          ticketPr: ticket.pr,
-          webhookPr: change.number
-        })
-      )
-      return
-    }
-    const write = planPullRequestWebhookTicket(ticket, change)
-    if (!write) return
-    const next = {
-      ...ticket,
-      pr: write.patch.pr !== undefined ? write.patch.pr : ticket.pr,
-      prState:
-        write.patch.prState !== undefined
-          ? write.patch.prState
-          : ticket.prState,
-      lastTransitionedPr:
-        write.patch.lastTransitionedPr !== undefined
-          ? write.patch.lastTransitionedPr
-          : ticket.lastTransitionedPr,
-      status: write.patch.status ?? ticket.status,
-      updatedAt: yield* DateTime.nowAsDate
-    }
-    yield* deps.ticketDocs
-      .write(match.orgSlug, match.projectSlug, match.ticketId, next)
-      .pipe(
-        Effect.tapError((error) =>
-          Effect.logWarning("github pull_request ticket write failed").pipe(
-            Effect.annotateLogs({
-              module: "GitHubWebhooks",
-              deliveryId,
-              orgSlug: match.orgSlug,
-              slug: match.projectSlug,
-              ticketId: match.ticketId,
-              error
-            })
+  withPullRequestTicketLock(
+    match,
+    Effect.gen(function* () {
+      const ticket = yield* deps.ticketDocs
+        .read(match.orgSlug, match.projectSlug, match.ticketId)
+        .pipe(
+          Effect.catchTag("NotFound", (error) =>
+            Effect.logWarning("github pull_request ticket ignored").pipe(
+              Effect.annotateLogs({
+                module: "GitHubWebhooks",
+                deliveryId,
+                orgSlug: match.orgSlug,
+                slug: match.projectSlug,
+                ticketId: match.ticketId,
+                error
+              }),
+              Effect.as(null)
+            )
+          ),
+          Effect.catchTag("MalformedTicketDocument", (error) =>
+            Effect.logWarning("github pull_request ticket ignored").pipe(
+              Effect.annotateLogs({
+                module: "GitHubWebhooks",
+                deliveryId,
+                orgSlug: match.orgSlug,
+                slug: match.projectSlug,
+                ticketId: match.ticketId,
+                error
+              }),
+              Effect.as(null)
+            )
           )
         )
-      )
-    const indexProject = {
-      orgSlug: match.orgSlug,
-      organizationId: match.organizationId,
-      projectId: match.projectId,
-      projectSlug: match.projectSlug
-    }
-    yield* deps.ticketIndex.upsertTicket(indexProject, next)
-    yield* Effect.logInfo("github pull_request ticket updated").pipe(
-      Effect.annotateLogs({
-        module: "GitHubWebhooks",
-        deliveryId,
+      if (!ticket) return
+      if (ticket.branch !== match.branch) {
+        yield* Effect.logDebug("github pull_request branch index stale").pipe(
+          Effect.annotateLogs({
+            module: "GitHubWebhooks",
+            deliveryId,
+            orgSlug: match.orgSlug,
+            slug: match.projectSlug,
+            ticketId: match.ticketId,
+            indexedBranch: match.branch,
+            ticketBranch: ticket.branch
+          })
+        )
+        return
+      }
+      if (ticket.pr !== null && change.number < ticket.pr) {
+        yield* Effect.logDebug("github pull_request delivery stale").pipe(
+          Effect.annotateLogs({
+            module: "GitHubWebhooks",
+            deliveryId,
+            orgSlug: match.orgSlug,
+            slug: match.projectSlug,
+            ticketId: match.ticketId,
+            ticketPr: ticket.pr,
+            webhookPr: change.number
+          })
+        )
+        return
+      }
+      const write = planPullRequestWebhookTicket(ticket, change)
+      if (!write) return
+      const next = {
+        ...ticket,
+        pr: write.patch.pr !== undefined ? write.patch.pr : ticket.pr,
+        prState:
+          write.patch.prState !== undefined
+            ? write.patch.prState
+            : ticket.prState,
+        lastTransitionedPr:
+          write.patch.lastTransitionedPr !== undefined
+            ? write.patch.lastTransitionedPr
+            : ticket.lastTransitionedPr,
+        status: write.patch.status ?? ticket.status,
+        updatedAt: yield* DateTime.nowAsDate
+      }
+      yield* deps.ticketDocs
+        .write(match.orgSlug, match.projectSlug, match.ticketId, next)
+        .pipe(
+          Effect.tapError((error) =>
+            Effect.logWarning("github pull_request ticket write failed").pipe(
+              Effect.annotateLogs({
+                module: "GitHubWebhooks",
+                deliveryId,
+                orgSlug: match.orgSlug,
+                slug: match.projectSlug,
+                ticketId: match.ticketId,
+                error
+              })
+            )
+          )
+        )
+      const indexProject = {
         orgSlug: match.orgSlug,
-        slug: match.projectSlug,
-        ticketId: match.ticketId,
-        pr: next.pr,
-        prState: next.prState,
-        status: next.status
-      })
-    )
-  }))
+        organizationId: match.organizationId,
+        projectId: match.projectId,
+        projectSlug: match.projectSlug
+      }
+      yield* deps.ticketIndex.upsertTicket(indexProject, next)
+      yield* Effect.logInfo("github pull_request ticket updated").pipe(
+        Effect.annotateLogs({
+          module: "GitHubWebhooks",
+          deliveryId,
+          orgSlug: match.orgSlug,
+          slug: match.projectSlug,
+          ticketId: match.ticketId,
+          pr: next.pr,
+          prState: next.prState,
+          status: next.status
+        })
+      )
+    })
+  )
 
 const GitHubId = Schema.Union(Schema.Number, Schema.String)
 
@@ -540,10 +543,14 @@ const handleCheckSuite = (
     const repositoryId = idToString(payload.repository.id)
     const branch = payload.check_suite.head_branch
     if (!branch) {
-      yield* logIgnored("github check_suite without head branch ignored", delivery, {
-        installationId,
-        repositoryId
-      })
+      yield* logIgnored(
+        "github check_suite without head branch ignored",
+        delivery,
+        {
+          installationId,
+          repositoryId
+        }
+      )
       return
     }
     yield* sink.checkStateChanged(
@@ -584,11 +591,15 @@ const handleStatus = (
       (entry) => entry.commit.sha === payload.sha
     )
     if (branches.length === 0) {
-      yield* logIgnored("github status without matching branch ignored", delivery, {
-        installationId,
-        repositoryId,
-        sha: payload.sha
-      })
+      yield* logIgnored(
+        "github status without matching branch ignored",
+        delivery,
+        {
+          installationId,
+          repositoryId,
+          sha: payload.sha
+        }
+      )
       return
     }
     yield* Effect.forEach(
@@ -619,7 +630,11 @@ const handleRepository = (
     const installationId = idToString(payload.installation.id)
     const repoId = idToString(payload.repository.id)
     if (payload.action === "archived") {
-      yield* sink.repositoryArchived(installationId, repoId, delivery.deliveryId)
+      yield* sink.repositoryArchived(
+        installationId,
+        repoId,
+        delivery.deliveryId
+      )
       return
     }
     if (payload.action === "unarchived") {
@@ -1240,69 +1255,66 @@ export const GitHubWebhooksLive = Layer.effect(
       }
     )
 
-    const branchDeleted = Effect.fn("GitHubWebhooks.branchDeleted")(
-      function* (
-        change: GitHubBranchDeletionChange,
-        deliveryId: string | null
-      ) {
-        const links = yield* activeProjectLinksForRepository(change)
-        if (links.length === 0) {
-          yield* Effect.logDebug("github delete repository unknown").pipe(
-            Effect.annotateLogs({
-              module: "GitHubWebhooks",
-              deliveryId,
-              installationId: change.installationId,
-              repositoryId: change.repositoryId
-            })
-          )
-          return
-        }
-        const now = yield* DateTime.nowAsDate
-        yield* sql
-          .withTransaction(
-            Effect.forEach(
-              links,
-              (link) =>
-                ticketIndex
-                  .markBranchStale(link.projectId, change.branch, now)
-                  .pipe(
-                    Effect.flatMap((ticketIds) =>
-                      ticketIds.length === 0
-                        ? Effect.logDebug("github delete branch unknown").pipe(
-                            Effect.annotateLogs({
-                              module: "GitHubWebhooks",
-                              deliveryId,
-                              installationId: change.installationId,
-                              repositoryId: change.repositoryId,
-                              branch: change.branch,
-                              projectIntegrationLinkId: link.id
-                            })
-                          )
-                        : Effect.logInfo("github delete branch marked stale").pipe(
-                            Effect.annotateLogs({
-                              module: "GitHubWebhooks",
-                              deliveryId,
-                              installationId: change.installationId,
-                              repositoryId: change.repositoryId,
-                              branch: change.branch,
-                              projectIntegrationLinkId: link.id,
-                              ticketIds
-                            })
-                          )
-                    )
-                  ),
-              { concurrency: 1 }
-            ).pipe(Effect.asVoid)
-          )
-          .pipe(Effect.catchTag("SqlError", Effect.die))
+    const branchDeleted = Effect.fn("GitHubWebhooks.branchDeleted")(function* (
+      change: GitHubBranchDeletionChange,
+      deliveryId: string | null
+    ) {
+      const links = yield* activeProjectLinksForRepository(change)
+      if (links.length === 0) {
+        yield* Effect.logDebug("github delete repository unknown").pipe(
+          Effect.annotateLogs({
+            module: "GitHubWebhooks",
+            deliveryId,
+            installationId: change.installationId,
+            repositoryId: change.repositoryId
+          })
+        )
+        return
       }
-    )
+      const now = yield* DateTime.nowAsDate
+      yield* sql
+        .withTransaction(
+          Effect.forEach(
+            links,
+            (link) =>
+              ticketIndex
+                .markBranchStale(link.projectId, change.branch, now)
+                .pipe(
+                  Effect.flatMap((ticketIds) =>
+                    ticketIds.length === 0
+                      ? Effect.logDebug("github delete branch unknown").pipe(
+                          Effect.annotateLogs({
+                            module: "GitHubWebhooks",
+                            deliveryId,
+                            installationId: change.installationId,
+                            repositoryId: change.repositoryId,
+                            branch: change.branch,
+                            projectIntegrationLinkId: link.id
+                          })
+                        )
+                      : Effect.logInfo(
+                          "github delete branch marked stale"
+                        ).pipe(
+                          Effect.annotateLogs({
+                            module: "GitHubWebhooks",
+                            deliveryId,
+                            installationId: change.installationId,
+                            repositoryId: change.repositoryId,
+                            branch: change.branch,
+                            projectIntegrationLinkId: link.id,
+                            ticketIds
+                          })
+                        )
+                  )
+                ),
+            { concurrency: 1 }
+          ).pipe(Effect.asVoid)
+        )
+        .pipe(Effect.catchTag("SqlError", Effect.die))
+    })
 
     const checkStateChanged = Effect.fn("GitHubWebhooks.checkStateChanged")(
-      function* (
-        change: GitHubCheckWebhookChange,
-        deliveryId: string | null
-      ) {
+      function* (change: GitHubCheckWebhookChange, deliveryId: string | null) {
         const links = yield* activeProjectLinksForRepository(change)
         if (links.length === 0) {
           yield* Effect.logDebug("github check repository unknown").pipe(

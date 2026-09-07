@@ -22,8 +22,9 @@ projectproject/
 
 ## Prerequisites
 
-- [Bun](https://bun.sh) — runtime, package manager, and workspaces driver
-- Postgres (later chapters; not required for Chapter 0)
+- Node.js 24.15.0 (see `.node-version`) for Vite Plus and its test runner.
+- [Bun](https://bun.sh) 1.3.13 for dependency installation and the backend runtime.
+- Postgres for running the app; the test suite uses mocks and temporary directories.
 
 ## Getting started
 
@@ -31,7 +32,52 @@ projectproject/
 bun install
 ```
 
-Per-chapter instructions live in `docs/chapters/`. Start with chapter 0.
+The install step patches TypeScript 7 with `@effect/tsgo`, so command-line
+checks and the native editor language service include Effect diagnostics.
+Install the recommended VS Code/Cursor extensions and select the workspace
+TypeScript version when prompted.
+
+```bash
+bun run check         # Formatting, linting, and native TypeScript + Effect checks
+bun run test          # All backend, frontend, and shared tests
+bun run build         # Frontend production build
+bun run dev           # Postgres, backend, and frontend (uses .env)
+```
+
+These scripts use the project's pinned Vite Plus installation; a global `vp`
+installation is optional. With the [Vite Plus CLI](https://viteplus.dev/guide/)
+installed, `vp install` uses Bun and `vp run <script>` runs the same scripts.
+Use `vp run dev` for the full app: bare `vp dev` starts only Vite.
+
+## Tooling
+
+Root `vite.config.ts` owns linting, formatting, and the three test projects.
+Each package's `vite.config.ts` owns its local build/test settings. Run a single
+suite with `bun run test --project backend` (or `frontend` / `shared`), and use
+`bun run --cwd packages/backend test:watch` for backend watch mode.
+
+`vp check` handles formatting and type-aware linting. `bun run check` also runs
+our patched native compiler, preserving the Effect diagnostics configured in
+`tsconfig.base.json`. Paraglide 2.25 supports TypeScript 7 declaration generation;
+frontend checks and tests generate translations automatically on a fresh checkout.
+The obsolete `importFromBarrel` diagnostic was removed from the configuration
+because `@effect/tsgo` no longer provides it.
+
+The four newly available React compiler lint rules start at warning severity;
+existing correctness rules remain errors. Generated database snapshots and the
+vendored Everhour API schema are excluded from formatting.
+
+The root overrides keep all Vite plugins on Vite Plus's Vite distribution and
+all tests on its bundled Vitest 4.1.11. `@effect/vitest` stays at 0.29.0 for
+Effect v3; its declared Vitest 3 peer range is overridden, with compatibility
+covered by the backend Effect test suite. Upgrade the Vitest pin together with
+Vite Plus and rerun the full suite. Effect itself remains on v3.
+
+Frontend test workers disable Node's native web storage so jsdom supplies
+browser-local storage. The test runner needs neither `.env` nor a running database.
+
+The setup follows [T3 Code's tooling layout](https://github.com/pingdotgg/t3code),
+with Bun retained for this project's runtime and package manager.
 
 ## Bootstrapping a fresh instance
 

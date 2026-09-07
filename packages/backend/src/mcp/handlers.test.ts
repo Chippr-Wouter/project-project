@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest"
+import { describe, expect, test } from "vite-plus/test"
 import * as Effect from "effect/Effect"
 import * as DateTime from "effect/DateTime"
 import * as Layer from "effect/Layer"

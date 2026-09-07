@@ -1,5 +1,5 @@
 import { Circle, CircleCheck } from "lucide-react"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "vite-plus/test"
 import { getStatusIcon } from "./status-icons"
 
 describe("getStatusIcon", () => {

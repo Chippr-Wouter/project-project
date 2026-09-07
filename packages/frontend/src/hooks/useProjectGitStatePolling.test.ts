@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test"
 import { cleanup, renderHook } from "@testing-library/react"
 
 const { refreshMock } = vi.hoisted(() => ({ refreshMock: vi.fn() }))

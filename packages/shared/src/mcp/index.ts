@@ -49,7 +49,7 @@ export * from "./RebuildTicketIndexOutput"
 export interface McpToolSpec<
   Input extends Schema.Schema.Any,
   Output extends Schema.Schema.Any,
-  Errors extends ReadonlyArray<Schema.Schema.Any>,
+  Errors extends ReadonlyArray<Schema.Schema.Any>
 > {
   readonly description: string
   readonly input: Input
@@ -258,7 +258,7 @@ export const McpTools = {
       "Add a comment to a ticket. `body` is required CommonMark markdown " +
       "(1–20,000 characters). The comment is attributed to the calling user. " +
       "Useful for agents to record what they did on a ticket (e.g. " +
-      "\"Opened PR #42, ready for review\"). Mentions use " +
+      '"Opened PR #42, ready for review"). Mentions use ' +
       "`[Label](mention:user/<userId>)` for people and " +
       "`[Label](mention:ticket/<T-N>)` for tickets; the user must be a " +
       "project member and the ticket must exist in this project. Malformed " +

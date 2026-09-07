@@ -45,9 +45,7 @@ const toZod = (
       if (nullIdx === 0) return variants[1]!.nullable()
       if (nullIdx === 1) return variants[0]!.nullable()
     }
-    return z.union(
-      variants as [z.ZodType, z.ZodType, ...Array<z.ZodType>]
-    )
+    return z.union(variants as [z.ZodType, z.ZodType, ...Array<z.ZodType>])
   }
 
   if (node.enum) {

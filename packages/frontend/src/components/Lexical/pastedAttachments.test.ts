@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "vite-plus/test"
 import { splitPastedAttachments } from "./pastedAttachments"
 
 const ID = "01JBX7Q2K9ZWCVE8MTQ4RXPGHN"

@@ -8,14 +8,14 @@ import * as Schema from "effect/Schema"
 
 export const Pagination = Schema.Struct({
   cursor: Schema.optional(Schema.String),
-  limit: Schema.optional(Schema.Int.pipe(Schema.between(1, 200))),
+  limit: Schema.optional(Schema.Int.pipe(Schema.between(1, 200)))
 })
 export type Pagination = typeof Pagination.Type
 
 export const Page = <A, I>(item: Schema.Schema<A, I>) =>
   Schema.Struct({
     items: Schema.Array(item),
-    nextCursor: Schema.NullOr(Schema.String),
+    nextCursor: Schema.NullOr(Schema.String)
   })
 
 export interface CursorPayload {
@@ -45,9 +45,7 @@ export const encodeCursor = (p: CursorPayload): string =>
   toBase64Url(new TextEncoder().encode(JSON.stringify(p)))
 
 export const decodeCursor = (s: string): CursorPayload => {
-  const parsed: unknown = JSON.parse(
-    new TextDecoder().decode(fromBase64Url(s))
-  )
+  const parsed: unknown = JSON.parse(new TextDecoder().decode(fromBase64Url(s)))
   if (
     typeof parsed !== "object" ||
     parsed === null ||

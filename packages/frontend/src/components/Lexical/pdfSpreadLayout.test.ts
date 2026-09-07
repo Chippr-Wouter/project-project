@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "vite-plus/test"
 import {
   PDF_SPREAD_PAGE_HEIGHT,
   PDF_SPREAD_PAGE_WIDTH,

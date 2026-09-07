@@ -4,7 +4,7 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
 import * as TestClock from "effect/TestClock"
-import { expect } from "vitest"
+import { expect } from "vite-plus/test"
 import {
   Forbidden,
   GroupId,
@@ -15,11 +15,7 @@ import {
   TicketId,
   TicketStatus
 } from "@projectproject/shared"
-import type {
-  GroupDetail,
-  ProjectDetail,
-  Role
-} from "@projectproject/shared"
+import type { GroupDetail, ProjectDetail, Role } from "@projectproject/shared"
 import { GroupDocs, type GroupDocsShape, type GroupDocument } from "./GroupDocs"
 import { Groups } from "./Groups"
 import { GroupsLive } from "../Layers/Groups"
@@ -85,7 +81,10 @@ function makeFakeDocs(initial?: {
   const ticketsById = new Map<string, TicketDocument>(
     ticketIds.map((id) => [
       id,
-      makeTicketDocument(id, initial?.ticketStatuses?.[id] ?? defaultTicketStatus)
+      makeTicketDocument(
+        id,
+        initial?.ticketStatuses?.[id] ?? defaultTicketStatus
+      )
     ])
   )
 
@@ -194,8 +193,7 @@ function makeFakeDocs(initial?: {
         indexed: ticketsById.size,
         skipped: 0
       }),
-    reconcileAllProjects: () =>
-      Effect.succeed({ projects: [], reconciled: 0 })
+    reconcileAllProjects: () => Effect.succeed({ projects: [], reconciled: 0 })
   } satisfies TicketIndexShape
 
   return {
@@ -851,7 +849,10 @@ it.effect("updateTicketOrder patches ticket status when provided", () =>
       makeGroupsLayer(
         {
           ticketIds: ["T-1", "T-2"],
-          ticketStatuses: { "T-1": ticketStatus("todo"), "T-2": ticketStatus("in_progress") }
+          ticketStatuses: {
+            "T-1": ticketStatus("todo"),
+            "T-2": ticketStatus("in_progress")
+          }
         },
         { role: "member" }
       )
@@ -933,7 +934,10 @@ it.effect("updateTicketOrder rejects on completed sprint", () =>
       makeGroupsLayer(
         {
           ticketIds: ["T-1", "T-2"],
-          ticketStatuses: { "T-1": ticketStatus("done"), "T-2": ticketStatus("done") }
+          ticketStatuses: {
+            "T-1": ticketStatus("done"),
+            "T-2": ticketStatus("done")
+          }
         },
         { role: "admin" }
       )

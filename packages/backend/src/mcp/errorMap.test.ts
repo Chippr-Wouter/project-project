@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vitest"
-import { Forbidden, NotFound, Unauthorized, Validation } from "@projectproject/shared"
+import { describe, expect, it } from "vite-plus/test"
+import {
+  Forbidden,
+  NotFound,
+  Unauthorized,
+  Validation
+} from "@projectproject/shared"
 import { mapToolError } from "./errorMap"
 
 describe("mapToolError", () => {

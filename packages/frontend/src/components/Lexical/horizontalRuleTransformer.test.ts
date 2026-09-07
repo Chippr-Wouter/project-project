@@ -9,7 +9,7 @@ import {
   $getSelection,
   createEditor
 } from "lexical"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "vite-plus/test"
 import { HORIZONTAL_RULE } from "./horizontalRuleTransformer"
 
 function importMarkdown(markdown: string) {

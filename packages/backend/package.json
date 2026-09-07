@@ -8,8 +8,8 @@
     "start": "bun --env-file=../../.env src/main.ts",
     "mcp": "bun --env-file=../../.env src/mcp.ts",
     "typecheck": "tsc --noEmit",
-    "test": "bun --env-file=../../.env vitest run",
-    "test:watch": "bun --env-file=../../.env vitest",
+    "test": "vp test run",
+    "test:watch": "vp test",
     "bootstrap:org": "bun --env-file=../../.env scripts/bootstrap-org.ts",
     "migrate:orgs": "bun --env-file=../../.env scripts/migrate-orgs.ts",
     "migrate:relayout": "bun --env-file=../../.env scripts/relayout-data.ts",
@@ -42,11 +42,11 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@effect/vitest": "^0.29.0",
+    "@effect/vitest": "0.29.0",
     "@types/bun": "latest",
     "@types/pg": "^8.20.0",
     "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
-    "vitest": "^3.2.0"
+    "vite-plus": "0.3.0"
   }
 }

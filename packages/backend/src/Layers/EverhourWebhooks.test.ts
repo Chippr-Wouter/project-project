@@ -1,7 +1,7 @@
 import { it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import { describe, expect } from "vitest"
+import { describe, expect } from "vite-plus/test"
 import { Db } from "../Services/Db"
 import type { EverhourTimeRecord } from "../Services/Everhour"
 import {
@@ -105,18 +105,20 @@ describe("parseTimeRecord", () => {
     })
   )
 
-  it.effect("maps a live api:time:updated delivery (payload.data nesting)", () =>
-    Effect.sync(() => {
-      const record = parseTimeRecord(liveDeliveryBody)
-      expect(record).toEqual({
-        id: "214588860",
-        taskId: "ev:188193235916608",
-        userId: "1362384",
-        seconds: 60,
-        date: "2024-10-18",
-        comment: null
+  it.effect(
+    "maps a live api:time:updated delivery (payload.data nesting)",
+    () =>
+      Effect.sync(() => {
+        const record = parseTimeRecord(liveDeliveryBody)
+        expect(record).toEqual({
+          id: "214588860",
+          taskId: "ev:188193235916608",
+          userId: "1362384",
+          seconds: 60,
+          date: "2024-10-18",
+          comment: null
+        })
       })
-    })
   )
 
   it.effect("returns null for unparseable bodies", () =>

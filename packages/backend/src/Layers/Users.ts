@@ -69,29 +69,27 @@ export const UsersLive = Layer.effect(
         })
         .pipe(
           Effect.map((rows) =>
-            rows.map(
-              (r): User => ({
-                id: r.id,
-                email: r.email,
-                name: r.name,
-                username: r.username,
-                image: r.image ?? null,
-                createdAt: r.createdAt,
-                activeOrgSlug: null,
-                personalGithub: {
-                  connected: false
-                },
-                editorPreference: "github",
-                personalEverhour: {
-                  connected: false,
-                  everhourUserId: null,
-                  name: null,
-                  email: null,
-                  lastVerifiedAt: null,
-                  lastCheckError: null
-                }
-              })
-            )
+            rows.map((r): User => ({
+              id: r.id,
+              email: r.email,
+              name: r.name,
+              username: r.username,
+              image: r.image ?? null,
+              createdAt: r.createdAt,
+              activeOrgSlug: null,
+              personalGithub: {
+                connected: false
+              },
+              editorPreference: "github",
+              personalEverhour: {
+                connected: false,
+                everhourUserId: null,
+                name: null,
+                email: null,
+                lastVerifiedAt: null,
+                lastCheckError: null
+              }
+            }))
           ),
           Effect.orDie
         )

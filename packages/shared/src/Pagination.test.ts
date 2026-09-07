@@ -1,6 +1,6 @@
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "vite-plus/test"
 import { decodeCursor, encodeCursor, Page, Pagination } from "./Pagination"
 
 describe("Pagination", () => {
@@ -21,17 +21,20 @@ describe("Pagination", () => {
     const PageOfString = Page(Schema.String)
     const decoded = Schema.decodeUnknownSync(PageOfString)({
       items: ["a", "b"],
-      nextCursor: null,
+      nextCursor: null
     })
     expect(decoded.items).toEqual(["a", "b"])
     expect(decoded.nextCursor).toBeNull()
   })
 
   it("cursor round-trip", () => {
-    const cursor = encodeCursor({ id: "T-12", sort: "2026-05-11T00:00:00.000Z" })
+    const cursor = encodeCursor({
+      id: "T-12",
+      sort: "2026-05-11T00:00:00.000Z"
+    })
     expect(decodeCursor(cursor)).toEqual({
       id: "T-12",
-      sort: "2026-05-11T00:00:00.000Z",
+      sort: "2026-05-11T00:00:00.000Z"
     })
   })
 })

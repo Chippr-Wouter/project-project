@@ -96,7 +96,10 @@ export interface TicketsShape {
     slug: string,
     id: string,
     input: UpdateTicketInput
-  ) => Effect.Effect<TicketDetail, TicketReadError | Validation | MentionInvalid>
+  ) => Effect.Effect<
+    TicketDetail,
+    TicketReadError | Validation | MentionInvalid
+  >
   readonly remove: (
     orgSlug: string,
     ownerId: string,

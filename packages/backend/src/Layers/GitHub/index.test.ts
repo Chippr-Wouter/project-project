@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, vi } from "vitest"
+import { beforeEach, describe, expect, vi } from "vite-plus/test"
 import { it } from "@effect/vitest"
 import * as ConfigProvider from "effect/ConfigProvider"
 import * as Effect from "effect/Effect"
