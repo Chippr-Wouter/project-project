@@ -1,6 +1,7 @@
 import {
   memo,
   useRef,
+  useState,
   type KeyboardEvent,
   type MouseEvent,
   type ReactNode
@@ -58,6 +59,7 @@ function RowImpl({
   const idTail = dashIdx >= 0 ? ticket.id.slice(dashIdx + 1) : ""
   const rowElement = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
+  const [previewMounted, setPreviewMounted] = useState(false)
   const open = () => {
     void navigate({
       to: "/orgs/$orgSlug/projects/$slug/tickets/$id",
@@ -86,7 +88,10 @@ function RowImpl({
     <div className="group/list-row col-span-full grid grid-cols-subgrid">
       <Popover
         open={activePreviewId === ticket.id}
-        onOpenChange={(open) => onPreviewOpenChange(ticket.id, open)}
+        onOpenChange={(nextOpen) => {
+          if (nextOpen) setPreviewMounted(true)
+          onPreviewOpenChange(ticket.id, nextOpen)
+        }}
       >
         <div
           ref={rowElement}
@@ -192,12 +197,14 @@ function RowImpl({
             </span>
           )}
         </div>
-        <TicketHoverCard
-          ticketId={ticket.id}
-          scope={{ orgSlug, slug, members }}
-          anchor={rowElement}
-          interactive={false}
-        />
+        {previewMounted && (
+          <TicketHoverCard
+            ticketId={ticket.id}
+            scope={{ orgSlug, slug, members }}
+            anchor={rowElement}
+            interactive={false}
+          />
+        )}
       </Popover>
     </div>
   )
