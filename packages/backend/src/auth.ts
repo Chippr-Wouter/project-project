@@ -62,35 +62,25 @@
 // the right behavior.
 
 import { betterAuth } from "better-auth"
-import { admin, magicLink, mcp, organization } from "better-auth/plugins"
+import { admin, jwt, magicLink, organization } from "better-auth/plugins"
+import { mcp } from "@better-auth/mcp"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
-import {
-  APIError,
-  createAuthMiddleware,
-  getSessionFromCtx
-} from "better-auth/api"
+import { APIError } from "better-auth/api"
 import { drizzle } from "drizzle-orm/node-postgres"
-import { and, eq, inArray, ne } from "drizzle-orm"
+import { and, eq, inArray, ne, sql } from "drizzle-orm"
 import { FileSystem, Path } from "@effect/platform"
 import { BunContext } from "@effect/platform-bun"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import matter from "gray-matter"
 import * as schema from "./db/schema"
+import * as authSchema from "./db/auth-schema"
 import {
-  account,
-  invitation,
   member,
-  oauthAccessToken,
-  oauthApplication,
-  oauthConsent,
   projectIndex,
   projectInviteGrant,
   projectMember,
-  organization as organizationTable,
-  session,
-  user,
-  verification
+  user
 } from "./db/schema"
 
 const db = drizzle(process.env.DATABASE_URL!, { schema })
@@ -283,22 +273,17 @@ async function cleanupRemovedOrgMemberProjectAccess(
     )
 }
 
-// TODO: configure and export `auth`.
+export const mcpResource = new URL(
+  "/mcp",
+  process.env.MCP_RESOURCE_URL ??
+    process.env.BETTER_AUTH_URL ??
+    "http://localhost:3000"
+).href
+
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
-    schema: {
-      user,
-      session,
-      account,
-      verification,
-      organization: organizationTable,
-      member,
-      invitation,
-      oauthApplication,
-      oauthAccessToken,
-      oauthConsent
-    }
+    schema: authSchema
   }),
   secret: process.env.BETTER_AUTH_SECRET,
   baseURL: process.env.BETTER_AUTH_URL,
@@ -346,35 +331,6 @@ export const auth = betterAuth({
       enabled: true,
       maxAge: 5 * 60
     }
-  },
-  // Better Auth's MCP plugin only honours `prompt=consent` on /mcp/authorize
-  // — its own gate is `requireConsent: query.prompt === "consent"`, with no
-  // first-time-consent check against the oauthConsent table. Without this
-  // hook, every MCP client (Claude Code, MCP Inspector, ...) silently
-  // exchanges a code for tokens and the user never sees a consent screen.
-  // We inject `prompt=consent` when no oauthConsent row exists for this
-  // (client, user) pair so the styled /oauth/consent page renders the first
-  // time. Subsequent re-auths read the persisted row and stay silent.
-  hooks: {
-    before: createAuthMiddleware(async (ctx) => {
-      if (ctx.path !== "/mcp/authorize") return
-      const clientId = (ctx.query as { client_id?: string } | undefined)
-        ?.client_id
-      if (!clientId) return
-      const session = await getSessionFromCtx(ctx)
-      if (!session) return
-      const existing = await ctx.context.adapter.findOne<{
-        consentGiven?: boolean
-      }>({
-        model: "oauthConsent",
-        where: [
-          { field: "clientId", value: clientId },
-          { field: "userId", value: session.user.id }
-        ]
-      })
-      if (existing?.consentGiven) return
-      ctx.query = { ...ctx.query, prompt: "consent" }
-    })
   },
   // On sign-in, return the user to the org they were last in. We persist
   // that on `user.lastActiveOrganizationId` (a column on the user table)
@@ -544,17 +500,49 @@ export const auth = betterAuth({
       }
     }),
     admin(),
+    jwt(),
     mcp({
       loginPage: "/login",
-      resource:
-        (process.env.MCP_RESOURCE_URL ??
-          process.env.BETTER_AUTH_URL ??
-          "http://localhost:3000") + "/mcp",
-      oidcConfig: {
-        loginPage: "/login",
-        consentPage: "/oauth/consent"
+      resource: mcpResource,
+      consentPage: "/oauth/consent",
+      allowDynamicClientRegistration: true,
+      allowUnauthenticatedClientRegistration: true,
+      refreshTokenReuseInterval: 0,
+      extensions: [
+        {
+          claims: {
+            accessToken: async ({ user, client }) => ({
+              pp_consent_ids: user
+                ? (
+                    await db
+                      .select({ id: authSchema.oauthConsent.id })
+                      .from(authSchema.oauthConsent)
+                      .where(
+                        and(
+                          eq(authSchema.oauthConsent.userId, user.id),
+                          eq(authSchema.oauthConsent.clientId, client.clientId)
+                        )
+                      )
+                  ).map((consent) => consent.id)
+                : []
+            })
+          }
+        }
+      ]
+    }),
+    {
+      id: "legacy-mcp-resources",
+      init: async () => {
+        await db.execute(sql`
+          INSERT INTO oauth_client_resource (id, client_id, resource_id, created_at)
+          SELECT gen_random_uuid()::text, client.client_id, ${mcpResource}, now()
+          FROM oauth_client AS client
+          INNER JOIN oauth_application AS legacy
+            ON legacy.id = client.id AND legacy.client_id = client.client_id
+          ON CONFLICT (client_id, resource_id) DO NOTHING
+        `)
       }
-    })
+    }
   ]
 })
 

@@ -4,6 +4,24 @@ import { magicLinkClient, organizationClient } from "better-auth/client/plugins"
 import { organization } from "better-auth/plugins"
 import * as DateTime from "effect/DateTime"
 import { describe, expect, it, vi } from "vite-plus/test"
+
+vi.mock("drizzle-orm/node-postgres", () => ({
+  drizzle: vi.fn(() => ({ query: {} }))
+}))
+
+vi.mock("better-auth", async () => {
+  const actual =
+    await vi.importActual<typeof import("better-auth")>("better-auth")
+  return {
+    ...actual,
+    betterAuth: vi.fn((options: Record<string, unknown>) => ({
+      options,
+      api: new Proxy({}, { get: () => vi.fn() }),
+      handler: vi.fn()
+    }))
+  }
+})
+
 import { auth, lastOrgOwnerBlocked, projectOwnerRemovalError } from "./auth"
 
 describe("Better Auth plugin wiring", () => {

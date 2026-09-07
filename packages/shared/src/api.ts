@@ -1155,7 +1155,7 @@ const OAuthApplicationsGroup = HttpApiGroup.make("oauthApplications")
       .setPayload(
         Schema.Struct({
           accept: Schema.Boolean,
-          consent_code: Schema.String
+          oauth_query: Schema.String
         })
       )
       .addSuccess(Schema.Struct({ redirectURI: Schema.String }))

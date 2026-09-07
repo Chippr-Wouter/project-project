@@ -217,11 +217,13 @@ export const BetterAuthLive = Layer.effect(
         }),
       submitConsent: (headers, input) =>
         Effect.tryPromise({
-          try: () =>
-            auth.api.oAuthConsent({
+          try: async () => {
+            const result = await auth.api.oauth2Consent({
               body: input,
               headers
-            }),
+            })
+            return { redirectURI: result.url }
+          },
           catch: (cause) => new BetterAuthError({ cause })
         })
     } satisfies BetterAuthShape

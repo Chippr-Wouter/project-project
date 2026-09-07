@@ -50,7 +50,11 @@ import * as ConfigProvider from "effect/ConfigProvider"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import { afterAll, expect } from "vite-plus/test"
+import { afterAll, expect, vi } from "vite-plus/test"
+vi.mock("./auth", () => ({
+  auth: {},
+  mcpResource: "http://localhost:3000/mcp"
+}))
 import { createHmac } from "node:crypto"
 import {
   GITHUB_WEBHOOK_MAX_BODY_BYTES,

@@ -5,17 +5,17 @@ import { ApiClient } from "@/services/ApiClient"
 
 export interface SubmitConsentInput {
   readonly accept: boolean
-  readonly consentCode: string
+  readonly oauthQuery: string
 }
 
-export const submitConsentAtom = Atom.family((consentCode: string) =>
+export const submitConsentAtom = Atom.family((oauthQuery: string) =>
   runtime.fn(
     Effect.fn(function* (input: SubmitConsentInput) {
       const client = yield* ApiClient
       return yield* client.oauthApplications.consent({
         payload: {
           accept: input.accept,
-          consent_code: consentCode
+          oauth_query: oauthQuery
         }
       })
     })

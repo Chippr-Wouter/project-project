@@ -20,7 +20,8 @@
     "format": "vp fmt",
     "format:check": "vp fmt --check",
     "prepare": "effect-tsgo patch",
-    "check": "vp check && vp run typecheck"
+    "check": "vp check && vp run typecheck",
+    "test:db": "vp test run --project backend packages/backend/src/db packages/backend/src/Layers/OAuthApplications.test.ts --no-file-parallelism"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
