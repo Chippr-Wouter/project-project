@@ -791,6 +791,17 @@ const TicketSearchParams = Schema.Struct({
 
 const TicketsGroup = HttpApiGroup.make("tickets")
   .add(
+    HttpApiEndpoint.get(
+      "prototypeSnapshot",
+      "/orgs/:orgSlug/projects/:slug/tickets/prototype-snapshot",
+      {
+        params: ProjectPath,
+        success: TicketListPage,
+        error: [Unauthorized, NotFound]
+      }
+    )
+  )
+  .add(
     HttpApiEndpoint.get("list", "/orgs/:orgSlug/projects/:slug/tickets", {
       params: ProjectPath,
       query: TicketListParams,

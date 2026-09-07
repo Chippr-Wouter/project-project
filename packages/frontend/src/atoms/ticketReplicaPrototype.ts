@@ -44,19 +44,31 @@ const hydrate = Effect.gen(function* () {
     return snapshot[0].items
   }
   const client = yield* ApiClient
+  const fetchStarted = performance.now()
   const items: Array<Ticket> = []
   let cursor: string | undefined
-  do {
-    const page = yield* client.tickets.list({
-      params: { orgSlug: "measure", slug: "ten-thousand" },
-      query: cursor ? { cursor } : {}
+  if (import.meta.env.VITE_TICKET_SNAPSHOT_PROTOTYPE === "true") {
+    const page = yield* client.tickets.prototypeSnapshot({
+      params: { orgSlug: "measure", slug: "ten-thousand" }
     })
+    if (page.nextCursor !== null)
+      return yield* Effect.die("Snapshot exceeded prototype limit")
     items.push(...page.items)
-    cursor = page.nextCursor ?? undefined
-  } while (cursor)
+  } else
+    do {
+      const page = yield* client.tickets.list({
+        params: { orgSlug: "measure", slug: "ten-thousand" },
+        query: cursor ? { cursor } : {}
+      })
+      items.push(...page.items)
+      cursor = page.nextCursor ?? undefined
+    } while (cursor)
+  performance.measure("replica-fetch-decode", { start: fetchStarted })
   if (items.length !== 10000)
     return yield* Effect.die("Expected 10,000 fixture tickets")
+  const persistStarted = performance.now()
   yield* db.from("snapshot").upsert({ id: "fixture", items })
+  performance.measure("replica-persist", { start: persistStarted })
   performance.measure("replica-bootstrap", { start: started })
   return items
 }).pipe(Effect.provide(layer), Effect.scoped)

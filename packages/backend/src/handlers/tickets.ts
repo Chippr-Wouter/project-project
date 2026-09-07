@@ -5,9 +5,11 @@ import {
   AppApi,
   CurrentUser,
   ticketListQueryFromSearch,
-  Validation
+  Validation,
+  NotFound
 } from "@projectproject/shared"
 import * as Effect from "effect/Effect"
+import * as Config from "effect/Config"
 import { CurrentOrg } from "../Services/CurrentOrg"
 import { Tickets } from "../Services/Tickets"
 import { dieOnMarkdown } from "./lib"
@@ -17,6 +19,32 @@ export const TicketsHandlerLive = HttpApiBuilder.group(
   "tickets",
   (handlers) =>
     handlers
+      .handle("prototypeSnapshot", ({ params }) =>
+        Effect.gen(function* () {
+          const enabled = yield* Config.boolean(
+            "TICKET_SNAPSHOT_PROTOTYPE"
+          ).pipe(Config.withDefault(false), Effect.orDie)
+          if (
+            !enabled ||
+            params.orgSlug !== "measure" ||
+            params.slug !== "ten-thousand"
+          )
+            return yield* new NotFound()
+          const user = yield* CurrentUser
+          const currentOrg = yield* CurrentOrg
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
+          const tickets = yield* Tickets
+          return yield* tickets.list(
+            org.orgSlug,
+            user.id,
+            params.slug,
+            {
+              sort: { key: "created", dir: "desc" }
+            },
+            10000
+          )
+        }).pipe(dieOnMarkdown)
+      )
       .handle("list", ({ params, query }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser

@@ -7,7 +7,11 @@ if (!directory || !port || !Bun.env.PROTOTYPE_COOKIE) {
   )
 }
 const root = resolve(directory)
+const backendPort = Number(Bun.env.PROTOTYPE_BACKEND_PORT ?? 3109)
+if (![3109, 3110].includes(backendPort))
+  throw new Error("Expected a disposable backend port")
 const instrumentation = `<script>
+performance.setResourceTimingBufferSize(5000);
 window.__overviewMeasure = { ready: null, longTasks: [] };
 new PerformanceObserver(list => {
   window.__overviewMeasure.longTasks.push(...list.getEntries().map(e => ({start:e.startTime,duration:e.duration})));
@@ -36,9 +40,12 @@ Bun.serve({
       const headers = new Headers(request.headers)
       headers.set("cookie", Bun.env.PROTOTYPE_COOKIE!)
       headers.delete("host")
-      return fetch(`http://127.0.0.1:3109${url.pathname}${url.search}`, {
-        headers
-      })
+      return fetch(
+        `http://127.0.0.1:${backendPort}${url.pathname}${url.search}`,
+        {
+          headers
+        }
+      )
     }
     const path = resolve(root, "." + decodeURIComponent(url.pathname))
     if (!path.startsWith(root + sep))
