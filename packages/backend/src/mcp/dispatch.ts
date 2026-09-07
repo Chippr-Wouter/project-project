@@ -1,27 +1,11 @@
-// Generic adapter: walks the shared `McpTools` catalog and registers each
-// entry on the SDK's `McpServer`. Each tool's input/output schemas come from
-// the catalog (Effect Schema). The SDK requires a Zod input schema for tool
-// advertisement, which we derive from the catalog at registration time (see
-// inputSchemas.ts).
-//
-// CurrentUser plumbing
-// --------------------
-// The MCP SDK's tool callback runs outside any Effect scope, so we read the
-// authed user from AsyncLocalStorage (populated by /mcp/route.ts wrapping
-// transport.handleRequest in storage.run(user, ...)) and provide it onto the
-// per-call program via `Effect.provideService(CurrentUser, user)`. This keeps
-// the bridging explicit at one boundary instead of hiding it inside a magic
-// `Layer.effect(... Effect.suspend(als read))` layer.
-//
-// Type contracts
-// --------------
-// `HandlersMap<R>` is derived directly from the shared `McpTools` catalog,
-// so each handler's input, output, and error channel are checked against the
-// spec at compile time. If a tool's catalog entry drifts from its handler
-// (or vice versa) the build fails — there's no `any` shaped escape hatch
-// between catalog declaration and runtime dispatch.
-
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
+import type { Server } from "@modelcontextprotocol/sdk/server/index.js"
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+  ErrorCode,
+  McpError,
+  type Tool
+} from "@modelcontextprotocol/sdk/types.js"
 import * as Effect from "effect/Effect"
 import type * as ManagedRuntime from "effect/ManagedRuntime"
 import * as Record from "effect/Record"
@@ -34,11 +18,21 @@ import {
 } from "@projectproject/shared"
 import { mapToolError, type McpToolErrorResult } from "./errorMap"
 import { currentUserStorage } from "./currentUserStorage"
-import { effectToZodObject } from "./inputSchemas"
 
-const inputSchemas = Record.map(McpTools, (spec) =>
-  effectToZodObject(spec.input)
-)
+const isToolName = Schema.is(Schema.Literals(Record.keys(McpTools)))
+
+const tools = Record.toEntries(McpTools).map(([name, spec]): Tool => {
+  const document = Schema.toJsonSchemaDocument(spec.input)
+  return {
+    name,
+    description: spec.description,
+    inputSchema: {
+      ...document.schema,
+      type: "object",
+      $defs: document.definitions
+    }
+  }
+})
 
 type SpecOf<K extends McpToolName> = (typeof McpTools)[K]
 
@@ -70,73 +64,69 @@ const asJsonContent = (value: unknown): JsonContentResult => ({
 })
 
 export function registerAllTools<R>(
-  server: McpServer,
+  server: Server,
   runtime: ManagedRuntime.ManagedRuntime<R, never>,
   handlers: HandlersMap<R>
 ): void {
-  for (const name of Object.keys(McpTools) as Array<McpToolName>) {
-    registerOne(server, runtime, handlers, name)
-  }
+  server.setRequestHandler(ListToolsRequestSchema, () => ({ tools }))
+  server.setRequestHandler(CallToolRequestSchema, (request) => {
+    const name = request.params.name
+    if (!isToolName(name)) {
+      throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${name}`)
+    }
+    return callTool(runtime, handlers, name, request.params.arguments ?? {})
+  })
 }
 
-function registerOne<R, K extends McpToolName>(
-  server: McpServer,
+async function callTool<R, K extends McpToolName>(
   runtime: ManagedRuntime.ManagedRuntime<R, never>,
   handlers: HandlersMap<R>,
-  name: K
-): void {
+  name: K,
+  input: unknown
+) {
   const spec = McpTools[name] as SpecOf<K>
   const handler = handlers[name] as (
     input: InputOf<K>
   ) => Effect.Effect<OutputOf<K>, SpecErrors<K>, R | CurrentUser>
 
-  server.registerTool(
-    name,
-    {
-      description: spec.description,
-      inputSchema: inputSchemas[name].shape
-    },
-    (async (input: unknown) => {
-      const user = currentUserStorage.getStore()
-      if (!user) {
-        return mapToolError(new Unauthorized())
-      }
+  const user = currentUserStorage.getStore()
+  if (!user) {
+    return mapToolError(new Unauthorized())
+  }
 
-      const decodeInput = (
-        value: unknown
-      ): Effect.Effect<InputOf<K>, Schema.SchemaError, never> =>
-        Schema.decodeUnknownEffect(spec.input)(value) as Effect.Effect<
-          InputOf<K>,
-          Schema.SchemaError,
-          never
-        >
-      const encodeOutput = (
-        value: OutputOf<K>
-      ): Effect.Effect<unknown, Schema.SchemaError, never> =>
-        Schema.encodeEffect(spec.output)(value) as Effect.Effect<
-          unknown,
-          Schema.SchemaError,
-          never
-        >
+  const decodeInput = (
+    value: unknown
+  ): Effect.Effect<InputOf<K>, Schema.SchemaError, never> =>
+    Schema.decodeUnknownEffect(spec.input)(value) as Effect.Effect<
+      InputOf<K>,
+      Schema.SchemaError,
+      never
+    >
+  const encodeOutput = (
+    value: OutputOf<K>
+  ): Effect.Effect<unknown, Schema.SchemaError, never> =>
+    Schema.encodeEffect(spec.output)(value) as Effect.Effect<
+      unknown,
+      Schema.SchemaError,
+      never
+    >
 
-      const program: Effect.Effect<
-        JsonContentResult | McpToolErrorResult,
-        never,
-        R
-      > = decodeInput(input).pipe(
-        Effect.flatMap(handler),
-        Effect.flatMap(encodeOutput),
-        Effect.map(asJsonContent),
-        Effect.catch((e) => Effect.succeed(mapToolError(e))),
-        Effect.tapDefect((cause) =>
-          Effect.logError(`mcp tool defect: ${name}`, cause)
-        ),
-        Effect.catchDefect((e) => Effect.succeed(mapToolError(e))),
-        Effect.provideService(CurrentUser, user),
-        Effect.withSpan(`mcp.tool.${name}`)
-      )
-
-      return await runtime.runPromise(program)
-    }) as Parameters<typeof server.registerTool>[2]
+  const program: Effect.Effect<
+    JsonContentResult | McpToolErrorResult,
+    never,
+    R
+  > = decodeInput(input).pipe(
+    Effect.flatMap(handler),
+    Effect.flatMap(encodeOutput),
+    Effect.map(asJsonContent),
+    Effect.catch((e) => Effect.succeed(mapToolError(e))),
+    Effect.tapDefect((cause) =>
+      Effect.logError(`mcp tool defect: ${name}`, cause)
+    ),
+    Effect.catchDefect((e) => Effect.succeed(mapToolError(e))),
+    Effect.provideService(CurrentUser, user),
+    Effect.withSpan(`mcp.tool.${name}`)
   )
+
+  return await runtime.runPromise(program)
 }
