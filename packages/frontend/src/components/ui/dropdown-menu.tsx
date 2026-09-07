@@ -21,7 +21,7 @@ function DeferredDropdownMenus({ children }: { children: React.ReactNode }) {
 function DropdownMenu(props: React.ComponentProps<typeof MenuPrimitive.Root>) {
   const defer = React.useContext(DeferMenusContext)
   return defer && !props.handle && typeof props.children !== "function" ? (
-    <DeferredDropdownMenu {...props} children={props.children} />
+    <DeferredDropdownMenu {...props}>{props.children}</DeferredDropdownMenu>
   ) : (
     <MenuPrimitive.Root {...props} />
   )
