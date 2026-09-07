@@ -21,7 +21,11 @@ export const consentErrorToFailure = (error: BetterAuthError) => {
     body?.code ??
     (typeof oauthError === "string" ? oauthError : "consent_failed")
 
-  return Effect.fail(new Validation({ reason }))
+  return Effect.logWarning("OAuth consent rejected", {
+    status: cause.statusCode,
+    code: body?.code,
+    oauthError: typeof oauthError === "string" ? oauthError : undefined
+  }).pipe(Effect.andThen(Effect.fail(new Validation({ reason }))))
 }
 
 export const OAuthApplicationsHandlerLive = HttpApiBuilder.group(
