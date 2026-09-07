@@ -85,6 +85,7 @@ function makeTicketDocument(
     createdAt: now,
     updatedAt: now,
     body: "",
+    commentsRegion: "",
     ...overrides
   }
 }
@@ -94,7 +95,7 @@ function makeFakeTicketDocs(initialIds: ReadonlyArray<string>) {
     initialIds.map((id) => [id, makeTicketDocument(id)])
   )
 
-  const service = {
+  const service: TicketDocsShape = {
     listIds: () =>
       Effect.succeed([...documents.keys()].map((id) => ticketId(id))),
     read: (_org: string, _slug: string, id: string) => {
@@ -119,8 +120,18 @@ function makeFakeTicketDocs(initialIds: ReadonlyArray<string>) {
       documents.delete(id)
       return Effect.void
     },
+    update: (org: string, slug: string, id: string, transform, onPersist) =>
+      service.read(org, slug, id).pipe(
+        Effect.flatMap(transform),
+        Effect.tap((document) =>
+          Effect.sync(() => documents.set(id, document))
+        ),
+        Effect.tap((document) =>
+          onPersist ? onPersist(document) : Effect.void
+        )
+      ),
     readRaw: () => unexpected("TicketDocs.readRaw")
-  } satisfies TicketDocsShape
+  }
 
   return {
     documents,

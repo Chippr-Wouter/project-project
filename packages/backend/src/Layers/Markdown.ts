@@ -8,6 +8,7 @@
 
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
+import { randomUUID } from "node:crypto"
 import * as Config from "effect/Config"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -181,6 +182,12 @@ export const MarkdownLive = Layer.effect(
     const ticketFilePath = (orgSlug: string, slug: string, id: string) =>
       path.join(ticketsDir(orgSlug, slug), `${id}.md`)
 
+    const ticketTemporaryFile = (file: string) =>
+      path.join(
+        path.dirname(file),
+        `.${path.basename(file)}.${randomUUID()}.tmp`
+      )
+
     const readTicketFile = (
       orgSlug: string,
       slug: string,
@@ -270,14 +277,30 @@ export const MarkdownLive = Layer.effect(
                 new MarkdownError({ cause, message: `create failed: ${file}` })
             )
           )
-        yield* fs.writeFileString(file, content, { flag: "wx" }).pipe(
-          Effect.mapError((cause): MarkdownError | TicketIdTaken =>
-            cause.reason._tag === "AlreadyExists"
-              ? new TicketIdTaken()
-              : new MarkdownError({
+        const temporary = ticketTemporaryFile(file)
+        yield* Effect.gen(function* () {
+          yield* fs.writeFileString(temporary, content, { flag: "wx" }).pipe(
+            Effect.mapError(
+              (cause) =>
+                new MarkdownError({
                   cause,
                   message: `create failed: ${file}`
                 })
+            )
+          )
+          yield* fs.link(temporary, file).pipe(
+            Effect.mapError((cause): MarkdownError | TicketIdTaken =>
+              cause.reason._tag === "AlreadyExists"
+                ? new TicketIdTaken()
+                : new MarkdownError({
+                    cause,
+                    message: `create failed: ${file}`
+                  })
+            )
+          )
+        }).pipe(
+          Effect.ensuring(
+            fs.remove(temporary, { force: true }).pipe(Effect.ignore)
           )
         )
       })
@@ -294,14 +317,29 @@ export const MarkdownLive = Layer.effect(
         yield* ensureSafeId(id)
         const file = ticketFilePath(orgSlug, slug, id)
         const content = matter.stringify(body, frontmatter)
-        yield* fs
-          .writeFileString(file, content)
-          .pipe(
-            Effect.mapError(
-              (cause) =>
-                new MarkdownError({ cause, message: `write failed: ${file}` })
+        const temporary = ticketTemporaryFile(file)
+        yield* Effect.gen(function* () {
+          yield* fs
+            .writeFileString(temporary, content, { flag: "wx" })
+            .pipe(
+              Effect.mapError(
+                (cause) =>
+                  new MarkdownError({ cause, message: `write failed: ${file}` })
+              )
             )
+          yield* fs
+            .rename(temporary, file)
+            .pipe(
+              Effect.mapError(
+                (cause) =>
+                  new MarkdownError({ cause, message: `write failed: ${file}` })
+              )
+            )
+        }).pipe(
+          Effect.ensuring(
+            fs.remove(temporary, { force: true }).pipe(Effect.ignore)
           )
+        )
       })
 
     const writeTicketWithRegion = (

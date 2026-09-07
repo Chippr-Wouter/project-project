@@ -717,6 +717,7 @@ const baseDocument = (
   createdAt: DateTime.toDate(DateTime.makeUnsafe("2026-05-01T00:00:00.000Z")),
   updatedAt: DateTime.toDate(DateTime.makeUnsafe("2026-05-01T00:00:00.000Z")),
   body: "",
+  commentsRegion: "",
   ...overrides
 })
 
@@ -751,6 +752,7 @@ const makeFakeDocs = (initial: ReadonlyArray<TicketDocument>) => {
         writes.push({ id, document })
       }),
     remove: () => Effect.die(new Error("unexpected TicketDocs.remove call")),
+    update: () => Effect.die(new Error("unexpected TicketDocs.update call")),
     readRaw: () => Effect.die(new Error("unexpected TicketDocs.readRaw call"))
   }
   return { documents, writes, reads, shape }
