@@ -1,5 +1,7 @@
 # T-118 ticket performance benchmark
 
+Ticket-detail follow-up: [isolated reruns and the subsequent optimization](t118-ticket-detail-performance.md). The figures below describe the original PR revision.
+
 Measured on 2026-09-07 against the latest `main`, after rebasing the performance commits.
 
 ## Method
