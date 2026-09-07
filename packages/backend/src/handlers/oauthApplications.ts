@@ -1,3 +1,4 @@
+import { isAPIError } from "better-auth/api"
 import { HttpServerRequest } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { AppApi, CurrentUser, Validation } from "@projectproject/shared"
@@ -6,27 +7,21 @@ import { toWebHeaders } from "../http/toWebHeaders"
 import { BetterAuth, type BetterAuthError } from "../Services/BetterAuth"
 import { OAuthApplications } from "../Services/OAuthApplications"
 
-export const consentErrorToFailure = (e: BetterAuthError) => {
-  const cause = e.cause as
-    | {
-        statusCode?: unknown
-        body?: { message?: unknown; code?: unknown; error?: unknown }
-      }
-    | undefined
-  const status =
-    cause && typeof cause.statusCode === "number" ? cause.statusCode : undefined
-  if (status !== undefined && status >= 400 && status < 500) {
-    const message =
-      cause?.body && typeof cause.body.message === "string"
-        ? cause.body.message
-        : typeof cause?.body?.code === "string"
-          ? cause.body.code
-          : typeof cause?.body?.error === "string"
-            ? cause.body.error
-            : "consent_failed"
-    return Effect.fail(new Validation({ reason: message }))
+export const consentErrorToFailure = (error: BetterAuthError) => {
+  const { cause } = error
+
+  if (!isAPIError(cause) || cause.statusCode < 400 || cause.statusCode >= 500) {
+    return Effect.die(error)
   }
-  return Effect.die(e)
+
+  const body = cause.body
+  const oauthError: unknown = body?.error
+  const reason =
+    body?.message ??
+    body?.code ??
+    (typeof oauthError === "string" ? oauthError : "consent_failed")
+
+  return Effect.fail(new Validation({ reason }))
 }
 
 export const OAuthApplicationsHandlerLive = HttpApiBuilder.group(
