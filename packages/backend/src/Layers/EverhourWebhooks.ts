@@ -1,9 +1,7 @@
 import * as Effect from "effect/Effect"
-import * as Either from "effect/Either"
+import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import { eq } from "drizzle-orm"
-import { projectEverhourIntegration } from "../db/schema"
 import { Db } from "../Services/Db"
 import type { EverhourTimeRecord } from "../Services/Everhour"
 import { EverhourTimeTracking } from "../Services/EverhourTimeTracking"
@@ -22,12 +20,14 @@ const idString = (value: unknown): string | null =>
       ? String(value)
       : null
 
-const decodeJson = Schema.decodeUnknownEither(Schema.parseJson())
+const decodeJson = Schema.decodeUnknownExit(
+  Schema.fromJsonString(Schema.Unknown)
+)
 
 export const parseTimeRecord = (body: string): EverhourTimeRecord | null => {
   const parsed = decodeJson(body)
-  if (Either.isLeft(parsed)) return null
-  const payload = parsed.right
+  if (Exit.isFailure(parsed)) return null
+  const payload = parsed.value
   const candidates: Array<unknown> = []
   if (isRecord(payload)) {
     candidates.push(payload)
@@ -69,7 +69,10 @@ export const EverhourWebhooksLive = Layer.effect(
         const integration = yield* db.query.projectEverhourIntegration
           .findFirst({
             columns: { projectIntegrationLinkId: true },
-            where: eq(projectEverhourIntegration.webhookSecret, secret)
+            where: {
+              RAW: (table, _operators) =>
+                _operators.eq(table.webhookSecret, secret)!
+            }
           })
           .pipe(Effect.orDie)
         if (!integration) return

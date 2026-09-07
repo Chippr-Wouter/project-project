@@ -43,6 +43,6 @@ export interface OrgStorageShape {
   ) => Effect.Effect<S3Connection, StorageNotConnected | StorageConfigMissing>
 }
 
-export class OrgStorage extends Context.Tag(
+export class OrgStorage extends Context.Service<OrgStorage, OrgStorageShape>()(
   "@projectproject/backend/Services/OrgStorage"
-)<OrgStorage, OrgStorageShape>() {}
+) {}

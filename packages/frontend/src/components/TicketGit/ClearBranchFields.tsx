@@ -1,4 +1,4 @@
-import { useAtomSet } from "@effect-atom/atom-react"
+import { useAtomSet } from "@effect/atom-react"
 import * as Exit from "effect/Exit"
 import { clearBranchAtom } from "@/atoms/github"
 import { projectKey } from "@/atoms/projects"

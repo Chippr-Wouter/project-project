@@ -1,20 +1,21 @@
 import * as Schema from "effect/Schema"
+import * as Effect from "effect/Effect"
 import { TicketStatus, TicketType } from "../schemas/Ticket"
 import { TagName } from "../schemas/Tag"
 import { GroupId } from "../schemas/Group"
 import { Ticket } from "../schemas/Ticket"
 import { Page } from "../Pagination"
 
-export const SortKey = Schema.Literal(
+export const SortKey = Schema.Literals([
   "id",
   "created",
   "updated",
   "title",
   "priority"
-)
+])
 export type SortKey = typeof SortKey.Type
 
-export const SortDir = Schema.Literal("asc", "desc")
+export const SortDir = Schema.Literals(["asc", "desc"])
 export type SortDir = typeof SortDir.Type
 
 export const TicketSort = Schema.Struct({
@@ -36,11 +37,11 @@ export const NATURAL_SORT_DIR: Record<SortKey, SortDir> = {
   priority: "desc"
 }
 
-export const AssigneeFilter = Schema.Union(
+export const AssigneeFilter = Schema.Union([
   Schema.Literal("mine"),
   Schema.Null,
   Schema.String
-)
+])
 export type AssigneeFilter = typeof AssigneeFilter.Type
 
 export const GroupIdFilter = Schema.NullOr(GroupId)
@@ -53,7 +54,7 @@ export const TicketFilter = Schema.Struct({
   tags: Schema.optional(Schema.Array(TagName)),
   hasBranch: Schema.optional(Schema.Boolean),
   hasPr: Schema.optional(Schema.Boolean),
-  updatedAfter: Schema.optional(Schema.Date),
+  updatedAfter: Schema.optional(Schema.DateFromString),
   groupId: Schema.optional(Schema.Array(GroupIdFilter)),
   archived: Schema.optional(Schema.Boolean)
 })
@@ -63,9 +64,9 @@ export const TICKET_LIST_LIMIT = 50
 
 export const TicketListQuery = Schema.Struct({
   filter: Schema.optional(TicketFilter),
-  sort: Schema.optionalWith(TicketSort, {
-    default: () => DEFAULT_TICKET_SORT
-  }),
+  sort: TicketSort.pipe(
+    Schema.withDecodingDefaultType(Effect.succeed(DEFAULT_TICKET_SORT))
+  ),
   q: Schema.optional(Schema.String),
   cursor: Schema.optional(Schema.String)
 })
@@ -75,8 +76,8 @@ export const TicketListPage = Page(Ticket)
 export type TicketListPage = typeof TicketListPage.Type
 
 export const TicketCounts = Schema.Struct({
-  total: Schema.Number,
-  byStatus: Schema.Record({ key: TicketStatus, value: Schema.Number })
+  total: Schema.Finite,
+  byStatus: Schema.Record(TicketStatus, Schema.Finite)
 })
 export type TicketCounts = typeof TicketCounts.Type
 

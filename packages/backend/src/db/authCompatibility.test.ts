@@ -6,7 +6,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { magicLink } from "better-auth/plugins"
 import { drizzle } from "drizzle-orm/node-postgres"
 import { migrate } from "drizzle-orm/node-postgres/migrator"
-import * as schema from "./schema"
+import { relations } from "./schema"
 import * as authSchema from "./auth-schema"
 
 const databaseUrl = process.env.PROJECTPROJECT_TEST_DATABASE_URL
@@ -48,7 +48,7 @@ describe.skipIf(!databaseUrl)("Better Auth session compatibility", () => {
     const testAuth = betterAuth({
       baseURL: "http://localhost:15999",
       secret: "isolated-effect-v4-auth-compatibility-test-secret",
-      database: drizzleAdapter(drizzle({ client: pool, schema }), {
+      database: drizzleAdapter(drizzle({ client: pool, relations }), {
         provider: "pg",
         schema: authSchema
       }),

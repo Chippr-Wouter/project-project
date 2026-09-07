@@ -71,12 +71,12 @@ export const isRasterImageContentType = (value: string): boolean =>
 export const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/
 
 export const AttachmentId = Schema.String.pipe(
-  Schema.pattern(ULID_PATTERN),
+  Schema.check(Schema.isPattern(ULID_PATTERN)),
   Schema.brand("AttachmentId")
 )
 export type AttachmentId = typeof AttachmentId.Type
 
-export const AttachmentStatus = Schema.Literal("pending", "live", "orphaned")
+export const AttachmentStatus = Schema.Literals(["pending", "live", "orphaned"])
 export type AttachmentStatus = typeof AttachmentStatus.Type
 
 export const Attachment = Schema.Struct({
@@ -84,17 +84,20 @@ export const Attachment = Schema.Struct({
   url: Schema.String,
   filename: Schema.String,
   contentType: Schema.String,
-  byteSize: Schema.Number,
+  byteSize: Schema.Finite,
   status: AttachmentStatus,
   uploadedBy: Schema.String,
-  createdAt: Schema.Date
+  createdAt: Schema.DateFromString
 })
 export type Attachment = typeof Attachment.Type
 
 export const PrepareAttachmentInput = Schema.Struct({
-  filename: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(255)),
-  contentType: Schema.String.pipe(Schema.minLength(1)),
-  byteSize: Schema.Number.pipe(Schema.int())
+  filename: Schema.String.pipe(
+    Schema.check(Schema.isMinLength(1)),
+    Schema.check(Schema.isMaxLength(255))
+  ),
+  contentType: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
+  byteSize: Schema.Finite.pipe(Schema.check(Schema.isInt()))
 })
 export type PrepareAttachmentInput = typeof PrepareAttachmentInput.Type
 
@@ -102,31 +105,45 @@ export const PrepareAttachmentResult = Schema.Struct({
   id: Schema.String,
   url: Schema.String,
   uploadUrl: Schema.String,
-  expiresAt: Schema.Date
+  expiresAt: Schema.DateFromString
 })
 export type PrepareAttachmentResult = typeof PrepareAttachmentResult.Type
 
 export const OrgStorageStatus = Schema.Struct({
-  status: Schema.Literal("not_connected", "active", "broken"),
+  status: Schema.Literals(["not_connected", "active", "broken"]),
   endpoint: Schema.NullOr(Schema.String),
   bucket: Schema.NullOr(Schema.String),
   region: Schema.NullOr(Schema.String),
   keyPrefix: Schema.NullOr(Schema.String),
   accessKeyIdMasked: Schema.NullOr(Schema.String),
   forcePathStyle: Schema.Boolean,
-  connectedAt: Schema.NullOr(Schema.Date),
-  lastCheckedAt: Schema.NullOr(Schema.Date),
+  connectedAt: Schema.NullOr(Schema.DateFromString),
+  lastCheckedAt: Schema.NullOr(Schema.DateFromString),
   lastCheckError: Schema.NullOr(Schema.String)
 })
 export type OrgStorageStatus = typeof OrgStorageStatus.Type
 
 export const ConnectStorageInput = Schema.Struct({
-  endpoint: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(500)),
-  bucket: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(255)),
-  region: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(64)),
-  accessKeyId: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(255)),
-  secretAccessKey: Schema.String.pipe(Schema.minLength(1)),
-  keyPrefix: Schema.NullOr(Schema.String.pipe(Schema.maxLength(255))),
+  endpoint: Schema.String.pipe(
+    Schema.check(Schema.isMinLength(1)),
+    Schema.check(Schema.isMaxLength(500))
+  ),
+  bucket: Schema.String.pipe(
+    Schema.check(Schema.isMinLength(1)),
+    Schema.check(Schema.isMaxLength(255))
+  ),
+  region: Schema.String.pipe(
+    Schema.check(Schema.isMinLength(1)),
+    Schema.check(Schema.isMaxLength(64))
+  ),
+  accessKeyId: Schema.String.pipe(
+    Schema.check(Schema.isMinLength(1)),
+    Schema.check(Schema.isMaxLength(255))
+  ),
+  secretAccessKey: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
+  keyPrefix: Schema.NullOr(
+    Schema.String.pipe(Schema.check(Schema.isMaxLength(255)))
+  ),
   forcePathStyle: Schema.Boolean
 })
 export type ConnectStorageInput = typeof ConnectStorageInput.Type
@@ -145,12 +162,12 @@ export const AttachmentRow = Schema.Struct({
 })
 export type AttachmentRow = typeof AttachmentRow.Type
 
-export const AttachmentSort = Schema.Literal(
+export const AttachmentSort = Schema.Literals([
   "created_desc",
   "created_asc",
   "size_desc",
   "size_asc"
-)
+])
 export type AttachmentSort = typeof AttachmentSort.Type
 
 export const AttachmentListParams = Schema.Struct({
@@ -158,30 +175,36 @@ export const AttachmentListParams = Schema.Struct({
   projectSlug: Schema.optional(Schema.String),
   sort: Schema.optional(AttachmentSort),
   page: Schema.optional(
-    Schema.NumberFromString.pipe(Schema.int(), Schema.greaterThanOrEqualTo(1))
+    Schema.FiniteFromString.pipe(
+      Schema.check(Schema.isInt()),
+      Schema.check(Schema.isGreaterThanOrEqualTo(1))
+    )
   ),
   limit: Schema.optional(
-    Schema.NumberFromString.pipe(Schema.int(), Schema.between(1, 200))
+    Schema.FiniteFromString.pipe(
+      Schema.check(Schema.isInt()),
+      Schema.check(Schema.isBetween({ minimum: 1, maximum: 200 }))
+    )
   )
 })
 export type AttachmentListParams = typeof AttachmentListParams.Type
 
 export const AttachmentListPage = Schema.Struct({
   items: Schema.Array(AttachmentRow),
-  total: Schema.Number
+  total: Schema.Finite
 })
 export type AttachmentListPage = typeof AttachmentListPage.Type
 
 export const AttachmentStatusTotals = Schema.Struct({
   status: AttachmentStatus,
-  count: Schema.Number,
-  bytes: Schema.Number
+  count: Schema.Finite,
+  bytes: Schema.Finite
 })
 export type AttachmentStatusTotals = typeof AttachmentStatusTotals.Type
 
 export const AttachmentSummary = Schema.Struct({
   byStatus: Schema.Array(AttachmentStatusTotals),
-  count: Schema.Number,
-  bytes: Schema.Number
+  count: Schema.Finite,
+  bytes: Schema.Finite
 })
 export type AttachmentSummary = typeof AttachmentSummary.Type

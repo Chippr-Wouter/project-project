@@ -9,11 +9,9 @@ import { betterAuth } from "better-auth"
 import { toNodeHandler } from "better-auth/node"
 import { makeSignature } from "better-auth/crypto"
 import { requireMcpAuth } from "@better-auth/mcp"
-import { FileSystem } from "@effect/platform"
-import { Effect, Layer, ManagedRuntime, Schema } from "effect"
+import { Effect, FileSystem, Layer, ManagedRuntime, Schema } from "effect"
 import * as BunFileSystem from "@effect/platform-bun/BunFileSystem"
 import { McpHttp } from "../Services/McpHttp"
-import * as authSchema from "./auth-schema"
 
 const databaseUrl = process.env.PROJECTPROJECT_TEST_DATABASE_URL
 const Client = Schema.Struct({ client_id: Schema.String })
@@ -49,7 +47,7 @@ describe.skipIf(!databaseUrl)("MCP OAuth provider compatibility", () => {
       throw new Error("OAuth tests require an isolated local test database")
     }
     pool = new Pool({ connectionString: databaseUrl })
-    await migrate(drizzle({ client: pool, schema: authSchema }), {
+    await migrate(drizzle({ client: pool }), {
       migrationsFolder: `${import.meta.dirname}/migrations`
     })
     server = createServer()
@@ -63,7 +61,7 @@ describe.skipIf(!databaseUrl)("MCP OAuth provider compatibility", () => {
     vi.stubEnv("MCP_RESOURCE_URL", baseUrl)
     vi.stubEnv("BETTER_AUTH_SECRET", secret)
     filesystem = await Effect.runPromise(
-      FileSystem.FileSystem.pipe(Effect.provide(BunFileSystem.layer))
+      Effect.provide(FileSystem.FileSystem, BunFileSystem.layer)
     )
     projectsDir = await Effect.runPromise(
       filesystem.makeTempDirectory({
@@ -96,8 +94,7 @@ describe.skipIf(!databaseUrl)("MCP OAuth provider compatibility", () => {
     const runtime = ManagedRuntime.make(
       McpHttpLive.pipe(
         Layer.provide(McpServerLive),
-        Layer.provide(DbLive.pipe(Layer.provide(PgLive))),
-        Layer.provide(Layer.scope)
+        Layer.provide(DbLive.pipe(Layer.provide(PgLive)))
       )
     )
     disposeMcp = () => runtime.dispose()

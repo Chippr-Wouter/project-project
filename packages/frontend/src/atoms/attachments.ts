@@ -1,5 +1,6 @@
-import { Atom, Result } from "@effect-atom/atom-react"
-import * as Reactivity from "@effect/experimental/Reactivity"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import * as Atom from "effect/unstable/reactivity/Atom"
+import * as Reactivity from "effect/unstable/reactivity/Reactivity"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import { ATTACHMENT_PAGE_SIZE } from "@projectproject/shared"
@@ -42,7 +43,7 @@ export const uploadAttachmentAtom = Atom.family((key: string) => {
 
       const client = yield* ApiClient
       const prepared = yield* client.attachments.prepare({
-        path: { orgSlug, slug, id },
+        params: { orgSlug, slug, id },
         payload: {
           filename: input.file.name,
           contentType: input.file.type,
@@ -52,10 +53,10 @@ export const uploadAttachmentAtom = Atom.family((key: string) => {
 
       yield* aborted
 
-      yield* Effect.async<void, AttachmentUploadFailed>((resume) => {
+      yield* Effect.callback<void, AttachmentUploadFailed>((resume, signal) => {
         const xhr = new XMLHttpRequest()
         const abort = () => xhr.abort()
-        input.signal?.addEventListener("abort", abort)
+        signal.addEventListener("abort", abort)
         xhr.open("PUT", prepared.uploadUrl, true)
         xhr.setRequestHeader("content-type", input.file.type)
         xhr.upload.onprogress = (event) => {
@@ -80,7 +81,7 @@ export const uploadAttachmentAtom = Atom.family((key: string) => {
           resume(Effect.fail(new AttachmentUploadFailed({ reason: "abort" })))
         xhr.send(input.file)
         return Effect.sync(() => {
-          input.signal?.removeEventListener("abort", abort)
+          signal.removeEventListener("abort", abort)
           xhr.abort()
         })
       })
@@ -88,7 +89,7 @@ export const uploadAttachmentAtom = Atom.family((key: string) => {
       yield* aborted
 
       const committed = yield* client.attachments.commit({
-        path: { orgSlug, slug, id, attachmentId: prepared.id }
+        params: { orgSlug, slug, id, attachmentId: prepared.id }
       })
 
       return {
@@ -112,8 +113,8 @@ const orgAttachmentsBaseAtom = Atom.family((key: string) => {
       Effect.gen(function* () {
         const client = yield* ApiClient
         return yield* client.attachments.list({
-          path: { orgSlug: query.orgSlug },
-          urlParams: {
+          params: { orgSlug: query.orgSlug },
+          query: {
             limit: ORG_ATTACHMENTS_PAGE_SIZE,
             page: query.page,
             ...(query.status ? { status: query.status } : {}),
@@ -138,7 +139,7 @@ export const orgAttachmentsSummaryAtom = Atom.family((orgSlug: string) =>
     .atom(
       Effect.gen(function* () {
         const client = yield* ApiClient
-        return yield* client.attachments.summary({ path: { orgSlug } })
+        return yield* client.attachments.summary({ params: { orgSlug } })
       })
     )
     .pipe(
@@ -172,7 +173,7 @@ export const deleteOrgAttachmentsAtom = Atom.family((key: string) => {
           ids,
           (attachmentId) =>
             client.attachments.remove({
-              path: { orgSlug: query.orgSlug, attachmentId }
+              params: { orgSlug: query.orgSlug, attachmentId }
             }),
           { concurrency: 4 }
         ).pipe(

@@ -1,6 +1,8 @@
-import { Atom, Result, useAtomSet } from "@effect-atom/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import * as Atom from "effect/unstable/reactivity/Atom"
+import { useAtomSet } from "@effect/atom-react"
 import { useCallback } from "react"
-import * as Reactivity from "@effect/experimental/Reactivity"
+import * as Reactivity from "effect/unstable/reactivity/Reactivity"
 import * as Cause from "effect/Cause"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
@@ -60,7 +62,7 @@ const sprintsListBaseAtom = Atom.family((key: string) => {
     .atom(
       Effect.gen(function* () {
         const client = yield* ApiClient
-        const all = yield* client.groups.list({ path: { orgSlug, slug } })
+        const all = yield* client.groups.list({ params: { orgSlug, slug } })
         return all.filter((g) => g.kind === "sprint")
       })
     )
@@ -78,7 +80,7 @@ const sprintBaseAtom = Atom.family((key: string) => {
       Effect.gen(function* () {
         const client = yield* ApiClient
         return yield* client.groups.get({
-          path: { orgSlug, slug, id: groupId }
+          params: { orgSlug, slug, id: groupId }
         })
       })
     )
@@ -104,7 +106,7 @@ export const createSprintAtom = Atom.family((key: string) => {
   return Atom.optimisticFn(sprintsListAtom(key), {
     reducer: (current, input: CreateSprintReducerInput) => {
       if (!Result.isSuccess(current)) return current
-      const now = DateTime.toDate(DateTime.unsafeNow())
+      const now = DateTime.toDate(DateTime.nowUnsafe())
       const synthetic: Group = {
         id: nextPendingId(),
         name: input.name,
@@ -130,7 +132,7 @@ export const createSprintAtom = Atom.family((key: string) => {
           endsAt: input.endsAt
         }
         const created = yield* client.groups.create({
-          path: { orgSlug, slug },
+          params: { orgSlug, slug },
           payload
         })
         get.refresh(sprintsListBaseAtom(key))
@@ -166,7 +168,7 @@ export const updateSprintAtom = Atom.family((key: string) => {
             input.patch.completedAt !== undefined
               ? input.patch.completedAt
               : g.completedAt,
-          updatedAt: DateTime.toDate(DateTime.unsafeNow())
+          updatedAt: DateTime.toDate(DateTime.nowUnsafe())
         }
       })
       return Result.success(next, { waiting: true })
@@ -175,7 +177,7 @@ export const updateSprintAtom = Atom.family((key: string) => {
       Effect.fn(function* (input: UpdateSprintReducerInput, get) {
         const client = yield* ApiClient
         const updated = yield* client.groups.update({
-          path: { orgSlug, slug, id: input.groupId },
+          params: { orgSlug, slug, id: input.groupId },
           payload: input.patch
         })
         get.refresh(sprintsListBaseAtom(key))
@@ -229,7 +231,7 @@ export const addTicketsToSprintAtom = Atom.family((key: string) => {
     reducer: (current, input: AddTicketsReducerInput) => {
       if (!Result.isSuccess(current)) return current
       const incoming = new Set<string>(input.ticketIds)
-      const now = DateTime.toDate(DateTime.unsafeNow())
+      const now = DateTime.toDate(DateTime.nowUnsafe())
       const next = current.value.map((g) => {
         if (g.id === input.groupId) {
           const merged = [...g.tickets]
@@ -270,7 +272,7 @@ export const addTicketsToSprintAtom = Atom.family((key: string) => {
           }
           const result: UpdateGroupTicketsOutput =
             yield* client.groups.updateTickets({
-              path: { orgSlug, slug, id: input.groupId },
+              params: { orgSlug, slug, id: input.groupId },
               payload: { tickets: union }
             })
           get.refresh(sprintsListBaseAtom(key))
@@ -297,8 +299,8 @@ export const addTicketsToSprintAtom = Atom.family((key: string) => {
           }
           return result
         }).pipe(
-          Effect.tapErrorCause((cause) =>
-            Cause.isInterruptedOnly(cause) ? Effect.void : releasePending
+          Effect.tapCause((cause) =>
+            Cause.hasInterruptsOnly(cause) ? Effect.void : releasePending
           ),
           Effect.uninterruptible
         )
@@ -318,7 +320,7 @@ export const removeTicketsFromSprintAtom = Atom.family((key: string) => {
     reducer: (current, input: RemoveTicketsReducerInput) => {
       if (!Result.isSuccess(current)) return current
       const drop = new Set<string>(input.ticketIds)
-      const now = DateTime.toDate(DateTime.unsafeNow())
+      const now = DateTime.toDate(DateTime.nowUnsafe())
       const next = current.value.map((g) => {
         if (g.id !== input.groupId) return g
         return {
@@ -350,7 +352,7 @@ export const removeTicketsFromSprintAtom = Atom.family((key: string) => {
           const drop = new Set<string>(input.ticketIds)
           const remaining = currentTickets.filter((tid) => !drop.has(tid))
           const result = yield* client.groups.updateTickets({
-            path: { orgSlug, slug, id: input.groupId },
+            params: { orgSlug, slug, id: input.groupId },
             payload: { tickets: remaining }
           })
           get.refresh(sprintsListBaseAtom(key))
@@ -374,8 +376,8 @@ export const removeTicketsFromSprintAtom = Atom.family((key: string) => {
           }
           return result
         }).pipe(
-          Effect.tapErrorCause((cause) =>
-            Cause.isInterruptedOnly(cause) ? Effect.void : releasePending
+          Effect.tapCause((cause) =>
+            Cause.hasInterruptsOnly(cause) ? Effect.void : releasePending
           ),
           Effect.uninterruptible
         )
@@ -446,7 +448,7 @@ export const completeSprintAtom = Atom.family((key: string) => {
   return Atom.optimisticFn(sprintsListAtom(key), {
     reducer: (current, input: CompleteSprintReducerInput) => {
       if (!Result.isSuccess(current)) return current
-      const now = DateTime.toDate(DateTime.unsafeNow())
+      const now = DateTime.toDate(DateTime.nowUnsafe())
       const source = current.value.find((g) => g.id === input.groupId)
       if (!source) return current
       const { stay, carry } = splitCarryover(
@@ -473,7 +475,7 @@ export const completeSprintAtom = Atom.family((key: string) => {
       Effect.fn(function* (input: CompleteSprintReducerInput, get) {
         const client = yield* ApiClient
         const completed = yield* client.groups.complete({
-          path: { orgSlug, slug, id: input.groupId },
+          params: { orgSlug, slug, id: input.groupId },
           payload: { destination: input.destination }
         })
 
@@ -505,7 +507,7 @@ export const deleteSprintAtom = Atom.family((key: string) => {
       Effect.fn(function* (input: { groupId: GroupId }, get) {
         const client = yield* ApiClient
         yield* client.groups.delete({
-          path: { orgSlug, slug, id: input.groupId }
+          params: { orgSlug, slug, id: input.groupId }
         })
         get.refresh(sprintsListBaseAtom(key))
         return undefined
@@ -543,7 +545,7 @@ export const placeTicketAtom = Atom.family((key: string) => {
       nextSprints[sprintIdx] = {
         ...sprint,
         tickets: nextTickets,
-        updatedAt: DateTime.toDate(DateTime.unsafeNow())
+        updatedAt: DateTime.toDate(DateTime.nowUnsafe())
       }
       return Result.success(nextSprints, { waiting: true })
     },
@@ -567,7 +569,7 @@ export const placeTicketAtom = Atom.family((key: string) => {
         return yield* Effect.gen(function* () {
           const client = yield* ApiClient
           const result = yield* client.groups.updateTicketOrder({
-            path: { orgSlug, slug, id: groupId },
+            params: { orgSlug, slug, id: groupId },
             payload: input
           })
           get.refresh(sprintsListBaseAtom(project))
@@ -586,8 +588,8 @@ export const placeTicketAtom = Atom.family((key: string) => {
           }
           return result
         }).pipe(
-          Effect.catchAllCause((cause) =>
-            resetOverlay.pipe(Effect.zipRight(Effect.failCause(cause)))
+          Effect.catchCause((cause) =>
+            resetOverlay.pipe(Effect.andThen(Effect.failCause(cause)))
           )
         )
       })

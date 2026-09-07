@@ -24,7 +24,6 @@ export interface OrgShape {
   ) => Effect.Effect<OrgDetail, NotFound | Forbidden | Conflict>
 }
 
-export class Org extends Context.Tag("@projectproject/backend/Services/Org")<
-  Org,
-  OrgShape
->() {}
+export class Org extends Context.Service<Org, OrgShape>()(
+  "@projectproject/backend/Services/Org"
+) {}

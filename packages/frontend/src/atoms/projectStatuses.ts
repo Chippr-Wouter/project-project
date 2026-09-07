@@ -1,5 +1,6 @@
-import { Atom, Result } from "@effect-atom/atom-react"
-import * as Reactivity from "@effect/experimental/Reactivity"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import * as Atom from "effect/unstable/reactivity/Atom"
+import * as Reactivity from "effect/unstable/reactivity/Reactivity"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import { runtime } from "@/runtime"
@@ -29,7 +30,7 @@ const projectStatusesBaseAtom = Atom.family((key: string) => {
     .atom(
       Effect.gen(function* () {
         const client = yield* ApiClient
-        return yield* client.statuses.list({ path: { orgSlug, slug } })
+        return yield* client.statuses.list({ params: { orgSlug, slug } })
       })
     )
     .pipe(Atom.setIdleTTL("5 minutes"))
@@ -56,7 +57,7 @@ export const createStatusAtom = Atom.family((key: string) => {
         color: color as ProjectStatus["color"],
         orderKey: "zzz" as ProjectStatus["orderKey"],
         createdBy: "",
-        createdAt: DateTime.toDate(DateTime.unsafeNow())
+        createdAt: DateTime.toDate(DateTime.nowUnsafe())
       }
       return Result.success([...current.value, synthetic], { waiting: true })
     },
@@ -64,7 +65,7 @@ export const createStatusAtom = Atom.family((key: string) => {
       Effect.fn(function* (input: CreateStatusInput, get) {
         const client = yield* ApiClient
         const created = yield* client.statuses.create({
-          path: { orgSlug, slug },
+          params: { orgSlug, slug },
           payload: input
         })
         get.refresh(projectStatusesBaseAtom(key))
@@ -100,7 +101,7 @@ export const updateStatusAtom = Atom.family((key: string) => {
       Effect.fn(function* (input: UpdateInput, get) {
         const client = yield* ApiClient
         const updated = yield* client.statuses.update({
-          path: {
+          params: {
             orgSlug,
             slug,
             statusSlug: input.statusSlug as StatusSlug
@@ -140,7 +141,7 @@ export const reorderStatusAtom = Atom.family((key: string) => {
       Effect.fn(function* (input: ReorderInput, get) {
         const client = yield* ApiClient
         const reordered = yield* client.statuses.reorder({
-          path: {
+          params: {
             orgSlug,
             slug,
             statusSlug: input.statusSlug as StatusSlug
@@ -175,12 +176,12 @@ export const deleteStatusAtom = Atom.family((key: string) => {
       Effect.fn(function* (input: DeleteInput, get) {
         const client = yield* ApiClient
         yield* client.statuses.remove({
-          path: {
+          params: {
             orgSlug,
             slug,
             statusSlug: input.statusSlug as StatusSlug
           },
-          urlParams: input.reassignTo ? { reassignTo: input.reassignTo } : {}
+          query: input.reassignTo ? { reassignTo: input.reassignTo } : {}
         })
         get.refresh(projectStatusesBaseAtom(key))
         yield* Reactivity.invalidate(["tickets", orgSlug, slug])

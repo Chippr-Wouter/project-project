@@ -1,4 +1,5 @@
-import { useAtomSet, useAtomValue, Result } from "@effect-atom/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import { Link, useNavigate } from "@tanstack/react-router"
 import * as DateTime from "effect/DateTime"
 import * as Exit from "effect/Exit"
@@ -375,7 +376,7 @@ function SprintDatesField({
           selected={draft}
           onSelect={(r) => setDraft(r ?? { from: undefined, to: undefined })}
           numberOfMonths={1}
-          defaultMonth={draft.from ?? DateTime.toDate(DateTime.unsafeNow())}
+          defaultMonth={draft.from ?? DateTime.toDate(DateTime.nowUnsafe())}
         />
       </PopoverContent>
     </Popover>

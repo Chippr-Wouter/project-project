@@ -6,7 +6,8 @@
 // org" lookup at this layer; callers (handlers via the Projects service)
 // thread it through.
 
-import { FileSystem, Path } from "@effect/platform"
+import * as FileSystem from "effect/FileSystem"
+import * as Path from "effect/Path"
 import * as Config from "effect/Config"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -38,17 +39,23 @@ const isSystemNotFound = (cause: unknown): boolean =>
   typeof cause === "object" &&
   cause !== null &&
   "_tag" in cause &&
-  cause._tag === "SystemError" &&
+  cause._tag === "PlatformError" &&
   "reason" in cause &&
-  cause.reason === "NotFound"
+  typeof cause.reason === "object" &&
+  cause.reason !== null &&
+  "_tag" in cause.reason &&
+  cause.reason._tag === "NotFound"
 
 const isSystemAlreadyExists = (cause: unknown): boolean =>
   typeof cause === "object" &&
   cause !== null &&
   "_tag" in cause &&
-  cause._tag === "SystemError" &&
+  cause._tag === "PlatformError" &&
   "reason" in cause &&
-  cause.reason === "AlreadyExists"
+  typeof cause.reason === "object" &&
+  cause.reason !== null &&
+  "_tag" in cause.reason &&
+  cause.reason._tag === "AlreadyExists"
 
 export const MarkdownLive = Layer.effect(
   Markdown,
@@ -364,7 +371,7 @@ export const MarkdownLive = Layer.effect(
         yield* ensureSafeOrgAndProject(orgSlug, slug)
         const dir = ticketsDir(orgSlug, slug)
         const entries = yield* fs.readDirectory(dir).pipe(
-          Effect.catchAll((cause) =>
+          Effect.catch((cause) =>
             isSystemNotFound(cause)
               ? Effect.succeed([] as ReadonlyArray<string>)
               : Effect.fail(
@@ -567,7 +574,7 @@ export const MarkdownLive = Layer.effect(
         yield* ensureSafeOrgAndProject(orgSlug, slug)
         const dir = groupsDir(orgSlug, slug)
         const entries = yield* fs.readDirectory(dir).pipe(
-          Effect.catchAll((cause) =>
+          Effect.catch((cause) =>
             isSystemNotFound(cause)
               ? Effect.succeed([] as ReadonlyArray<string>)
               : Effect.fail(

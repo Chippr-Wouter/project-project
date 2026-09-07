@@ -1,5 +1,4 @@
-import * as JSONSchema from "effect/JSONSchema"
-import type * as Schema from "effect/Schema"
+import * as Schema from "effect/Schema"
 import { z } from "zod"
 
 type JsonSchemaNode = {
@@ -101,10 +100,12 @@ const toZod = (
   }
 }
 
-export const effectToZodObject = <A, I, R>(
-  schema: Schema.Schema<A, I, R>
-): z.ZodObject => {
-  const root = JSONSchema.make(schema) as JsonSchemaNode
+export const effectToZodObject = <A>(schema: Schema.Schema<A>): z.ZodObject => {
+  const document = Schema.toJsonSchemaDocument(schema)
+  const root = {
+    ...document.schema,
+    $defs: document.definitions
+  } as JsonSchemaNode
   const defs = root.$defs ?? {}
   const converted = toZod({ ...root, $defs: undefined }, defs, new Set())
   if (converted instanceof z.ZodObject) return converted

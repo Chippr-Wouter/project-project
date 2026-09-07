@@ -35,7 +35,8 @@
 // ----------------------------------------------------------------------------
 //   1. Imports:
 //        import { Effect } from "effect"
-//        import { FetchHttpClient, HttpApiClient } from "@effect/platform"
+//        import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient"
+//        import * as HttpApiClient from "effect/unstable/httpapi/HttpApiClient"
 //        import { AppApi } from "@projectproject/shared"
 //
 //   2. Declare the service in one shot:
@@ -59,14 +60,21 @@
 // first call to `Effect.runPromise(program.pipe(Effect.provide(ApiClient.Default)))`
 // is when the layer is actually constructed.
 
+import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
-import { FetchHttpClient, HttpApiClient } from "@effect/platform"
+import * as Layer from "effect/Layer"
+import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient"
+import * as HttpApiClient from "effect/unstable/httpapi/HttpApiClient"
 import { AppApi } from "@projectproject/shared"
 
-export class ApiClient extends Effect.Service<ApiClient>()(
-  "@projectproject/frontend/services/ApiClient",
-  {
-    effect: HttpApiClient.make(AppApi, { baseUrl: "/api" }),
-    dependencies: [FetchHttpClient.layer]
-  }
-) {}
+export class ApiClient extends Context.Service<
+  ApiClient,
+  HttpApiClient.ForApi<typeof AppApi>
+>()("@projectproject/frontend/services/ApiClient") {
+  static readonly Default = Layer.effect(
+    ApiClient,
+    HttpApiClient.make(AppApi, { baseUrl: "/api" }).pipe(
+      Effect.provide(FetchHttpClient.layer)
+    )
+  )
+}

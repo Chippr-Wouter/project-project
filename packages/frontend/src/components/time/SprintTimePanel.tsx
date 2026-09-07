@@ -1,4 +1,5 @@
-import { Result, useAtomSet, useAtomValue } from "@effect-atom/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import { useState } from "react"
 import { DEFAULT_WORK_TYPES, type GroupId } from "@projectproject/shared"
 import {

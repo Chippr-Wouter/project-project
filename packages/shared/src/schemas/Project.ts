@@ -12,40 +12,40 @@ import * as Schema from "effect/Schema"
 export const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
 export const Slug = Schema.String.pipe(
-  Schema.pattern(SLUG_PATTERN),
-  Schema.minLength(1),
-  Schema.maxLength(64)
+  Schema.check(Schema.isPattern(SLUG_PATTERN)),
+  Schema.check(Schema.isMinLength(1)),
+  Schema.check(Schema.isMaxLength(64))
 )
 export type Slug = typeof Slug.Type
 
 export const CreatableProjectKey = Schema.String.pipe(
-  Schema.pattern(/^[A-Z][A-Z0-9]{1,9}$/),
+  Schema.check(Schema.isPattern(/^[A-Z][A-Z0-9]{1,9}$/)),
   Schema.brand("CreatableProjectKey")
 )
 export type CreatableProjectKey = typeof CreatableProjectKey.Type
 
-export const ProjectKey = Schema.Union(
+export const ProjectKey = Schema.Union([
   CreatableProjectKey,
   Schema.Literal("T")
-).pipe(Schema.brand("ProjectKey"))
+]).pipe(Schema.brand("ProjectKey"))
 export type ProjectKey = typeof ProjectKey.Type
 
 // Three-tier role model (spec §"Permission model").
 //   owner  — created the project. Sole role with delete + role-change rights.
 //   admin  — can manage members; can edit everything.
 //   member — read/write tickets and the project body.
-export const Role = Schema.Literal("owner", "admin", "member")
+export const Role = Schema.Literals(["owner", "admin", "member"])
 export type Role = typeof Role.Type
 
 export const ProjectIcon = Schema.String.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(16),
+  Schema.check(Schema.isMinLength(1)),
+  Schema.check(Schema.isMaxLength(16)),
   Schema.brand("ProjectIcon")
 )
 export type ProjectIcon = typeof ProjectIcon.Type
 
 export const ProjectColor = Schema.String.pipe(
-  Schema.pattern(/^#[0-9a-f]{6}$/i),
+  Schema.check(Schema.isPattern(/^#[0-9a-f]{6}$/i)),
   Schema.brand("ProjectColor")
 )
 export type ProjectColor = typeof ProjectColor.Type
@@ -53,7 +53,7 @@ export type ProjectColor = typeof ProjectColor.Type
 // A role assignable through the API. Owner is set on create and transferred
 // only via a future "transfer ownership" flow; we don't expose it as a value
 // the user can pick from a dropdown.
-export const AssignableRole = Schema.Literal("admin", "member")
+export const AssignableRole = Schema.Literals(["admin", "member"])
 export type AssignableRole = typeof AssignableRole.Type
 
 // Wire shape for a project member. Includes everything the UI needs to
@@ -77,7 +77,7 @@ export const PendingProjectMember = Schema.Struct({
   invitationId: Schema.String,
   email: Schema.String,
   role: AssignableRole,
-  expiresAt: Schema.Date
+  expiresAt: Schema.DateFromString
 })
 export type PendingProjectMember = typeof PendingProjectMember.Type
 
@@ -92,10 +92,10 @@ export const GithubConnection = Schema.Struct({
 export type GithubConnection = typeof GithubConnection.Type
 
 export const GithubOrgIntegrationStatus = Schema.Struct({
-  status: Schema.Literal("not_connected", "active", "broken"),
+  status: Schema.Literals(["not_connected", "active", "broken"]),
   accountLogin: Schema.NullOr(Schema.String),
-  accountType: Schema.NullOr(Schema.Literal("User", "Organization")),
-  lastCheckedAt: Schema.NullOr(Schema.Date),
+  accountType: Schema.NullOr(Schema.Literals(["User", "Organization"])),
+  lastCheckedAt: Schema.NullOr(Schema.DateFromString),
   lastCheckError: Schema.NullOr(Schema.String)
 })
 export type GithubOrgIntegrationStatus = typeof GithubOrgIntegrationStatus.Type
@@ -111,9 +111,9 @@ export const StartGithubInstallResponse = Schema.Struct({
 export type StartGithubInstallResponse = typeof StartGithubInstallResponse.Type
 
 export const ProjectSetup = Schema.Struct({
-  workflowReviewedAt: Schema.NullOr(Schema.Date),
-  invitePeopleDismissedAt: Schema.NullOr(Schema.Date),
-  connectGithubDismissedAt: Schema.NullOr(Schema.Date)
+  workflowReviewedAt: Schema.NullOr(Schema.DateFromString),
+  invitePeopleDismissedAt: Schema.NullOr(Schema.DateFromString),
+  connectGithubDismissedAt: Schema.NullOr(Schema.DateFromString)
 })
 export type ProjectSetup = typeof ProjectSetup.Type
 
@@ -125,12 +125,15 @@ export const Project = Schema.Struct({
   icon: ProjectIcon,
   color: ProjectColor,
   createdBy: Schema.String,
-  createdAt: Schema.Date
+  createdAt: Schema.DateFromString
 })
 export type Project = typeof Project.Type
 
 export const CreateProjectInput = Schema.Struct({
-  name: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(120)),
+  name: Schema.String.pipe(
+    Schema.check(Schema.isMinLength(1)),
+    Schema.check(Schema.isMaxLength(120))
+  ),
   key: CreatableProjectKey
 })
 export type CreateProjectInput = typeof CreateProjectInput.Type
@@ -153,7 +156,10 @@ export const ProjectDetail = Schema.Struct({
 export type ProjectDetail = typeof ProjectDetail.Type
 
 export const AddMemberInput = Schema.Struct({
-  email: Schema.String.pipe(Schema.minLength(3), Schema.maxLength(254)),
+  email: Schema.String.pipe(
+    Schema.check(Schema.isMinLength(3)),
+    Schema.check(Schema.isMaxLength(254))
+  ),
   role: AssignableRole
 })
 export type AddMemberInput = typeof AddMemberInput.Type
@@ -172,7 +178,10 @@ export type TransferOwnershipInput = typeof TransferOwnershipInput.Type
 // changed. Empty object is allowed but a no-op on the server.
 export const UpdateProjectInput = Schema.Struct({
   name: Schema.optional(
-    Schema.String.pipe(Schema.minLength(1), Schema.maxLength(120))
+    Schema.String.pipe(
+      Schema.check(Schema.isMinLength(1)),
+      Schema.check(Schema.isMaxLength(120))
+    )
   ),
   body: Schema.optional(Schema.String),
   icon: Schema.optional(ProjectIcon),
@@ -181,18 +190,31 @@ export const UpdateProjectInput = Schema.Struct({
 export type UpdateProjectInput = typeof UpdateProjectInput.Type
 
 export const UpdateProjectSetupInput = Schema.Struct({
-  workflowReviewedAt: Schema.optional(Schema.NullOr(Schema.Date)),
-  invitePeopleDismissedAt: Schema.optional(Schema.NullOr(Schema.Date)),
-  connectGithubDismissedAt: Schema.optional(Schema.NullOr(Schema.Date))
+  workflowReviewedAt: Schema.optional(Schema.NullOr(Schema.DateFromString)),
+  invitePeopleDismissedAt: Schema.optional(
+    Schema.NullOr(Schema.DateFromString)
+  ),
+  connectGithubDismissedAt: Schema.optional(
+    Schema.NullOr(Schema.DateFromString)
+  )
 })
 export type UpdateProjectSetupInput = typeof UpdateProjectSetupInput.Type
 
 // --- GitHub connection inputs ----------------------------------------------
 
 export const ConnectGithubInput = Schema.Struct({
-  repoId: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(80)),
-  repoOwner: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(120)),
-  repoName: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(120)),
+  repoId: Schema.String.pipe(
+    Schema.check(Schema.isMinLength(1)),
+    Schema.check(Schema.isMaxLength(80))
+  ),
+  repoOwner: Schema.String.pipe(
+    Schema.check(Schema.isMinLength(1)),
+    Schema.check(Schema.isMaxLength(120))
+  ),
+  repoName: Schema.String.pipe(
+    Schema.check(Schema.isMinLength(1)),
+    Schema.check(Schema.isMaxLength(120))
+  ),
   defaultBaseBranch: Schema.optional(Schema.NullOr(Schema.String))
 })
 export type ConnectGithubInput = typeof ConnectGithubInput.Type

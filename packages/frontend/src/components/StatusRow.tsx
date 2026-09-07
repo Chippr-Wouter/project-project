@@ -1,4 +1,4 @@
-import { useAtomSet } from "@effect-atom/atom-react"
+import { useAtomSet } from "@effect/atom-react"
 import { Reorder, useDragControls, type DragControls } from "motion/react"
 import { GripVertical, Lock } from "lucide-react"
 import { useEffect, useState } from "react"

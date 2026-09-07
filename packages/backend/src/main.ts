@@ -57,13 +57,11 @@
 //   exit-code mapping.
 
 import {
-  HttpApiBuilder,
-  HttpApiSwagger,
   HttpRouter,
   HttpServerRequest,
   HttpServerResponse
-} from "@effect/platform"
-import { BunHttpServer, BunRuntime } from "@effect/platform-bun"
+} from "effect/unstable/http"
+import { HttpApiBuilder, HttpApiSwagger } from "effect/unstable/httpapi"
 import { AppApi } from "@projectproject/shared"
 import { count } from "drizzle-orm"
 import * as Config from "effect/Config"
@@ -127,15 +125,15 @@ const betterAuthApp = Effect.gen(function* () {
   const webRes = yield* ba.handler(webReq)
   return HttpServerResponse.fromWeb(webRes)
 }).pipe(
-  Effect.catchAllCause((cause) =>
-    Effect.zipRight(
+  Effect.catchCause((cause) =>
+    Effect.andThen(
       Effect.logError("auth route failure", cause),
-      HttpServerResponse.text("Auth error", { status: 500 })
+      Effect.succeed(HttpServerResponse.text("Auth error", { status: 500 }))
     )
   )
 )
 
-export const ApiLive = HttpApiBuilder.api(AppApi).pipe(
+export const ApiLive = HttpApiBuilder.layer(AppApi).pipe(
   Layer.provide(HealthHandlerLive),
   Layer.provide(DbHandlerLive),
   Layer.provide(AuthHandlerLive),
@@ -157,7 +155,7 @@ export const ApiLive = HttpApiBuilder.api(AppApi).pipe(
 // derived OpenAPI spec). Both are implemented by `HttpApiSwagger.layer({...})`,
 // which we mount alongside our typed handlers in the same Layer chain — no
 // extra mountApp call needed; the layer adds routes to the api group.
-const SwaggerLive = HttpApiSwagger.layer({ path: "/docs" })
+const SwaggerLive = HttpApiSwagger.layer(AppApi, { path: "/docs" })
 
 // /mcp is mounted as an HttpRouter.all route so any HTTP method (POST for
 // JSON-RPC, GET for SSE, DELETE for session teardown) reaches the SDK
@@ -171,10 +169,10 @@ const mcpRoute = Effect.gen(function* () {
   const webRes = yield* Effect.promise(() => mcpHttp.handle(webReq))
   return HttpServerResponse.fromWeb(webRes)
 }).pipe(
-  Effect.catchAllCause((cause) =>
-    Effect.zipRight(
+  Effect.catchCause((cause) =>
+    Effect.andThen(
       Effect.logError("mcp route failure", cause),
-      HttpServerResponse.text("MCP error", { status: 500 })
+      Effect.succeed(HttpServerResponse.text("MCP error", { status: 500 }))
     )
   )
 )
@@ -198,14 +196,20 @@ const githubSetupRoute = Effect.gen(function* () {
 }).pipe(
   Effect.catchTags({
     NotFound: () =>
-      HttpServerResponse.text("GitHub setup expired", { status: 404 }),
+      Effect.succeed(
+        HttpServerResponse.text("GitHub setup expired", { status: 404 })
+      ),
     GitHubError: () =>
-      HttpServerResponse.text("GitHub setup failed", { status: 500 })
+      Effect.succeed(
+        HttpServerResponse.text("GitHub setup failed", { status: 500 })
+      )
   }),
-  Effect.catchAllCause((cause) =>
-    Effect.zipRight(
+  Effect.catchCause((cause) =>
+    Effect.andThen(
       Effect.logError("github setup route failure", cause),
-      HttpServerResponse.text("GitHub setup failed", { status: 500 })
+      Effect.succeed(
+        HttpServerResponse.text("GitHub setup failed", { status: 500 })
+      )
     )
   )
 )
@@ -223,18 +227,26 @@ const githubCallbackRoute = Effect.gen(function* () {
 }).pipe(
   Effect.catchTags({
     NotFound: () =>
-      HttpServerResponse.text("GitHub callback expired", { status: 404 }),
+      Effect.succeed(
+        HttpServerResponse.text("GitHub callback expired", { status: 404 })
+      ),
     Forbidden: () =>
-      HttpServerResponse.text("GitHub installation was not verified", {
-        status: 403
-      }),
+      Effect.succeed(
+        HttpServerResponse.text("GitHub installation was not verified", {
+          status: 403
+        })
+      ),
     GitHubError: () =>
-      HttpServerResponse.text("GitHub callback failed", { status: 500 })
+      Effect.succeed(
+        HttpServerResponse.text("GitHub callback failed", { status: 500 })
+      )
   }),
-  Effect.catchAllCause((cause) =>
-    Effect.zipRight(
+  Effect.catchCause((cause) =>
+    Effect.andThen(
       Effect.logError("github callback route failure", cause),
-      HttpServerResponse.text("GitHub callback failed", { status: 500 })
+      Effect.succeed(
+        HttpServerResponse.text("GitHub callback failed", { status: 500 })
+      )
     )
   )
 )
@@ -339,18 +351,23 @@ export const githubWebhookRoute = Effect.gen(function* () {
   })
   return HttpServerResponse.text("ok")
 }).pipe(
-  Effect.catchAllCause((cause) =>
-    Effect.zipRight(
+  Effect.catchCause((cause) =>
+    Effect.andThen(
       Effect.logError("github webhook route failure", cause),
-      HttpServerResponse.text("GitHub webhook failed", { status: 500 })
+      Effect.succeed(
+        HttpServerResponse.text("GitHub webhook failed", { status: 500 })
+      )
     )
   )
 )
 
-const githubIntegrationRoutes = HttpRouter.empty.pipe(
-  HttpRouter.get("/setup", githubSetupRoute),
-  HttpRouter.get("/callback", githubCallbackRoute),
-  HttpRouter.post("/webhook", githubWebhookRoute)
+const githubIntegrationRoutes = HttpRouter.addAll(
+  [
+    HttpRouter.route("GET", "/setup", githubSetupRoute),
+    HttpRouter.route("GET", "/callback", githubCallbackRoute),
+    HttpRouter.route("POST", "/webhook", githubWebhookRoute)
+  ],
+  { prefix: "/api/integrations/github" }
 )
 
 export const everhourWebhookRoute = Effect.gen(function* () {
@@ -365,44 +382,42 @@ export const everhourWebhookRoute = Effect.gen(function* () {
   yield* webhooks.handle({ secret, body })
   return HttpServerResponse.text("ok")
 }).pipe(
-  Effect.catchAllCause((cause) =>
-    Effect.zipRight(
+  Effect.catchCause((cause) =>
+    Effect.andThen(
       Effect.logError("everhour webhook route failure", cause),
-      HttpServerResponse.text("ok")
+      Effect.succeed(HttpServerResponse.text("ok"))
     )
   )
 )
 
-const everhourIntegrationRoutes = HttpRouter.empty.pipe(
-  HttpRouter.post("/:secret", everhourWebhookRoute)
+const everhourIntegrationRoutes = HttpRouter.add(
+  "POST",
+  "/api/integrations/everhour/webhook/:secret",
+  everhourWebhookRoute
 )
 
-const ServerLive = HttpApiBuilder.serve((apiApp) =>
-  HttpRouter.empty.pipe(
-    HttpRouter.mountApp("/api/auth", betterAuthApp),
-    HttpRouter.all("/.well-known/*", betterAuthApp),
-    HttpRouter.mountApp("/api/integrations/github", githubIntegrationRoutes),
-    HttpRouter.mountApp(
-      "/api/integrations/everhour/webhook",
-      everhourIntegrationRoutes
-    ),
-    HttpRouter.mountApp("/api/attachments", attachmentRoutes),
-    HttpRouter.all("/mcp", mcpRoute),
-    HttpRouter.mountApp("/api", apiApp),
-    Effect.catchTag("RouteNotFound", () =>
-      HttpServerResponse.text("Not Found", { status: 404 })
-    )
-  )
-).pipe(
-  Layer.provide(SwaggerLive),
-  Layer.provide(ApiLive),
+const RouteLive = Layer.mergeAll(
+  HttpRouter.add("*", "/api/auth/*", betterAuthApp),
+  HttpRouter.add("*", "/.well-known/*", betterAuthApp),
+  githubIntegrationRoutes,
+  everhourIntegrationRoutes,
+  HttpRouter.add(
+    "GET",
+    "/api/attachments/:orgSlug/:attachmentId",
+    attachmentRoutes
+  ),
+  HttpRouter.add("*", "/mcp", mcpRoute),
+  ApiLive,
+  SwaggerLive
+)
+
+const ServerLive = HttpRouter.serve(RouteLive).pipe(
   Layer.provide(McpHttpLive),
   Layer.provide(McpServerLive),
   Layer.provide(GitHubWebhooksLive),
   Layer.provide(EverhourWebhooksLive),
   Layer.provide(BackendHttpServicesLive),
-  Layer.provide(BackendInfrastructureLive),
-  Layer.provide(BunHttpServer.layer({ port: 3000 }))
+  Layer.provide(BackendInfrastructureLive)
 )
 
 const ReconcilerLive = TicketIndexReconcilerLive.pipe(
@@ -422,5 +437,11 @@ const AppLive = Layer.mergeAll(ServerLive, ReconcilerLive, ReaperLive)
 // skip the bind. (Bun-specific — Node has no equivalent built-in, but we're
 // running on Bun.)
 if (import.meta.main) {
-  BunRuntime.runMain(Layer.launch(AppLive))
+  const BunHttpServer = await import("@effect/platform-bun/BunHttpServer")
+  const BunRuntime = await import("@effect/platform-bun/BunRuntime")
+  BunRuntime.runMain(
+    Layer.launch(
+      AppLive.pipe(Layer.provide(BunHttpServer.layer({ port: 3000 })))
+    )
+  )
 }

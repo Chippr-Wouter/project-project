@@ -22,21 +22,25 @@ import {
 
 const GroupFrontmatter = Schema.Struct({
   ...Group.fields,
-  kind: Schema.optionalWith(GroupKind, { default: () => "other" as const }),
-  tickets: Schema.optionalWith(Schema.Array(TicketId), { default: () => [] }),
-  startsAt: Schema.optionalWith(Schema.NullOr(Schema.Date), {
-    default: () => null
-  }),
-  endsAt: Schema.optionalWith(Schema.NullOr(Schema.Date), {
-    default: () => null
-  }),
-  completedAt: Schema.optionalWith(Schema.NullOr(Schema.Date), {
-    default: () => null
-  })
+  kind: GroupKind.pipe(
+    Schema.withDecodingDefaultTypeKey(Effect.succeed("other" as const))
+  ),
+  tickets: Schema.Array(TicketId).pipe(
+    Schema.withDecodingDefaultTypeKey(Effect.succeed([]))
+  ),
+  startsAt: Schema.NullOr(Schema.DateFromString).pipe(
+    Schema.withDecodingDefaultTypeKey(Effect.succeed(null))
+  ),
+  endsAt: Schema.NullOr(Schema.DateFromString).pipe(
+    Schema.withDecodingDefaultTypeKey(Effect.succeed(null))
+  ),
+  completedAt: Schema.NullOr(Schema.DateFromString).pipe(
+    Schema.withDecodingDefaultTypeKey(Effect.succeed(null))
+  )
 })
 
-const decodeFrontmatter = Schema.decodeUnknown(GroupFrontmatter)
-const decodeGroupId = Schema.decodeUnknown(GroupId)
+const decodeFrontmatter = Schema.decodeUnknownEffect(GroupFrontmatter)
+const decodeGroupId = Schema.decodeUnknownEffect(GroupId)
 
 function frontmatterToDisk(document: GroupDocument): Record<string, unknown> {
   return {

@@ -1,3 +1,5 @@
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import * as Atom from "effect/unstable/reactivity/Atom"
 // GitHub-related atoms.
 //
 // The mutation atoms here use the project's optimistic-update pattern (see
@@ -8,8 +10,7 @@
 // Family keys: every project-scoped atom is keyed on `${orgSlug}/${slug}`.
 // Slugs are URL-safe (no `/`), so a slash is an unambiguous separator.
 
-import { Atom, Result } from "@effect-atom/atom-react"
-import * as Reactivity from "@effect/experimental/Reactivity"
+import * as Reactivity from "effect/unstable/reactivity/Reactivity"
 import * as Effect from "effect/Effect"
 import { runtime } from "@/runtime"
 import { ApiClient } from "@/services/ApiClient"
@@ -46,7 +47,7 @@ export const projectGitStatesBaseAtom = Atom.family((key: string) => {
       return Effect.gen(function* () {
         const client = yield* ApiClient
         const states = yield* client.projects.gitStates({
-          path: { orgSlug, slug }
+          params: { orgSlug, slug }
         })
         if (shouldInvalidateTicketsForGitStates(states)) {
           yield* Reactivity.invalidate(["tickets", orgSlug, slug])
@@ -67,7 +68,7 @@ export const githubOrgIntegrationAtom = Atom.family((orgSlug: string) =>
       Effect.gen(function* () {
         const client = yield* ApiClient
         return yield* client.projects.githubIntegration({
-          path: { orgSlug }
+          params: { orgSlug }
         })
       })
     )
@@ -124,8 +125,8 @@ export const githubInstallationReposAtom = Atom.family((key: string) =>
         const client = yield* ApiClient
         const q = query.trim() ? query.trim() : undefined
         const first = yield* client.projects.listGithubInstallationRepos({
-          path: { orgSlug },
-          urlParams: { q, page: 1 }
+          params: { orgSlug },
+          query: { q, page: 1 }
         })
         if (!q || !first.hasMore) return first
         const repos = [...first.repos]
@@ -133,8 +134,8 @@ export const githubInstallationReposAtom = Atom.family((key: string) =>
         let page = 2
         while (hasMore) {
           const next = yield* client.projects.listGithubInstallationRepos({
-            path: { orgSlug },
-            urlParams: { q, page }
+            params: { orgSlug },
+            query: { q, page }
           })
           repos.push(...next.repos)
           hasMore = next.hasMore
@@ -166,8 +167,8 @@ export const branchesAtom = Atom.family((key: string) => {
         const q = key.slice(secondSep + 1)
         const client = yield* ApiClient
         return yield* client.projects.listBranches({
-          path: { orgSlug, slug },
-          urlParams: { q: q.trim() ? q.trim() : undefined }
+          params: { orgSlug, slug },
+          query: { q: q.trim() ? q.trim() : undefined }
         })
       })
     })
@@ -201,7 +202,7 @@ export const connectGithubAtom = Atom.family((key: string) => {
       Effect.fn(function* (input: ConnectGithubInput, get) {
         const client = yield* ApiClient
         const updated = yield* client.projects.connectGithub({
-          path: { orgSlug, slug },
+          params: { orgSlug, slug },
           payload: input
         })
         get.refresh(projectBaseAtom(key))
@@ -218,7 +219,7 @@ export const startGithubInstallAtom = Atom.family((orgSlug: string) =>
     Effect.fn(function* (input: { returnProjectSlug?: Slug }, get) {
       const client = yield* ApiClient
       const response = yield* client.projects.startGithubInstall({
-        path: { orgSlug },
+        params: { orgSlug },
         payload: { returnProjectSlug: input.returnProjectSlug ?? null }
       })
       get.refresh(githubOrgIntegrationAtom(orgSlug))
@@ -238,7 +239,7 @@ export const disconnectGithubAtom = Atom.family((key: string) => {
       Effect.fn(function* (_input: void, get) {
         const client = yield* ApiClient
         const updated = yield* client.projects.disconnectGithub({
-          path: { orgSlug, slug }
+          params: { orgSlug, slug }
         })
         get.refresh(projectBaseAtom(key))
         get.refresh(projectGitStatesBaseAtom(key))
@@ -281,7 +282,7 @@ export const createBranchAtom = Atom.family((key: string) => {
       Effect.fn(function* (input: CreateBranchMutationInput, get) {
         const client = yield* ApiClient
         const updated = yield* client.tickets.createBranch({
-          path: { orgSlug, slug, id: input.id },
+          params: { orgSlug, slug, id: input.id },
           payload: { name: input.name, baseBranch: input.baseBranch }
         })
         get.refresh(projectGitStatesBaseAtom(key))
@@ -329,7 +330,7 @@ export const attachBranchAtom = Atom.family((key: string) => {
       Effect.fn(function* (input: { id: TicketId } & AttachBranchInput, get) {
         const client = yield* ApiClient
         const updated = yield* client.tickets.attachBranch({
-          path: { orgSlug, slug, id: input.id },
+          params: { orgSlug, slug, id: input.id },
           payload: { name: input.name }
         })
         get.refresh(projectGitStatesBaseAtom(key))
@@ -362,7 +363,7 @@ export const clearBranchAtom = Atom.family((key: string) => {
       Effect.fn(function* (input: { id: TicketId }, get) {
         const client = yield* ApiClient
         const updated = yield* client.tickets.clearBranch({
-          path: { orgSlug, slug, id: input.id }
+          params: { orgSlug, slug, id: input.id }
         })
         get.refresh(ticketBaseAtom(ticketKey(orgSlug, slug, input.id)))
         yield* Reactivity.invalidate(["tickets", orgSlug, slug])

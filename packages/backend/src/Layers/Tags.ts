@@ -15,7 +15,7 @@ import {
   type CursorPayload,
   type UpdateTagInput
 } from "@projectproject/shared"
-import { projectIndex, projectTag } from "../db/schema"
+import { projectTag } from "../db/schema"
 import { Db } from "../Services/Db"
 import type { MarkdownError } from "../Services/Markdown"
 import { Projects } from "../Services/Projects"
@@ -48,7 +48,9 @@ export const TagsLive = Layer.effect(
       db.query.projectIndex
         .findFirst({
           columns: { id: true },
-          where: eq(projectIndex.slug, slug)
+          where: {
+            RAW: (table, _operators) => _operators.eq(table.slug, slug)!
+          }
         })
         .pipe(
           Effect.orDie,
@@ -108,7 +110,12 @@ export const TagsLive = Layer.effect(
         yield* projects.requireMember(orgSlug, userId, slug)
         const projectId = yield* projectIdFromSlug(slug)
         const rows = yield* db.query.projectTag
-          .findMany({ where: eq(projectTag.projectId, projectId) })
+          .findMany({
+            where: {
+              RAW: (table, _operators) =>
+                _operators.eq(table.projectId, projectId)!
+            }
+          })
           .pipe(Effect.orDie)
         return rows.map((r): Tag => ({
           name: makeTagName(r.name),
@@ -154,7 +161,10 @@ export const TagsLive = Layer.effect(
         const existing = yield* db.query.projectTag
           .findMany({
             columns: { color: true },
-            where: eq(projectTag.projectId, projectId)
+            where: {
+              RAW: (table, _operators) =>
+                _operators.eq(table.projectId, projectId)!
+            }
           })
           .pipe(Effect.orDie)
 
@@ -163,10 +173,13 @@ export const TagsLive = Layer.effect(
         const existingRow = yield* db.query.projectTag
           .findFirst({
             columns: { name: true },
-            where: and(
-              eq(projectTag.projectId, projectId),
-              eq(projectTag.name, input.name)
-            )
+            where: {
+              RAW: (table, _operators) =>
+                _operators.and(
+                  _operators.eq(table.projectId, projectId),
+                  _operators.eq(table.name, input.name)
+                )!
+            }
           })
           .pipe(Effect.orDie)
         if (existingRow) return yield* new Conflict({ reason: "tag_exists" })
@@ -203,10 +216,13 @@ export const TagsLive = Layer.effect(
 
         const existing = yield* db.query.projectTag
           .findFirst({
-            where: and(
-              eq(projectTag.projectId, projectId),
-              eq(projectTag.name, name)
-            )
+            where: {
+              RAW: (table, _operators) =>
+                _operators.and(
+                  _operators.eq(table.projectId, projectId),
+                  _operators.eq(table.name, name)
+                )!
+            }
           })
           .pipe(Effect.orDie)
         if (!existing) return yield* new NotFound()
@@ -219,10 +235,13 @@ export const TagsLive = Layer.effect(
           const collision = yield* db.query.projectTag
             .findFirst({
               columns: { name: true },
-              where: and(
-                eq(projectTag.projectId, projectId),
-                eq(projectTag.name, nextName)
-              )
+              where: {
+                RAW: (table, _operators) =>
+                  _operators.and(
+                    _operators.eq(table.projectId, projectId),
+                    _operators.eq(table.name, nextName)
+                  )!
+              }
             })
             .pipe(Effect.orDie)
           if (collision) return yield* new Conflict({ reason: "tag_exists" })
@@ -261,10 +280,13 @@ export const TagsLive = Layer.effect(
         const existingRow = yield* db.query.projectTag
           .findFirst({
             columns: { name: true },
-            where: and(
-              eq(projectTag.projectId, projectId),
-              eq(projectTag.name, name)
-            )
+            where: {
+              RAW: (table, _operators) =>
+                _operators.and(
+                  _operators.eq(table.projectId, projectId),
+                  _operators.eq(table.name, name)
+                )!
+            }
           })
           .pipe(Effect.orDie)
         if (!existingRow) return yield* new NotFound()

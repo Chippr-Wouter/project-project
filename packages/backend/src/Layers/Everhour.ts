@@ -188,7 +188,7 @@ const send = <A>(
     }
     return yield* new EverhourError({ message })
   }).pipe(
-    Effect.catchAll((cause) =>
+    Effect.catch((cause) =>
       isEverhourClientError(cause)
         ? Effect.fail(cause)
         : Effect.fail(new EverhourError({ message: String(cause) }))

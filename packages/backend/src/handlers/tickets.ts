@@ -1,6 +1,6 @@
 // Thin handlers for the `tickets` HttpApi group. All logic in Tickets.
 
-import { HttpApiBuilder } from "@effect/platform"
+import { HttpApiBuilder } from "effect/unstable/httpapi"
 import {
   AppApi,
   CurrentUser,
@@ -17,33 +17,33 @@ export const TicketsHandlerLive = HttpApiBuilder.group(
   "tickets",
   (handlers) =>
     handlers
-      .handle("list", ({ path, urlParams }) =>
+      .handle("list", ({ params, query }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const tickets = yield* Tickets
           return yield* tickets.list(
             org.orgSlug,
             user.id,
-            path.slug,
-            ticketListQueryFromSearch(urlParams)
+            params.slug,
+            ticketListQueryFromSearch(query)
           )
         }).pipe(dieOnMarkdown)
       )
-      .handle("search", ({ path, urlParams }) =>
+      .handle("search", ({ params, query }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const tickets = yield* Tickets
           const limitNum =
-            urlParams.limit !== undefined
-              ? Number.parseInt(urlParams.limit, 10)
+            query.limit !== undefined
+              ? Number.parseInt(query.limit, 10)
               : undefined
-          return yield* tickets.search(org.orgSlug, user.id, path.slug, {
-            q: urlParams.q,
-            excludeGroupId: urlParams.excludeGroupId,
+          return yield* tickets.search(org.orgSlug, user.id, params.slug, {
+            q: query.q,
+            excludeGroupId: query.excludeGroupId,
             limit:
               limitNum !== undefined && Number.isFinite(limitNum)
                 ? limitNum
@@ -51,87 +51,97 @@ export const TicketsHandlerLive = HttpApiBuilder.group(
           })
         }).pipe(dieOnMarkdown)
       )
-      .handle("count", ({ path, urlParams }) =>
+      .handle("count", ({ params, query }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const tickets = yield* Tickets
           return yield* tickets.count(
             org.orgSlug,
             user.id,
-            path.slug,
-            ticketListQueryFromSearch(urlParams)
+            params.slug,
+            ticketListQueryFromSearch(query)
           )
         }).pipe(dieOnMarkdown)
       )
-      .handle("quickCreate", ({ path, payload }) =>
+      .handle("quickCreate", ({ params, payload }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const tickets = yield* Tickets
           return yield* tickets.quickCreate(
             org.orgSlug,
             user.id,
-            path.slug,
+            params.slug,
             payload
           )
         }).pipe(dieOnMarkdown)
       )
-      .handle("create", ({ path, payload }) =>
+      .handle("create", ({ params, payload }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const tickets = yield* Tickets
-          return yield* tickets.create(org.orgSlug, user.id, path.slug, payload)
+          return yield* tickets.create(
+            org.orgSlug,
+            user.id,
+            params.slug,
+            payload
+          )
         }).pipe(dieOnMarkdown)
       )
-      .handle("get", ({ path }) =>
+      .handle("get", ({ params }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const tickets = yield* Tickets
-          return yield* tickets.get(org.orgSlug, user.id, path.slug, path.id)
+          return yield* tickets.get(
+            org.orgSlug,
+            user.id,
+            params.slug,
+            params.id
+          )
         }).pipe(dieOnMarkdown)
       )
-      .handle("update", ({ path, payload }) =>
+      .handle("update", ({ params, payload }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const tickets = yield* Tickets
           return yield* tickets.update(
             org.orgSlug,
             user.id,
-            path.slug,
-            path.id,
+            params.slug,
+            params.id,
             payload
           )
         }).pipe(dieOnMarkdown)
       )
-      .handle("delete", ({ path }) =>
+      .handle("delete", ({ params }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const tickets = yield* Tickets
-          yield* tickets.remove(org.orgSlug, user.id, path.slug, path.id)
+          yield* tickets.remove(org.orgSlug, user.id, params.slug, params.id)
         }).pipe(dieOnMarkdown)
       )
-      .handle("archive", ({ path, payload }) =>
+      .handle("archive", ({ params, payload }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const tickets = yield* Tickets
           return yield* tickets.archive(
             org.orgSlug,
             user.id,
-            path.slug,
-            path.id,
+            params.slug,
+            params.id,
             payload.reason
           )
         }).pipe(
@@ -141,75 +151,75 @@ export const TicketsHandlerLive = HttpApiBuilder.group(
           dieOnMarkdown
         )
       )
-      .handle("unarchive", ({ path }) =>
+      .handle("unarchive", ({ params }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const tickets = yield* Tickets
           return yield* tickets.unarchive(
             org.orgSlug,
             user.id,
-            path.slug,
-            path.id
+            params.slug,
+            params.id
           )
         }).pipe(dieOnMarkdown)
       )
-      .handle("createBranch", ({ path, payload }) =>
+      .handle("createBranch", ({ params, payload }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const tickets = yield* Tickets
           return yield* tickets.createBranch(
             org.orgSlug,
             user.id,
-            path.slug,
-            path.id,
+            params.slug,
+            params.id,
             payload
           )
         }).pipe(dieOnMarkdown)
       )
-      .handle("openPr", ({ path, payload }) =>
+      .handle("openPr", ({ params, payload }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const tickets = yield* Tickets
           return yield* tickets.openPr(
             org.orgSlug,
             user.id,
-            path.slug,
-            path.id,
+            params.slug,
+            params.id,
             payload
           )
         }).pipe(dieOnMarkdown)
       )
-      .handle("clearBranch", ({ path }) =>
+      .handle("clearBranch", ({ params }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const tickets = yield* Tickets
           return yield* tickets.clearBranch(
             org.orgSlug,
             user.id,
-            path.slug,
-            path.id
+            params.slug,
+            params.id
           )
         }).pipe(dieOnMarkdown)
       )
-      .handle("attachBranch", ({ path, payload }) =>
+      .handle("attachBranch", ({ params, payload }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const tickets = yield* Tickets
           return yield* tickets.attachBranch(
             org.orgSlug,
             user.id,
-            path.slug,
-            path.id,
+            params.slug,
+            params.id,
             payload
           )
         }).pipe(dieOnMarkdown)

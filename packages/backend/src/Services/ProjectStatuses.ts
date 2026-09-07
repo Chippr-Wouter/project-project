@@ -54,6 +54,7 @@ export interface ProjectStatusesShape {
   ) => Effect.Effect<void, NotFound | Forbidden | Conflict | MarkdownError>
 }
 
-export class ProjectStatuses extends Context.Tag(
-  "@projectproject/backend/Services/ProjectStatuses"
-)<ProjectStatuses, ProjectStatusesShape>() {}
+export class ProjectStatuses extends Context.Service<
+  ProjectStatuses,
+  ProjectStatusesShape
+>()("@projectproject/backend/Services/ProjectStatuses") {}

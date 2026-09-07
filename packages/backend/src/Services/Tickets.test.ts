@@ -37,7 +37,7 @@ import {
 } from "./TicketDocs"
 import { Tickets } from "./Tickets"
 
-const isoDate = (s: string) => DateTime.toDate(DateTime.unsafeMake(s))
+const isoDate = (s: string) => DateTime.toDate(DateTime.makeUnsafe(s))
 const ticketId = Schema.decodeUnknownSync(TicketId)
 const ticketStatus = Schema.decodeUnknownSync(TicketStatus)
 const projectKey = Schema.decodeUnknownSync(ProjectKey)
@@ -749,7 +749,7 @@ it.effect("list paginates by cursor", () => {
 it.effect("list paginates by cursor with default created desc sort", () => {
   const { documents, layer } = makeTicketsFixture("T", [])
   const total = TICKET_LIST_LIMIT + 5
-  const base = DateTime.unsafeMake("2026-01-01T00:00:00.000Z")
+  const base = DateTime.makeUnsafe("2026-01-01T00:00:00.000Z")
   for (let i = 0; i < total; i++) {
     const id = `T-${i + 1}`
     documents.set(

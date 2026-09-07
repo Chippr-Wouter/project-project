@@ -1,4 +1,6 @@
-import { Atom, Result, useAtomSet, useAtomValue } from "@effect-atom/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import * as Atom from "effect/unstable/reactivity/Atom"
+import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import { useLocation } from "@tanstack/react-router"
 import * as DateTime from "effect/DateTime"
 import * as Schema from "effect/Schema"
@@ -63,7 +65,7 @@ const elapsedSeconds = (startedAt: Date): number =>
   Math.max(
     0,
     Math.floor(
-      (DateTime.toEpochMillis(DateTime.unsafeNow()) - startedAt.getTime()) /
+      (DateTime.toEpochMillis(DateTime.nowUnsafe()) - startedAt.getTime()) /
         1000
     )
   )

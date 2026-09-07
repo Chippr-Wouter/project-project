@@ -2,7 +2,7 @@ import * as DateTime from "effect/DateTime"
 import * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import * as SqlClient from "@effect/sql/SqlClient"
+import * as SqlClient from "effect/unstable/sql/SqlClient"
 import { and, desc, eq, inArray } from "drizzle-orm"
 import { randomBytes } from "node:crypto"
 import {
@@ -19,12 +19,9 @@ import {
 import {
   everhourSectionLink,
   everhourWorkTypeTaskLink,
-  member as orgMember,
   organizationIntegration,
   projectEverhourIntegration,
-  projectIndex,
   projectIntegrationLink,
-  projectMember,
   userEverhourIntegration
 } from "../db/schema"
 import { Db } from "../Services/Db"
@@ -192,7 +189,9 @@ export const EverhourIntegrationsLive = Layer.effect(
             lastVerifiedAt: true,
             lastCheckError: true
           },
-          where: eq(userEverhourIntegration.userId, userId)
+          where: {
+            RAW: (table, _operators) => _operators.eq(table.userId, userId)!
+          }
         })
         .pipe(
           Effect.orDie,
@@ -216,7 +215,9 @@ export const EverhourIntegrationsLive = Layer.effect(
               apiKeyTag: true,
               everhourUserId: true
             },
-            where: eq(userEverhourIntegration.userId, userId)
+            where: {
+              RAW: (table, _operators) => _operators.eq(table.userId, userId)!
+            }
           })
           .pipe(Effect.orDie)
         if (!row) return yield* new EverhourApiKeyMissing()
@@ -277,7 +278,7 @@ export const EverhourIntegrationsLive = Layer.effect(
       db
         .delete(userEverhourIntegration)
         .where(eq(userEverhourIntegration.userId, userId))
-        .pipe(Effect.orDie, Effect.zipRight(getProfile(userId)))
+        .pipe(Effect.orDie, Effect.andThen(getProfile(userId)))
 
     const projectRow = (orgSlug: string, slug: string) =>
       ticketIndex.projectFor(orgSlug, slug).pipe(Effect.orDie)
@@ -285,7 +286,9 @@ export const EverhourIntegrationsLive = Layer.effect(
     const indexById = (projectId: string) =>
       db.query.projectIndex
         .findFirst({
-          where: eq(projectIndex.id, projectId)
+          where: {
+            RAW: (table, _operators) => _operators.eq(table.id, projectId)!
+          }
         })
         .pipe(
           Effect.orDie,
@@ -300,20 +303,26 @@ export const EverhourIntegrationsLive = Layer.effect(
         const explicit = yield* db.query.projectMember
           .findFirst({
             columns: { role: true },
-            where: and(
-              eq(projectMember.projectSlug, slug),
-              eq(projectMember.userId, userId)
-            )
+            where: {
+              RAW: (table, _operators) =>
+                _operators.and(
+                  _operators.eq(table.projectSlug, slug),
+                  _operators.eq(table.userId, userId)
+                )!
+            }
           })
           .pipe(Effect.orDie)
         if (explicit) return explicit.role
         const orgRole = yield* db.query.member
           .findFirst({
             columns: { role: true },
-            where: and(
-              eq(orgMember.organizationId, project.organizationId),
-              eq(orgMember.userId, userId)
-            )
+            where: {
+              RAW: (table, _operators) =>
+                _operators.and(
+                  _operators.eq(table.organizationId, project.organizationId),
+                  _operators.eq(table.userId, userId)
+                )!
+            }
           })
           .pipe(Effect.orDie)
         if (orgRole?.role === "owner" || orgRole?.role === "admin") {
@@ -418,7 +427,7 @@ export const EverhourIntegrationsLive = Layer.effect(
         return yield* effect.pipe(
           Effect.catchTag("EverhourRateLimited", (error) =>
             Effect.sleep(Duration.seconds(error.retryAfterSeconds)).pipe(
-              Effect.zipRight(effect)
+              Effect.andThen(effect)
             )
           )
         )
@@ -436,8 +445,8 @@ export const EverhourIntegrationsLive = Layer.effect(
         if (existing?.status === "active") {
           const remote = yield* everhour
             .getProject(actor.apiKey, existing.everhourProjectId)
-            .pipe(Effect.either)
-          if (remote._tag === "Right") return existing
+            .pipe(Effect.result)
+          if (remote._tag === "Success") return existing
           yield* Effect.logWarning(
             "Everhour existing project is unavailable; creating replacement"
           ).pipe(
@@ -446,8 +455,8 @@ export const EverhourIntegrationsLive = Layer.effect(
               slug,
               userId,
               everhourProjectId: existing.everhourProjectId,
-              errorTag: errorTag(remote.left),
-              error: formatError(remote.left)
+              errorTag: errorTag(remote.failure),
+              error: formatError(remote.failure)
             })
           )
           yield* recordProjectSync(
@@ -455,7 +464,7 @@ export const EverhourIntegrationsLive = Layer.effect(
             "broken",
             userId,
             "error",
-            formatError(remote.left)
+            formatError(remote.failure)
           )
         }
         const index = yield* indexById(project.projectId)
@@ -472,17 +481,17 @@ export const EverhourIntegrationsLive = Layer.effect(
             Effect.gen(function* () {
               const orgIntegration = yield* db.query.organizationIntegration
                 .findFirst({
-                  where: and(
-                    eq(
-                      organizationIntegration.organizationId,
-                      project.organizationId
-                    ),
-                    eq(organizationIntegration.provider, "everhour"),
-                    inArray(organizationIntegration.status, [
-                      "active",
-                      "broken"
-                    ])
-                  )
+                  where: {
+                    RAW: (table, _operators) =>
+                      _operators.and(
+                        _operators.eq(
+                          table.organizationId,
+                          project.organizationId
+                        ),
+                        _operators.eq(table.provider, "everhour"),
+                        _operators.inArray(table.status, ["active", "broken"])
+                      )!
+                  }
                 })
                 .pipe(Effect.orDie)
               const activeOrgIntegration =
@@ -560,7 +569,7 @@ export const EverhourIntegrationsLive = Layer.effect(
                   everhourProjectId: remote.id,
                   error: formatError(error)
                 }),
-                Effect.zipRight(
+                Effect.andThen(
                   Effect.fail(
                     new EverhourError({
                       message:
@@ -607,7 +616,10 @@ export const EverhourIntegrationsLive = Layer.effect(
         const desired = sprintSections
         const existing = yield* db.query.everhourSectionLink
           .findMany({
-            where: eq(everhourSectionLink.projectIntegrationLinkId, link.linkId)
+            where: {
+              RAW: (table, _operators) =>
+                _operators.eq(table.projectIntegrationLinkId, link.linkId)!
+            }
           })
           .pipe(Effect.orDie)
         const existingByKey = new Map(
@@ -692,15 +704,18 @@ export const EverhourIntegrationsLive = Layer.effect(
         const now = yield* DateTime.nowAsDate
         const sections = yield* db.query.everhourSectionLink
           .findMany({
-            where: eq(everhourSectionLink.projectIntegrationLinkId, link.linkId)
+            where: {
+              RAW: (table, _operators) =>
+                _operators.eq(table.projectIntegrationLinkId, link.linkId)!
+            }
           })
           .pipe(Effect.orDie)
         const existing = yield* db.query.everhourWorkTypeTaskLink
           .findMany({
-            where: eq(
-              everhourWorkTypeTaskLink.projectIntegrationLinkId,
-              link.linkId
-            )
+            where: {
+              RAW: (table, _operators) =>
+                _operators.eq(table.projectIntegrationLinkId, link.linkId)!
+            }
           })
           .pipe(Effect.orDie)
         const byKey = new Map(
@@ -786,14 +801,14 @@ export const EverhourIntegrationsLive = Layer.effect(
         yield* everhour
           .getProject(apiKey, link.everhourProjectId)
           .pipe(
-            Effect.catchAll((error) =>
+            Effect.catch((error) =>
               recordProjectSync(
                 link.linkId,
                 "broken",
                 userId,
                 "error",
                 formatError(error)
-              ).pipe(Effect.zipRight(Effect.fail(error)))
+              ).pipe(Effect.andThen(Effect.fail(error)))
             )
           )
         if (link.everhourProjectName !== index.name) {
@@ -817,11 +832,14 @@ export const EverhourIntegrationsLive = Layer.effect(
         const orgIntegration = yield* db.query.organizationIntegration
           .findFirst({
             columns: { config: true },
-            where: and(
-              eq(organizationIntegration.organizationId, link.organizationId),
-              eq(organizationIntegration.provider, "everhour"),
-              inArray(organizationIntegration.status, ["active", "broken"])
-            )
+            where: {
+              RAW: (table, _operators) =>
+                _operators.and(
+                  _operators.eq(table.organizationId, link.organizationId),
+                  _operators.eq(table.provider, "everhour"),
+                  _operators.inArray(table.status, ["active", "broken"])
+                )!
+            }
           })
           .pipe(Effect.orDie)
         const config = (orgIntegration?.config as OrgEverhourConfig | null) ?? {
@@ -870,10 +888,10 @@ export const EverhourIntegrationsLive = Layer.effect(
         const row = yield* db.query.projectEverhourIntegration
           .findFirst({
             columns: { webhookId: true },
-            where: eq(
-              projectEverhourIntegration.projectIntegrationLinkId,
-              linkId
-            )
+            where: {
+              RAW: (table, _operators) =>
+                _operators.eq(table.projectIntegrationLinkId, linkId)!
+            }
           })
           .pipe(Effect.orDie)
         if (row?.webhookId) return
@@ -891,7 +909,7 @@ export const EverhourIntegrationsLive = Layer.effect(
           )
           .pipe(Effect.orDie)
       }).pipe(
-        Effect.catchAll((error) =>
+        Effect.catch((error) =>
           Effect.logWarning("Everhour webhook registration failed").pipe(
             Effect.annotateLogs({
               orgSlug,
@@ -910,7 +928,7 @@ export const EverhourIntegrationsLive = Layer.effect(
       webhookId: string
     ) =>
       everhour.deleteWebhook(apiKey, webhookId).pipe(
-        Effect.zipRight(
+        Effect.andThen(
           db
             .update(projectEverhourIntegration)
             .set({ webhookId: null, webhookSecret: null })
@@ -919,7 +937,7 @@ export const EverhourIntegrationsLive = Layer.effect(
             )
             .pipe(Effect.orDie)
         ),
-        Effect.catchAll(() => Effect.void)
+        Effect.catch(() => Effect.void)
       )
 
     const disconnectProject = (orgSlug: string, userId: string, slug: string) =>
@@ -932,10 +950,10 @@ export const EverhourIntegrationsLive = Layer.effect(
           const integration = yield* db.query.projectEverhourIntegration
             .findFirst({
               columns: { webhookId: true },
-              where: eq(
-                projectEverhourIntegration.projectIntegrationLinkId,
-                link.linkId
-              )
+              where: {
+                RAW: (table, _operators) =>
+                  _operators.eq(table.projectIntegrationLinkId, link.linkId)!
+              }
             })
             .pipe(Effect.orDie)
           if (integration?.webhookId) {
@@ -947,7 +965,7 @@ export const EverhourIntegrationsLive = Layer.effect(
                   integration.webhookId!
                 )
               ),
-              Effect.catchAll(() => Effect.void)
+              Effect.catch(() => Effect.void)
             )
           }
           yield* db
@@ -980,7 +998,7 @@ export const EverhourIntegrationsLive = Layer.effect(
     ) =>
       runFullSync(orgSlug, userId, slug, false).pipe(
         Effect.timeout(Duration.seconds(5)),
-        Effect.catchAll((error) =>
+        Effect.catch((error) =>
           Effect.logWarning("Everhour best-effort sync failed").pipe(
             Effect.annotateLogs({
               orgSlug,
@@ -996,7 +1014,7 @@ export const EverhourIntegrationsLive = Layer.effect(
 
     const connectProject = (orgSlug: string, userId: string, slug: string) =>
       runFullSync(orgSlug, userId, slug, true).pipe(
-        Effect.catchAll((error) =>
+        Effect.catch((error) =>
           Effect.gen(function* () {
             const project = yield* projectRow(orgSlug, slug)
             const link = yield* activeLink(project.projectId)
@@ -1035,7 +1053,7 @@ export const EverhourIntegrationsLive = Layer.effect(
                 )
               })
             ),
-            Effect.catchAll(() => Effect.void)
+            Effect.catch(() => Effect.void)
           )
         )
       )

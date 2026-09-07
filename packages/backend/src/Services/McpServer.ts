@@ -1,18 +1,16 @@
 import * as Context from "effect/Context"
 import type * as Effect from "effect/Effect"
+import type * as Layer from "effect/Layer"
 import type * as ManagedRuntime from "effect/ManagedRuntime"
 import type { McpServer as SdkMcpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
+import type { BackendInfrastructureLive, BackendServicesLive } from "../runtime"
 
-// The runtime is parameterised by the full backend service stack, but the
-// concrete service union changes whenever a new Layer is added to
-// BackendServicesLive. We type-erase it here so consumers (the /mcp route)
-// can `runPromise` any Effect that needs backend services without having to
-// duplicate the union. ManagedRuntime is variant-safe enough that this
-// erasure doesn't bypass anything that the layer construction wouldn't
-// already have caught at build time.
+type McpToolServices =
+  | Layer.Success<typeof BackendInfrastructureLive>
+  | Layer.Success<typeof BackendServicesLive>
+
 export type McpToolRuntime = ManagedRuntime.ManagedRuntime<
-  // biome-ignore lint/suspicious/noExplicitAny: see comment above
-  any,
+  McpToolServices,
   never
 >
 
@@ -21,10 +19,8 @@ export interface McpServerShape {
   readonly runtime: McpToolRuntime
 }
 
-export class McpServer extends Context.Tag(
+export class McpServer extends Context.Service<McpServer, McpServerShape>()(
   "@projectproject/backend/Services/McpServer"
-)<McpServer, McpServerShape>() {}
+) {}
 
-// Helper type for the dispatcher: a handler whose Effect can be run by the
-// shared runtime once `CurrentUser` is provided per call.
 export type ToolEffect<A> = Effect.Effect<A, unknown, never>

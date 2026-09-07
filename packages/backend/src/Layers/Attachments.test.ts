@@ -18,7 +18,7 @@ import { Projects } from "../Services/Projects"
 import { S3Storage } from "../Services/S3Storage"
 import { AttachmentsLive } from "./Attachments"
 
-const at = (iso: string) => DateTime.toDate(DateTime.unsafeMake(iso))
+const at = (iso: string) => DateTime.toDate(DateTime.makeUnsafe(iso))
 import {
   attachmentServesInline,
   attachmentPageOffset,
@@ -427,7 +427,7 @@ const servingLayer = (role: Role) =>
 const resolveAs = (role: Role) =>
   Attachments.pipe(
     Effect.flatMap((attachments) =>
-      Effect.either(attachments.resolveForServing("acme", "att-1", "user-1"))
+      Effect.result(attachments.resolveForServing("acme", "att-1", "user-1"))
     ),
     Effect.provide(servingLayer(role))
   )
@@ -438,23 +438,23 @@ describe("resolveForServing beyond project membership", () => {
     () =>
       Effect.gen(function* () {
         const result = yield* resolveAs("owner")
-        expect(result._tag).toBe("Right")
+        expect(result._tag).toBe("Success")
       })
   )
 
   it.effect("serves an org admin who is not a project member", () =>
     Effect.gen(function* () {
       const result = yield* resolveAs("admin")
-      expect(result._tag).toBe("Right")
+      expect(result._tag).toBe("Success")
     })
   )
 
   it.effect("refuses a plain member who is not on the owning project", () =>
     Effect.gen(function* () {
       const result = yield* resolveAs("member")
-      expect(result._tag).toBe("Left")
-      if (result._tag === "Left") {
-        expect(result.left._tag).toBe("Forbidden")
+      expect(result._tag).toBe("Failure")
+      if (result._tag === "Failure") {
+        expect(result.failure._tag).toBe("Forbidden")
       }
     })
   )
@@ -519,7 +519,7 @@ const deletionHarness = (input: {
   )
   const run = Attachments.pipe(
     Effect.flatMap((attachments) =>
-      Effect.either(attachments.deleteForOrg("acme", "att-1", "user-1"))
+      Effect.result(attachments.deleteForOrg("acme", "att-1", "user-1"))
     ),
     Effect.provide(layer)
   )
@@ -531,7 +531,7 @@ describe("deleteForOrg", () => {
     Effect.gen(function* () {
       const harness = deletionHarness({ status: "orphaned", role: "owner" })
       const result = yield* harness.run
-      expect(result._tag).toBe("Right")
+      expect(result._tag).toBe("Success")
       expect(harness.deletedKeys).toEqual([servingRow.objectKey])
       expect(harness.deletedRows).toHaveLength(1)
     })
@@ -543,7 +543,7 @@ describe("deleteForOrg", () => {
       Effect.gen(function* () {
         const harness = deletionHarness({ status: "live", role: "owner" })
         const result = yield* harness.run
-        expect(result._tag).toBe("Right")
+        expect(result._tag).toBe("Success")
         expect(harness.deletedKeys).toEqual([servingRow.objectKey])
         expect(harness.deletedRows).toHaveLength(1)
       })
@@ -553,7 +553,7 @@ describe("deleteForOrg", () => {
     Effect.gen(function* () {
       const harness = deletionHarness({ status: "pending", role: "owner" })
       const result = yield* harness.run
-      expect(result._tag).toBe("Left")
+      expect(result._tag).toBe("Failure")
       expect(harness.deletedKeys).toEqual([])
     })
   )
@@ -588,8 +588,9 @@ describe("deleteForOrg", () => {
           rowVanished: true
         })
         const result = yield* harness.run
-        expect(result._tag).toBe("Left")
-        if (result._tag === "Left") expect(result.left._tag).toBe("Forbidden")
+        expect(result._tag).toBe("Failure")
+        if (result._tag === "Failure")
+          expect(result.failure._tag).toBe("Forbidden")
         expect(harness.deletedKeys).toEqual([])
       })
   )
@@ -604,7 +605,7 @@ describe("deleteForOrg", () => {
           sharers: [{ id: "att-2", objectKey: servingRow.objectKey }]
         })
         const result = yield* harness.run
-        expect(result._tag).toBe("Right")
+        expect(result._tag).toBe("Success")
         expect(harness.deletedRows).toHaveLength(1)
         expect(harness.deletedKeys).toEqual([])
       })
@@ -614,8 +615,9 @@ describe("deleteForOrg", () => {
     Effect.gen(function* () {
       const harness = deletionHarness({ status: "orphaned", role: "member" })
       const result = yield* harness.run
-      expect(result._tag).toBe("Left")
-      if (result._tag === "Left") expect(result.left._tag).toBe("Forbidden")
+      expect(result._tag).toBe("Failure")
+      if (result._tag === "Failure")
+        expect(result.failure._tag).toBe("Forbidden")
       expect(harness.deletedKeys).toEqual([])
     })
   )
@@ -693,12 +695,13 @@ describe("listForOrg", () => {
       const { layer } = listHarness({ role: "member" })
       const result = yield* Attachments.pipe(
         Effect.flatMap((a) =>
-          Effect.either(a.listForOrg("acme", "user-1", {}))
+          Effect.result(a.listForOrg("acme", "user-1", {}))
         ),
         Effect.provide(layer)
       )
-      expect(result._tag).toBe("Left")
-      if (result._tag === "Left") expect(result.left._tag).toBe("Forbidden")
+      expect(result._tag).toBe("Failure")
+      if (result._tag === "Failure")
+        expect(result.failure._tag).toBe("Forbidden")
     })
   )
 
@@ -838,12 +841,13 @@ describe("summarizeForOrg", () => {
       const { layer } = listHarness({ role: "member" })
       const result = yield* Attachments.pipe(
         Effect.flatMap((a) =>
-          Effect.either(a.summarizeForOrg("acme", "user-1"))
+          Effect.result(a.summarizeForOrg("acme", "user-1"))
         ),
         Effect.provide(layer)
       )
-      expect(result._tag).toBe("Left")
-      if (result._tag === "Left") expect(result.left._tag).toBe("Forbidden")
+      expect(result._tag).toBe("Failure")
+      if (result._tag === "Failure")
+        expect(result.failure._tag).toBe("Forbidden")
     })
   )
 

@@ -1,5 +1,6 @@
-import { Atom, Result } from "@effect-atom/atom-react"
-import * as Reactivity from "@effect/experimental/Reactivity"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import * as Atom from "effect/unstable/reactivity/Atom"
+import * as Reactivity from "effect/unstable/reactivity/Reactivity"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import { runtime } from "@/runtime"
@@ -25,7 +26,7 @@ const projectsListBaseAtom = Atom.family((orgSlug: string) =>
     .atom(
       Effect.gen(function* () {
         const client = yield* ApiClient
-        return yield* client.projects.list({ path: { orgSlug } })
+        return yield* client.projects.list({ params: { orgSlug } })
       })
     )
     .pipe(Atom.setIdleTTL("1 minute"))
@@ -39,7 +40,7 @@ export const projectBaseAtom = Atom.family((key: string) => {
     .atom(
       Effect.gen(function* () {
         const client = yield* ApiClient
-        return yield* client.projects.get({ path: { orgSlug, slug } })
+        return yield* client.projects.get({ params: { orgSlug, slug } })
       })
     )
     .pipe(Atom.setIdleTTL("2 minutes"))
@@ -60,7 +61,7 @@ export const updateProjectAtom = Atom.family((key: string) => {
       Effect.fn(function* (input: UpdateProjectInputShared, get) {
         const client = yield* ApiClient
         const updated = yield* client.projects.update({
-          path: { orgSlug, slug },
+          params: { orgSlug, slug },
           payload: input
         })
         get.refresh(projectBaseAtom(key))
@@ -91,7 +92,7 @@ export const updateProjectSetupAtom = Atom.family((key: string) => {
       ) {
         const client = yield* ApiClient
         const updated = yield* client.projects.updateSetup({
-          path: { orgSlug, slug },
+          params: { orgSlug, slug },
           payload: input
         })
         get.refresh(projectBaseAtom(key))
@@ -106,7 +107,7 @@ export const deleteProjectAtom = Atom.family((key: string) => {
   return runtime.fn(
     Effect.fn(function* (_input: void, get) {
       const client = yield* ApiClient
-      yield* client.projects.delete({ path: { orgSlug, slug } })
+      yield* client.projects.delete({ params: { orgSlug, slug } })
       get.refresh(projectBaseAtom(key))
       get.refresh(projectsListBaseAtom(orgSlug))
       yield* Reactivity.invalidate(["tickets", orgSlug, slug])
@@ -125,7 +126,7 @@ export const addMemberAtom = Atom.family((key: string) => {
     ) {
       const client = yield* ApiClient
       const updated = yield* client.projects.addMember({
-        path: { orgSlug, slug },
+        params: { orgSlug, slug },
         payload: input
       })
       get.refresh(projectBaseAtom(key))
@@ -154,7 +155,7 @@ export const updateMemberAtom = Atom.family((key: string) => {
     Effect.fn(function* (input: { role: "admin" | "member" }, get) {
       const client = yield* ApiClient
       const updated = yield* client.projects.updateMember({
-        path: { orgSlug, slug, userId },
+        params: { orgSlug, slug, userId },
         payload: input
       })
       get.refresh(projectBaseAtom(projectKey(orgSlug, slug)))
@@ -168,7 +169,7 @@ export const removeMemberAtom = Atom.family((key: string) => {
   return runtime.fn(
     Effect.fn(function* (_input: void, get) {
       const client = yield* ApiClient
-      yield* client.projects.removeMember({ path: { orgSlug, slug, userId } })
+      yield* client.projects.removeMember({ params: { orgSlug, slug, userId } })
       get.refresh(projectBaseAtom(projectKey(orgSlug, slug)))
     })
   )
@@ -197,7 +198,7 @@ export const cancelPendingMemberAtom = Atom.family((key: string) => {
     Effect.fn(function* (_input: void, get) {
       const client = yield* ApiClient
       const updated = yield* client.projects.cancelPendingMember({
-        path: { orgSlug, slug, invitationId }
+        params: { orgSlug, slug, invitationId }
       })
       get.refresh(projectBaseAtom(projectKey(orgSlug, slug)))
       return updated
@@ -209,9 +210,11 @@ export const createProjectAtom = Atom.family((orgSlug: string) =>
   runtime.fn(
     Effect.fn(function* (input: { name: string; key: string }, get) {
       const client = yield* ApiClient
-      const key = yield* Schema.decodeUnknown(CreatableProjectKey)(input.key)
+      const key = yield* Schema.decodeUnknownEffect(CreatableProjectKey)(
+        input.key
+      )
       const project = yield* client.projects.create({
-        path: { orgSlug },
+        params: { orgSlug },
         payload: { name: input.name, key }
       })
       get.refresh(projectBaseAtom(projectKey(orgSlug, project.slug)))

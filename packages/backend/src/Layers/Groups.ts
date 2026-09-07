@@ -2,6 +2,7 @@ import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
+import * as Semaphore from "effect/Semaphore"
 import {
   ADMIN_GATED_KINDS,
   CompleteSprintInput,
@@ -40,7 +41,7 @@ const MAX_CREATE_ATTEMPTS = 16
 const makeGroupId = Schema.decodeUnknownSync(GroupId)
 const makeGroupColor = Schema.decodeUnknownSync(GroupColor)
 
-const projectMutationLocks = new Map<string, Effect.Semaphore>()
+const projectMutationLocks = new Map<string, Semaphore.Semaphore>()
 
 const projectLockKey = (orgSlug: string, slug: string) => `${orgSlug}:${slug}`
 
@@ -49,7 +50,7 @@ const projectLockFor = (orgSlug: string, slug: string) =>
     const key = projectLockKey(orgSlug, slug)
     const cached = projectMutationLocks.get(key)
     if (cached) return cached
-    const created = yield* Effect.makeSemaphore(1)
+    const created = yield* Semaphore.make(1)
     projectMutationLocks.set(key, created)
     return created
   })

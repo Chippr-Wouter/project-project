@@ -37,25 +37,21 @@
 // the frontend uses; same types; full contract enforcement.
 
 import { it } from "@effect/vitest"
-import {
-  FetchHttpClient,
-  HttpApi,
-  HttpApp,
-  HttpApiBuilder,
-  HttpApiClient,
-  HttpServer
-} from "@effect/platform"
+import { FetchHttpClient, HttpRouter, HttpServer } from "effect/unstable/http"
+import { HttpApi, HttpApiBuilder, HttpApiClient } from "effect/unstable/httpapi"
 import { AppApi } from "@projectproject/shared"
 import * as ConfigProvider from "effect/ConfigProvider"
+import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
 import { afterAll, expect, vi } from "vite-plus/test"
+import { createHmac } from "node:crypto"
+
 vi.mock("./auth", () => ({
   auth: {},
   mcpResource: "http://localhost:3000/mcp"
 }))
-import { createHmac } from "node:crypto"
 import {
   GITHUB_WEBHOOK_MAX_BODY_BYTES,
   HealthHandlerLive,
@@ -73,13 +69,13 @@ const healthGroup = Object.values(AppApi.groups).find(
 )
 if (!healthGroup) throw new Error("Health API group not found")
 
-const ApiUnderTestLive = HttpApiBuilder.api(
+const ApiUnderTestLive = HttpApiBuilder.layer(
   HttpApi.make(AppApi.identifier).add(healthGroup)
 ).pipe(Layer.provide(HealthHandlerLive))
 
 // One shared web handler for the whole suite.
-const { handler, dispose } = HttpApiBuilder.toWebHandler(
-  ApiUnderTestLive.pipe(Layer.provideMerge(HttpServer.layerContext))
+const { handler, dispose } = HttpRouter.toWebHandler(
+  ApiUnderTestLive.pipe(Layer.provideMerge(HttpServer.layerServices))
 )
 
 afterAll(() => dispose())
@@ -173,22 +169,43 @@ it.effect("HttpApiClient.health.get() returns { status: 'ok' }", () =>
 
 const webhookSecret = "test-webhook-secret"
 const jsonBody = (value: unknown) =>
-  Schema.encodeSync(Schema.parseJson())(value)
+  Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)
 
 const signWebhookBody = (body: string) =>
   `sha256=${createHmac("sha256", webhookSecret).update(body).digest("hex")}`
 
 const makeWebhookHandler = (service: GitHubWebhooksShape) =>
-  HttpApp.toWebHandlerLayer(
-    githubWebhookRoute.pipe(
-      Effect.withConfigProvider(
-        ConfigProvider.fromMap(
-          new Map([["GITHUB_APP_WEBHOOK_SECRET", webhookSecret]])
+  (() => {
+    const web = HttpRouter.toWebHandler(
+      HttpRouter.add(
+        "POST",
+        "/api/integrations/github/webhook",
+        githubWebhookRoute
+      ).pipe(
+        Layer.provide(Layer.succeed(GitHubWebhooks, service)),
+        Layer.provide(
+          ConfigProvider.layer(
+            ConfigProvider.fromUnknown({
+              GITHUB_APP_WEBHOOK_SECRET: webhookSecret
+            })
+          )
         )
       )
-    ),
-    Layer.succeed(GitHubWebhooks, service)
-  )
+    )
+    const context = Context.merge(
+      Context.make(GitHubWebhooks, service),
+      Context.make(
+        ConfigProvider.ConfigProvider,
+        ConfigProvider.fromUnknown({
+          GITHUB_APP_WEBHOOK_SECRET: webhookSecret
+        })
+      )
+    )
+    return {
+      handler: (request: Request) => web.handler(request, context),
+      dispose: web.dispose
+    }
+  })()
 
 it("verifyGithubWebhook accepts the matching sha256 signature", () => {
   const body = jsonBody({ action: "ping" })
@@ -208,9 +225,9 @@ it.effect(
           body: "abcd"
         }),
         3
-      ).pipe(Effect.either)
+      ).pipe(Effect.result)
 
-      expect(result._tag).toBe("Left")
+      expect(result._tag).toBe("Failure")
     })
 )
 

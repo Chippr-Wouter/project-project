@@ -1,4 +1,5 @@
-import { Atom, Result } from "@effect-atom/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import * as Atom from "effect/unstable/reactivity/Atom"
 import * as Effect from "effect/Effect"
 import type { ConnectStorageInput } from "@projectproject/shared"
 import { runtime } from "@/runtime"
@@ -9,7 +10,7 @@ const orgStorageBaseAtom = Atom.family((orgSlug: string) =>
     .atom(
       Effect.gen(function* () {
         const client = yield* ApiClient
-        return yield* client.storage.get({ path: { orgSlug } })
+        return yield* client.storage.get({ params: { orgSlug } })
       })
     )
     .pipe(Atom.setIdleTTL("30 seconds"))
@@ -29,7 +30,7 @@ export const connectStorageAtom = Atom.family((orgSlug: string) =>
       Effect.fn(function* (input: ConnectStorageInput, get) {
         const client = yield* ApiClient
         const status = yield* client.storage.connect({
-          path: { orgSlug },
+          params: { orgSlug },
           payload: input
         })
         get.refresh(orgStorageBaseAtom(orgSlug))
@@ -62,7 +63,7 @@ export const disconnectStorageAtom = Atom.family((orgSlug: string) =>
     fn: runtime.fn(
       Effect.fn(function* (_input: void, get) {
         const client = yield* ApiClient
-        const status = yield* client.storage.disconnect({ path: { orgSlug } })
+        const status = yield* client.storage.disconnect({ params: { orgSlug } })
         get.refresh(orgStorageBaseAtom(orgSlug))
         return status
       })

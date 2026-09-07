@@ -15,14 +15,8 @@ import {
 import {
   everhourActiveTimer,
   everhourTimeAttribution,
-  everhourWorkTypeTaskLink,
-  member as orgMember,
-  organizationIntegration,
   projectEverhourIntegration,
-  projectIndex,
-  projectIntegrationLink,
-  projectMember,
-  userEverhourIntegration
+  projectIntegrationLink
 } from "../db/schema"
 import { Db } from "../Services/Db"
 import { Everhour, type EverhourTimeRecord } from "../Services/Everhour"
@@ -104,20 +98,26 @@ export const EverhourTimeTrackingLive = Layer.effect(
         const explicit = yield* db.query.projectMember
           .findFirst({
             columns: { role: true },
-            where: and(
-              eq(projectMember.projectSlug, slug),
-              eq(projectMember.userId, userId)
-            )
+            where: {
+              RAW: (table, _operators) =>
+                _operators.and(
+                  _operators.eq(table.projectSlug, slug),
+                  _operators.eq(table.userId, userId)
+                )!
+            }
           })
           .pipe(Effect.orDie)
         if (explicit) return project
         const orgRole = yield* db.query.member
           .findFirst({
             columns: { role: true },
-            where: and(
-              eq(orgMember.organizationId, project.organizationId),
-              eq(orgMember.userId, userId)
-            )
+            where: {
+              RAW: (table, _operators) =>
+                _operators.and(
+                  _operators.eq(table.organizationId, project.organizationId),
+                  _operators.eq(table.userId, userId)
+                )!
+            }
           })
           .pipe(Effect.orDie)
         if (orgRole?.role === "owner" || orgRole?.role === "admin") {
@@ -162,11 +162,14 @@ export const EverhourTimeTrackingLive = Layer.effect(
       db.query.organizationIntegration
         .findFirst({
           columns: { config: true },
-          where: and(
-            eq(organizationIntegration.organizationId, organizationId),
-            eq(organizationIntegration.provider, "everhour"),
-            inArray(organizationIntegration.status, ["active", "broken"])
-          )
+          where: {
+            RAW: (table, _operators) =>
+              _operators.and(
+                _operators.eq(table.organizationId, organizationId),
+                _operators.eq(table.provider, "everhour"),
+                _operators.inArray(table.status, ["active", "broken"])
+              )!
+          }
         })
         .pipe(
           Effect.orDie,
@@ -209,7 +212,9 @@ export const EverhourTimeTrackingLive = Layer.effect(
               apiKeyTag: true,
               everhourUserId: true
             },
-            where: eq(userEverhourIntegration.userId, userId)
+            where: {
+              RAW: (table, _operators) => _operators.eq(table.userId, userId)!
+            }
           })
           .pipe(Effect.orDie)
         if (!row) return yield* new EverhourApiKeyMissing()
@@ -227,7 +232,9 @@ export const EverhourTimeTrackingLive = Layer.effect(
       db.query.userEverhourIntegration
         .findFirst({
           columns: { everhourUserId: true },
-          where: eq(userEverhourIntegration.userId, userId)
+          where: {
+            RAW: (table, _operators) => _operators.eq(table.userId, userId)!
+          }
         })
         .pipe(
           Effect.orDie,
@@ -243,11 +250,14 @@ export const EverhourTimeTrackingLive = Layer.effect(
       Effect.gen(function* () {
         const row = yield* db.query.everhourWorkTypeTaskLink
           .findFirst({
-            where: and(
-              eq(everhourWorkTypeTaskLink.projectIntegrationLinkId, linkId),
-              eq(everhourWorkTypeTaskLink.groupId, groupId),
-              eq(everhourWorkTypeTaskLink.workTypeKey, workTypeKey)
-            )
+            where: {
+              RAW: (table, _operators) =>
+                _operators.and(
+                  _operators.eq(table.projectIntegrationLinkId, linkId),
+                  _operators.eq(table.groupId, groupId),
+                  _operators.eq(table.workTypeKey, workTypeKey)
+                )!
+            }
           })
           .pipe(Effect.orDie)
         if (!row) return yield* new NotFound()
@@ -260,7 +270,7 @@ export const EverhourTimeTrackingLive = Layer.effect(
     const ticketTitle = (orgSlug: string, slug: string, ticketId: string) =>
       ticketDocs.read(orgSlug, slug, ticketId).pipe(
         Effect.map((ticket) => ticket.title),
-        Effect.catchAll(() => Effect.succeed<string | null>(null))
+        Effect.catch(() => Effect.succeed<string | null>(null))
       )
 
     const writeAttribution = (
@@ -304,7 +314,10 @@ export const EverhourTimeTrackingLive = Layer.effect(
     const activeTimerRowFor = (everhourUserId: string) =>
       db.query.everhourActiveTimer
         .findFirst({
-          where: eq(everhourActiveTimer.everhourUserId, everhourUserId)
+          where: {
+            RAW: (table, _operators) =>
+              _operators.eq(table.everhourUserId, everhourUserId)!
+          }
         })
         .pipe(Effect.orDie)
 
@@ -316,7 +329,10 @@ export const EverhourTimeTrackingLive = Layer.effect(
         const link = yield* db.query.projectIntegrationLink
           .findFirst({
             columns: { organizationId: true, projectId: true },
-            where: eq(projectIntegrationLink.id, row.projectIntegrationLinkId)
+            where: {
+              RAW: (table, _operators) =>
+                _operators.eq(table.id, row.projectIntegrationLinkId)!
+            }
           })
           .pipe(Effect.orDie)
         let workTypeLabel = row.workTypeKey
@@ -331,7 +347,10 @@ export const EverhourTimeTrackingLive = Layer.effect(
           const index = yield* db.query.projectIndex
             .findFirst({
               columns: { slug: true },
-              where: eq(projectIndex.id, link.projectId)
+              where: {
+                RAW: (table, _operators) =>
+                  _operators.eq(table.id, link.projectId)!
+              }
             })
             .pipe(Effect.orDie)
           if (index) {
@@ -616,10 +635,13 @@ export const EverhourTimeTrackingLive = Layer.effect(
         const rows = yield* db.query.everhourTimeAttribution
           .findMany({
             columns: { everhourUserId: true, seconds: true },
-            where: and(
-              eq(everhourTimeAttribution.projectIntegrationLinkId, link.linkId),
-              eq(everhourTimeAttribution.ticketId, ticketId)
-            )
+            where: {
+              RAW: (table, _operators) =>
+                _operators.and(
+                  _operators.eq(table.projectIntegrationLinkId, link.linkId),
+                  _operators.eq(table.ticketId, ticketId)
+                )!
+            }
           })
           .pipe(Effect.orDie)
         const everhourUserId = yield* everhourUserIdFor(userId)
@@ -634,14 +656,19 @@ export const EverhourTimeTrackingLive = Layer.effect(
       (_projectIntegrationLinkId, record) =>
         Effect.gen(function* () {
           const now = yield* DateTime.nowAsDate
+          const recordUserId = record.userId
+          const recordTaskId = record.taskId
           const matched =
-            record.userId !== null && record.taskId !== null
+            recordUserId !== null && recordTaskId !== null
               ? yield* db.query.everhourActiveTimer
                   .findFirst({
-                    where: and(
-                      eq(everhourActiveTimer.everhourUserId, record.userId),
-                      eq(everhourActiveTimer.everhourTaskId, record.taskId)
-                    )
+                    where: {
+                      RAW: (table, _operators) =>
+                        _operators.and(
+                          _operators.eq(table.everhourUserId, recordUserId),
+                          _operators.eq(table.everhourTaskId, recordTaskId)
+                        )!
+                    }
                   })
                   .pipe(Effect.orDie)
               : undefined
@@ -663,7 +690,10 @@ export const EverhourTimeTrackingLive = Layer.effect(
           }
           const existing = yield* db.query.everhourTimeAttribution
             .findFirst({
-              where: eq(everhourTimeAttribution.everhourTimeId, record.id)
+              where: {
+                RAW: (table, _operators) =>
+                  _operators.eq(table.everhourTimeId, record.id)!
+              }
             })
             .pipe(Effect.orDie)
           if (existing) {

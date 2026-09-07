@@ -1,4 +1,5 @@
-import { Atom, Result } from "@effect-atom/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import * as Atom from "effect/unstable/reactivity/Atom"
 import * as Effect from "effect/Effect"
 import { runtime } from "@/runtime"
 import { ApiClient } from "@/services/ApiClient"
@@ -77,7 +78,7 @@ export const everhourProjectStatusBaseAtom = Atom.family((key: string) => {
       Effect.gen(function* () {
         const client = yield* ApiClient
         return yield* client.everhour.projectStatus({
-          path: { orgSlug, slug }
+          params: { orgSlug, slug }
         })
       })
     )
@@ -98,7 +99,7 @@ export const connectEverhourProjectAtom = Atom.family((key: string) =>
       Effect.fn(function* (_input: void, get) {
         const { orgSlug, slug } = splitProjectKey(key)
         const client = yield* ApiClient
-        yield* client.everhour.connectProject({ path: { orgSlug, slug } })
+        yield* client.everhour.connectProject({ params: { orgSlug, slug } })
         get.refresh(everhourProjectStatusBaseAtom(key))
       })
     )
@@ -115,7 +116,7 @@ export const syncEverhourProjectAtom = Atom.family((key: string) =>
       Effect.fn(function* (_input: void, get) {
         const { orgSlug, slug } = splitProjectKey(key)
         const client = yield* ApiClient
-        yield* client.everhour.syncProject({ path: { orgSlug, slug } })
+        yield* client.everhour.syncProject({ params: { orgSlug, slug } })
         get.refresh(everhourProjectStatusBaseAtom(key))
       })
     )
@@ -132,7 +133,7 @@ export const disconnectEverhourProjectAtom = Atom.family((key: string) =>
       Effect.fn(function* (_input: void, get) {
         const { orgSlug, slug } = splitProjectKey(key)
         const client = yield* ApiClient
-        yield* client.everhour.disconnectProject({ path: { orgSlug, slug } })
+        yield* client.everhour.disconnectProject({ params: { orgSlug, slug } })
         get.refresh(everhourProjectStatusBaseAtom(key))
       })
     )

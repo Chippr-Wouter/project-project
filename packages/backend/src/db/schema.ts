@@ -40,7 +40,7 @@
 // Then run `bun run db:generate` to produce the first migration, and
 // `bun run db:migrate` to apply it against the running Postgres.
 
-import { relations, sql } from "drizzle-orm"
+import { defineRelations, sql } from "drizzle-orm"
 import {
   boolean,
   check,
@@ -60,6 +60,7 @@ import type { OrgEverhourConfig } from "@projectproject/shared"
 
 export * from "./auth-schema"
 import { invitation, organization, user } from "./auth-schema"
+import * as authSchema from "./auth-schema"
 
 export type OrgIntegrationConfig = OrgEverhourConfig | Record<string, never>
 
@@ -332,7 +333,7 @@ export const projectIntegrationLink = pgTable(
       foreignColumns: [projectIndex.id, projectIndex.organizationId]
     }).onDelete("cascade"),
     foreignKey({
-      name: "project_integration_link_org_integration_id_organization_id_fkey",
+      name: "project_integration_link_org_integration_id_organization_id_fke",
       columns: [t.organizationIntegrationId, t.organizationId],
       foreignColumns: [
         organizationIntegration.id,
@@ -592,161 +593,6 @@ export const ticketIndex = pgTable(
   ]
 )
 
-export const projectIndexRelations = relations(
-  projectIndex,
-  ({ one, many }) => ({
-    organization: one(organization, {
-      fields: [projectIndex.organizationId],
-      references: [organization.id]
-    }),
-    members: many(projectMember),
-    inviteGrants: many(projectInviteGrant),
-    tags: many(projectTag),
-    statuses: many(projectStatus),
-    integrationLinks: many(projectIntegrationLink)
-  })
-)
-
-export const projectMemberRelations = relations(projectMember, ({ one }) => ({
-  project: one(projectIndex, {
-    fields: [projectMember.projectSlug],
-    references: [projectIndex.slug]
-  }),
-  user: one(user, {
-    fields: [projectMember.userId],
-    references: [user.id]
-  })
-}))
-
-export const projectInviteGrantRelations = relations(
-  projectInviteGrant,
-  ({ one }) => ({
-    invitation: one(invitation, {
-      fields: [projectInviteGrant.invitationId],
-      references: [invitation.id]
-    }),
-    project: one(projectIndex, {
-      fields: [projectInviteGrant.projectSlug],
-      references: [projectIndex.slug]
-    })
-  })
-)
-
-export const projectTagRelations = relations(projectTag, ({ one }) => ({
-  project: one(projectIndex, {
-    fields: [projectTag.projectId],
-    references: [projectIndex.id]
-  }),
-  createdByUser: one(user, {
-    fields: [projectTag.createdBy],
-    references: [user.id]
-  })
-}))
-
-export const projectStatusRelations = relations(projectStatus, ({ one }) => ({
-  project: one(projectIndex, {
-    fields: [projectStatus.projectId],
-    references: [projectIndex.id]
-  }),
-  createdByUser: one(user, {
-    fields: [projectStatus.createdBy],
-    references: [user.id]
-  })
-}))
-
-export const organizationIntegrationRelations = relations(
-  organizationIntegration,
-  ({ one, many }) => ({
-    organization: one(organization, {
-      fields: [organizationIntegration.organizationId],
-      references: [organization.id]
-    }),
-    github: one(organizationGithubIntegration),
-    projectLinks: many(projectIntegrationLink)
-  })
-)
-
-export const githubAppInstallSessionRelations = relations(
-  githubAppInstallSession,
-  ({ one }) => ({
-    organization: one(organization, {
-      fields: [githubAppInstallSession.organizationId],
-      references: [organization.id]
-    }),
-    user: one(user, {
-      fields: [githubAppInstallSession.userId],
-      references: [user.id]
-    }),
-    returnProject: one(projectIndex, {
-      fields: [
-        githubAppInstallSession.returnProjectId,
-        githubAppInstallSession.returnProjectOrgId
-      ],
-      references: [projectIndex.id, projectIndex.organizationId]
-    })
-  })
-)
-
-export const organizationGithubIntegrationRelations = relations(
-  organizationGithubIntegration,
-  ({ one }) => ({
-    integration: one(organizationIntegration, {
-      fields: [organizationGithubIntegration.organizationIntegrationId],
-      references: [organizationIntegration.id]
-    })
-  })
-)
-
-export const projectIntegrationLinkRelations = relations(
-  projectIntegrationLink,
-  ({ one }) => ({
-    project: one(projectIndex, {
-      fields: [projectIntegrationLink.projectId],
-      references: [projectIndex.id]
-    }),
-    organization: one(organization, {
-      fields: [projectIntegrationLink.organizationId],
-      references: [organization.id]
-    }),
-    organizationIntegration: one(organizationIntegration, {
-      fields: [projectIntegrationLink.organizationIntegrationId],
-      references: [organizationIntegration.id]
-    }),
-    githubRepository: one(projectGithubRepository),
-    everhourIntegration: one(projectEverhourIntegration)
-  })
-)
-
-export const projectGithubRepositoryRelations = relations(
-  projectGithubRepository,
-  ({ one }) => ({
-    projectLink: one(projectIntegrationLink, {
-      fields: [projectGithubRepository.projectIntegrationLinkId],
-      references: [projectIntegrationLink.id]
-    })
-  })
-)
-
-export const userEverhourIntegrationRelations = relations(
-  userEverhourIntegration,
-  ({ one }) => ({
-    user: one(user, {
-      fields: [userEverhourIntegration.userId],
-      references: [user.id]
-    })
-  })
-)
-
-export const projectEverhourIntegrationRelations = relations(
-  projectEverhourIntegration,
-  ({ one }) => ({
-    projectLink: one(projectIntegrationLink, {
-      fields: [projectEverhourIntegration.projectIntegrationLinkId],
-      references: [projectIntegrationLink.id]
-    })
-  })
-)
-
 export const commentIndex = pgTable(
   "comment_index",
   {
@@ -765,13 +611,6 @@ export const commentIndex = pgTable(
     index("comment_index_ticket_idx").on(t.projectSlug, t.ticketId, t.createdAt)
   ]
 )
-
-export const commentIndexRelations = relations(commentIndex, ({ one }) => ({
-  author: one(user, {
-    fields: [commentIndex.authorId],
-    references: [user.id]
-  })
-}))
 
 export const attachmentIndex = pgTable(
   "attachment_index",
@@ -841,4 +680,256 @@ export const attachmentReference = pgTable(
       t.ticketId
     )
   ]
+)
+
+export const relations = defineRelations(
+  {
+    ...authSchema,
+    projectIndex,
+    projectMember,
+    projectInviteGrant,
+    projectTag,
+    projectStatus,
+    organizationIntegration,
+    organizationGithubIntegration,
+    organizationS3Integration,
+    githubAppInstallSession,
+    projectIntegrationLink,
+    projectGithubRepository,
+    userEverhourIntegration,
+    projectEverhourIntegration,
+    everhourSectionLink,
+    everhourWorkTypeTaskLink,
+    everhourActiveTimer,
+    everhourTimeAttribution,
+    ticketIndex,
+    commentIndex,
+    attachmentIndex,
+    attachmentReference
+  },
+  (r) => ({
+    projectIndex: {
+      organization: r.one.organization({
+        optional: false,
+        from: [r.projectIndex.organizationId],
+        to: [r.organization.id]
+      }),
+      members: r.many.projectMember(),
+      inviteGrants: r.many.projectInviteGrant(),
+      tags: r.many.projectTag(),
+      statuses: r.many.projectStatus(),
+      integrationLinks: r.many.projectIntegrationLink()
+    },
+    projectMember: {
+      project: r.one.projectIndex({
+        optional: false,
+        from: [r.projectMember.projectSlug],
+        to: [r.projectIndex.slug]
+      }),
+      user: r.one.user({
+        optional: false,
+        from: [r.projectMember.userId],
+        to: [r.user.id]
+      })
+    },
+    projectInviteGrant: {
+      invitation: r.one.invitation({
+        optional: false,
+        from: [r.projectInviteGrant.invitationId],
+        to: [r.invitation.id]
+      }),
+      project: r.one.projectIndex({
+        optional: false,
+        from: [r.projectInviteGrant.projectSlug],
+        to: [r.projectIndex.slug]
+      })
+    },
+    projectTag: {
+      project: r.one.projectIndex({
+        optional: false,
+        from: [r.projectTag.projectId],
+        to: [r.projectIndex.id]
+      }),
+      createdByUser: r.one.user({
+        optional: false,
+        from: [r.projectTag.createdBy],
+        to: [r.user.id]
+      })
+    },
+    projectStatus: {
+      project: r.one.projectIndex({
+        optional: false,
+        from: [r.projectStatus.projectId],
+        to: [r.projectIndex.id]
+      }),
+      createdByUser: r.one.user({
+        optional: false,
+        from: [r.projectStatus.createdBy],
+        to: [r.user.id]
+      })
+    },
+    organizationIntegration: {
+      organization: r.one.organization({
+        optional: false,
+        from: [r.organizationIntegration.organizationId],
+        to: [r.organization.id]
+      }),
+      github: r.one.organizationGithubIntegration(),
+      projectLinks: r.many.projectIntegrationLink()
+    },
+    githubAppInstallSession: {
+      organization: r.one.organization({
+        optional: false,
+        from: [r.githubAppInstallSession.organizationId],
+        to: [r.organization.id]
+      }),
+      user: r.one.user({
+        optional: false,
+        from: [r.githubAppInstallSession.userId],
+        to: [r.user.id]
+      }),
+      returnProject: r.one.projectIndex({
+        from: [
+          r.githubAppInstallSession.returnProjectId,
+          r.githubAppInstallSession.returnProjectOrgId
+        ],
+        to: [r.projectIndex.id, r.projectIndex.organizationId]
+      })
+    },
+    organizationGithubIntegration: {
+      integration: r.one.organizationIntegration({
+        optional: false,
+        from: [r.organizationGithubIntegration.organizationIntegrationId],
+        to: [r.organizationIntegration.id]
+      })
+    },
+    projectIntegrationLink: {
+      project: r.one.projectIndex({
+        optional: false,
+        from: [r.projectIntegrationLink.projectId],
+        to: [r.projectIndex.id]
+      }),
+      organization: r.one.organization({
+        optional: false,
+        from: [r.projectIntegrationLink.organizationId],
+        to: [r.organization.id]
+      }),
+      organizationIntegration: r.one.organizationIntegration({
+        optional: false,
+        from: [r.projectIntegrationLink.organizationIntegrationId],
+        to: [r.organizationIntegration.id]
+      }),
+      githubRepository: r.one.projectGithubRepository(),
+      everhourIntegration: r.one.projectEverhourIntegration()
+    },
+    projectGithubRepository: {
+      projectLink: r.one.projectIntegrationLink({
+        optional: false,
+        from: [r.projectGithubRepository.projectIntegrationLinkId],
+        to: [r.projectIntegrationLink.id]
+      })
+    },
+    userEverhourIntegration: {
+      user: r.one.user({
+        optional: false,
+        from: [r.userEverhourIntegration.userId],
+        to: [r.user.id]
+      })
+    },
+    projectEverhourIntegration: {
+      projectLink: r.one.projectIntegrationLink({
+        optional: false,
+        from: [r.projectEverhourIntegration.projectIntegrationLinkId],
+        to: [r.projectIntegrationLink.id]
+      })
+    },
+    commentIndex: {
+      author: r.one.user({
+        optional: false,
+        from: [r.commentIndex.authorId],
+        to: [r.user.id]
+      })
+    },
+    user: {
+      sessions: r.many.session(),
+      accounts: r.many.account(),
+      members: r.many.member(),
+      invitations: r.many.invitation(),
+      oauthClients: r.many.oauthClient(),
+      oauthAccessTokens: r.many.oauthAccessToken(),
+      oauthConsents: r.many.oauthConsent()
+    },
+    session: {
+      user: r.one.user({
+        optional: false,
+        from: [r.session.userId],
+        to: [r.user.id]
+      })
+    },
+    account: {
+      user: r.one.user({
+        optional: false,
+        from: [r.account.userId],
+        to: [r.user.id]
+      })
+    },
+    organization: {
+      members: r.many.member(),
+      invitations: r.many.invitation()
+    },
+    member: {
+      organization: r.one.organization({
+        optional: false,
+        from: [r.member.organizationId],
+        to: [r.organization.id]
+      }),
+      user: r.one.user({
+        optional: false,
+        from: [r.member.userId],
+        to: [r.user.id]
+      })
+    },
+    invitation: {
+      organization: r.one.organization({
+        optional: false,
+        from: [r.invitation.organizationId],
+        to: [r.organization.id]
+      }),
+      user: r.one.user({
+        optional: false,
+        from: [r.invitation.inviterId],
+        to: [r.user.id]
+      })
+    },
+    oauthClient: {
+      user: r.one.user({
+        from: [r.oauthClient.userId],
+        to: [r.user.id]
+      }),
+      oauthAccessTokens: r.many.oauthAccessToken(),
+      oauthConsents: r.many.oauthConsent()
+    },
+    oauthAccessToken: {
+      oauthClient: r.one.oauthClient({
+        optional: false,
+        from: [r.oauthAccessToken.clientId],
+        to: [r.oauthClient.clientId]
+      }),
+      user: r.one.user({
+        from: [r.oauthAccessToken.userId],
+        to: [r.user.id]
+      })
+    },
+    oauthConsent: {
+      oauthClient: r.one.oauthClient({
+        optional: false,
+        from: [r.oauthConsent.clientId],
+        to: [r.oauthClient.clientId]
+      }),
+      user: r.one.user({
+        from: [r.oauthConsent.userId],
+        to: [r.user.id]
+      })
+    }
+  })
 )

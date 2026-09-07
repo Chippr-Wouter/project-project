@@ -28,7 +28,7 @@ const McpBackendLive = BackendServicesLive.pipe(
   Layer.orDie
 )
 
-export const McpServerLive = Layer.scoped(
+export const McpServerLive = Layer.effect(
   McpServer,
   Effect.gen(function* () {
     const runtime = ManagedRuntime.make(McpBackendLive)

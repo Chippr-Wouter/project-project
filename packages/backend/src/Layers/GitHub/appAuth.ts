@@ -29,7 +29,7 @@ export const appAuth = (): Effect.Effect<GitHubAppAuth, GitHubError> =>
       catch: (cause) => new GitHubError({ message: String(cause) })
     })
   }).pipe(
-    Effect.catchAll((cause) =>
+    Effect.catch((cause) =>
       cause._tag === "GitHubError"
         ? Effect.fail(cause)
         : Effect.fail(

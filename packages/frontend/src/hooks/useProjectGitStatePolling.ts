@@ -1,4 +1,4 @@
-import { useAtomRefresh } from "@effect-atom/atom-react"
+import { useAtomRefresh } from "@effect/atom-react"
 import { useEffect } from "react"
 import { projectGitStatesBaseAtom } from "@/atoms/github"
 import { projectKey } from "@/atoms/projects"

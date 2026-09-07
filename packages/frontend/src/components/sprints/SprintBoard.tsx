@@ -1,4 +1,5 @@
-import { Result, useAtomValue, useAtomSet } from "@effect-atom/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import { useAtomValue, useAtomSet } from "@effect/atom-react"
 import { motion, Reorder } from "motion/react"
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { monitorForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter"

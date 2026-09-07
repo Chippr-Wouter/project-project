@@ -1,4 +1,4 @@
-import { HttpApiBuilder } from "@effect/platform"
+import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { AppApi, CurrentUser } from "@projectproject/shared"
 import * as Effect from "effect/Effect"
 import { Attachments } from "../Services/Attachments"
@@ -8,54 +8,54 @@ export const AttachmentsHandlerLive = HttpApiBuilder.group(
   "attachments",
   (handlers) =>
     handlers
-      .handle("prepare", ({ path, payload }) =>
+      .handle("prepare", ({ params, payload }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const attachments = yield* Attachments
           return yield* attachments.prepare(
-            path.orgSlug,
-            path.slug,
-            path.id,
+            params.orgSlug,
+            params.slug,
+            params.id,
             user.id,
             payload
           )
         })
       )
-      .handle("list", ({ path, urlParams }) =>
+      .handle("list", ({ params, query }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const attachments = yield* Attachments
-          return yield* attachments.listForOrg(path.orgSlug, user.id, urlParams)
+          return yield* attachments.listForOrg(params.orgSlug, user.id, query)
         })
       )
-      .handle("summary", ({ path }) =>
+      .handle("summary", ({ params }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const attachments = yield* Attachments
-          return yield* attachments.summarizeForOrg(path.orgSlug, user.id)
+          return yield* attachments.summarizeForOrg(params.orgSlug, user.id)
         })
       )
-      .handle("remove", ({ path }) =>
+      .handle("remove", ({ params }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const attachments = yield* Attachments
           return yield* attachments.deleteForOrg(
-            path.orgSlug,
-            path.attachmentId,
+            params.orgSlug,
+            params.attachmentId,
             user.id
           )
         })
       )
-      .handle("commit", ({ path }) =>
+      .handle("commit", ({ params }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const attachments = yield* Attachments
           return yield* attachments.commit(
-            path.orgSlug,
-            path.slug,
-            path.id,
+            params.orgSlug,
+            params.slug,
+            params.id,
             user.id,
-            path.attachmentId
+            params.attachmentId
           )
         })
       )

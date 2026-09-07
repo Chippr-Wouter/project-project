@@ -3,9 +3,8 @@ import { cleanup, renderHook } from "@testing-library/react"
 
 const { refreshMock } = vi.hoisted(() => ({ refreshMock: vi.fn() }))
 
-vi.mock("@effect-atom/atom-react", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@effect-atom/atom-react")>()
+vi.mock("@effect/atom-react", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@effect/atom-react")>()
   return { ...actual, useAtomRefresh: () => refreshMock }
 })
 

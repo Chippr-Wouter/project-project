@@ -1,4 +1,5 @@
-import { Result, useAtomValue } from "@effect-atom/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import { useAtomValue } from "@effect/atom-react"
 import { meAtom } from "@/atoms/auth"
 import { useProject } from "@/routes/_authed/orgs/$orgSlug/projects/$slug/-context"
 import type { Role } from "@projectproject/shared"

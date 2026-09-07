@@ -1,4 +1,4 @@
-import type { Headers as PlatformHeaders } from "@effect/platform"
+import type { Headers as PlatformHeaders } from "effect/unstable/http"
 
 export const toWebHeaders = (h: PlatformHeaders.Headers): Headers => {
   const out = new Headers()

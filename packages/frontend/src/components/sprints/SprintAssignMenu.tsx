@@ -45,7 +45,7 @@ export type SprintAssignMenuProps = {
 
 export function pickDefaultSprint(
   sprints: ReadonlyArray<Group>,
-  now: Date = DateTime.toDate(DateTime.unsafeNow())
+  now: Date = DateTime.toDate(DateTime.nowUnsafe())
 ): Group | null {
   return (
     pickActiveSprint(sprints, now) ??
@@ -66,7 +66,7 @@ export function SprintAssignMenu({
   finalFocus,
   clearLabel
 }: SprintAssignMenuProps) {
-  const now = DateTime.toDate(DateTime.unsafeNow())
+  const now = DateTime.toDate(DateTime.nowUnsafe())
   const eligible = sprints
     .filter((s) => s.completedAt === null)
     .slice()

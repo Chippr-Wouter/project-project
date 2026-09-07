@@ -1,4 +1,5 @@
-import { HttpApiBuilder, HttpServerRequest } from "@effect/platform"
+import { HttpServerRequest } from "effect/unstable/http"
+import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { AppApi, CurrentUser, Validation } from "@projectproject/shared"
 import * as Effect from "effect/Effect"
 import { toWebHeaders } from "../http/toWebHeaders"
@@ -35,11 +36,11 @@ export const OAuthApplicationsHandlerLive = HttpApiBuilder.group(
           return yield* svc.listForUser(user.id)
         })
       )
-      .handle("revoke", ({ path }) =>
+      .handle("revoke", ({ params }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const svc = yield* OAuthApplications
-          yield* svc.revokeForUser(user.id, path.id)
+          yield* svc.revokeForUser(user.id, params.id)
           return { ok: true } as const
         })
       )

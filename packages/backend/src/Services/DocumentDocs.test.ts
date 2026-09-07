@@ -5,7 +5,7 @@ import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
 import { expect } from "vite-plus/test"
 
-const isoDate = (s: string) => DateTime.toDate(DateTime.unsafeMake(s))
+const isoDate = (s: string) => DateTime.toDate(DateTime.makeUnsafe(s))
 import {
   GroupColor,
   GroupId,

@@ -1,19 +1,16 @@
-import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import { describe, expect, it } from "vite-plus/test"
 import { decodeCursor, encodeCursor, Page, Pagination } from "./Pagination"
 
 describe("Pagination", () => {
   it("rejects limit below 1", () => {
-    const decode = Schema.decodeUnknownEither(Pagination)
+    const decode = Schema.decodeUnknownExit(Pagination)
     const result = decode({ limit: 0 })
-    expect(result._tag).toBe("Left")
+    expect(result._tag).toBe("Failure")
   })
 
   it("accepts limit at upper bound", async () => {
-    const decoded = await Effect.runPromise(
-      Schema.decodeUnknown(Pagination)({ limit: 200 })
-    )
+    const decoded = Schema.decodeUnknownSync(Pagination)({ limit: 200 })
     expect(decoded.limit).toBe(200)
   })
 

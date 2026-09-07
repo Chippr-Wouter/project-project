@@ -1,4 +1,5 @@
-import { Result, useAtomSet, useAtomValue } from "@effect-atom/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import { generateKeyBetween } from "fractional-indexing"
 import { AnimatePresence, motion } from "motion/react"
 import { useCallback, useState } from "react"

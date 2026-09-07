@@ -1,4 +1,4 @@
-import { HttpApiBuilder } from "@effect/platform"
+import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { AppApi, CurrentUser } from "@projectproject/shared"
 import * as Effect from "effect/Effect"
 import { CurrentOrg } from "../Services/CurrentOrg"
@@ -31,140 +31,140 @@ export const EverhourHandlerLive = HttpApiBuilder.group(
           return yield* integrations.disconnectProfile(user.id)
         })
       )
-      .handle("projectStatus", ({ path }) =>
+      .handle("projectStatus", ({ params }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const integrations = yield* EverhourIntegrations
           return yield* integrations.getProjectStatus(
             org.orgSlug,
             user.id,
-            path.slug
+            params.slug
           )
         })
       )
-      .handle("connectProject", ({ path }) =>
+      .handle("connectProject", ({ params }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const integrations = yield* EverhourIntegrations
           return yield* integrations.connectProject(
             org.orgSlug,
             user.id,
-            path.slug
+            params.slug
           )
         })
       )
-      .handle("syncProject", ({ path }) =>
+      .handle("syncProject", ({ params }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const integrations = yield* EverhourIntegrations
           return yield* integrations.syncProject(
             org.orgSlug,
             user.id,
-            path.slug
+            params.slug
           )
         })
       )
-      .handle("disconnectProject", ({ path }) =>
+      .handle("disconnectProject", ({ params }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const integrations = yield* EverhourIntegrations
           return yield* integrations.disconnectProject(
             org.orgSlug,
             user.id,
-            path.slug
+            params.slug
           )
         })
       )
-      .handle("ticketWorkTypes", ({ path }) =>
+      .handle("ticketWorkTypes", ({ params }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const time = yield* EverhourTimeTracking
           return yield* time.workTypesForTicket(
             org.orgSlug,
             user.id,
-            path.slug,
-            path.id
+            params.slug,
+            params.id
           )
         })
       )
-      .handle("startTicketTimer", ({ path, payload }) =>
+      .handle("startTicketTimer", ({ params, payload }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const time = yield* EverhourTimeTracking
           return yield* time.startTicketTimer(
             org.orgSlug,
             user.id,
-            path.slug,
-            path.id,
+            params.slug,
+            params.id,
             payload
           )
         })
       )
-      .handle("startSprintTimer", ({ path, payload }) =>
+      .handle("startSprintTimer", ({ params, payload }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const time = yield* EverhourTimeTracking
           return yield* time.startSprintTimer(
             org.orgSlug,
             user.id,
-            path.slug,
-            path.id,
+            params.slug,
+            params.id,
             payload
           )
         })
       )
-      .handle("stopTimer", ({ path }) =>
+      .handle("stopTimer", ({ params }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const time = yield* EverhourTimeTracking
           return yield* time.stopTimer(org.orgSlug, user.id)
         })
       )
-      .handle("currentTimer", ({ path }) =>
+      .handle("currentTimer", ({ params }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const time = yield* EverhourTimeTracking
           return yield* time.currentTimer(org.orgSlug, user.id)
         })
       )
-      .handle("logTime", ({ path, payload }) =>
+      .handle("logTime", ({ params, payload }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const time = yield* EverhourTimeTracking
-          return yield* time.logTime(org.orgSlug, user.id, path.slug, payload)
+          return yield* time.logTime(org.orgSlug, user.id, params.slug, payload)
         })
       )
-      .handle("ticketTime", ({ path }) =>
+      .handle("ticketTime", ({ params }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const time = yield* EverhourTimeTracking
           return yield* time.ticketTimeSummary(
             org.orgSlug,
             user.id,
-            path.slug,
-            path.id
+            params.slug,
+            params.id
           )
         })
       )

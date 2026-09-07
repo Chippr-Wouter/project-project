@@ -1,5 +1,6 @@
-import { Atom, Result } from "@effect-atom/atom-react"
-import * as Reactivity from "@effect/experimental/Reactivity"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import * as Atom from "effect/unstable/reactivity/Atom"
+import * as Reactivity from "effect/unstable/reactivity/Reactivity"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
@@ -25,7 +26,7 @@ const tagsBaseAtom = Atom.family((key: string) => {
     .atom(
       Effect.gen(function* () {
         const client = yield* ApiClient
-        return yield* client.tags.list({ path: { orgSlug, slug } })
+        return yield* client.tags.list({ params: { orgSlug, slug } })
       })
     )
     .pipe(Atom.setIdleTTL("2 minutes"))
@@ -43,7 +44,7 @@ export const tagUsageCountsAtom = Atom.family((key: string) => {
     .atom(
       Effect.gen(function* () {
         const client = yield* ApiClient
-        return yield* client.tags.usageCounts({ path: { orgSlug, slug } })
+        return yield* client.tags.usageCounts({ params: { orgSlug, slug } })
       })
     )
     .pipe(
@@ -63,7 +64,7 @@ export const createTagAtom = Atom.family((key: string) => {
         name: input.name,
         color: input.color ?? makeTagColor("#7c3aed"),
         createdBy: "",
-        createdAt: DateTime.toDate(DateTime.unsafeNow())
+        createdAt: DateTime.toDate(DateTime.nowUnsafe())
       }
       return Result.success([...current.value, synthetic], { waiting: true })
     },
@@ -71,7 +72,7 @@ export const createTagAtom = Atom.family((key: string) => {
       Effect.fn(function* (input: CreateTagInput, get) {
         const client = yield* ApiClient
         const tag = yield* client.tags.create({
-          path: { orgSlug, slug },
+          params: { orgSlug, slug },
           payload: input
         })
         get.refresh(tagsBaseAtom(key))
@@ -112,7 +113,7 @@ export const renameTagAtom = Atom.family((key: string) => {
           ...(input.color ? { color: input.color } : {})
         }
         const tag = yield* client.tags.update({
-          path: { orgSlug, slug, name: input.oldName },
+          params: { orgSlug, slug, name: input.oldName },
           payload: patch
         })
         get.refresh(tagsBaseAtom(key))
@@ -139,7 +140,7 @@ export const deleteTagAtom = Atom.family((key: string) => {
       Effect.fn(function* (input: DeleteInput, get) {
         const client = yield* ApiClient
         yield* client.tags.delete({
-          path: { orgSlug, slug, name: input.name }
+          params: { orgSlug, slug, name: input.name }
         })
         get.refresh(tagsBaseAtom(key))
         yield* Reactivity.invalidate(["tickets", orgSlug, slug])

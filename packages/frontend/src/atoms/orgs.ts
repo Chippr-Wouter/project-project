@@ -1,4 +1,5 @@
-import { Atom, Result } from "@effect-atom/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import * as Atom from "effect/unstable/reactivity/Atom"
 import * as Effect from "effect/Effect"
 import { runtime } from "@/runtime"
 import { ApiClient } from "@/services/ApiClient"
@@ -63,7 +64,7 @@ const orgDetailBaseAtom = Atom.family((orgSlug: string) =>
     .atom(
       Effect.gen(function* () {
         const client = yield* ApiClient
-        return yield* client.org.get({ path: { orgSlug } })
+        return yield* client.org.get({ params: { orgSlug } })
       })
     )
     .pipe(Atom.setIdleTTL("2 minutes"))
@@ -86,7 +87,7 @@ export const renameOrgAtom = Atom.family((orgSlug: string) =>
       Effect.fn(function* (input: { name: string }, get) {
         const current = get(orgDetailBaseAtom(orgSlug))
         if (!Result.isSuccess(current)) {
-          return yield* Effect.dieMessage("org detail not loaded")
+          return yield* Effect.die(new Error("org detail not loaded"))
         }
         yield* Effect.tryPromise(() =>
           authData(
@@ -108,7 +109,7 @@ export const softDeleteOrgAtom = Atom.family((orgSlug: string) =>
   runtime.fn(
     Effect.fn(function* (_input: void, get) {
       const client = yield* ApiClient
-      const detail = yield* client.org.softDelete({ path: { orgSlug } })
+      const detail = yield* client.org.softDelete({ params: { orgSlug } })
       get.refresh(orgDetailBaseAtom(orgSlug))
       get.refresh(userOrgsAtom)
       get.refresh(meAtom)
@@ -121,7 +122,7 @@ export const restoreOrgAtom = Atom.family((orgSlug: string) =>
   runtime.fn(
     Effect.fn(function* (_input: void, get) {
       const client = yield* ApiClient
-      const detail = yield* client.org.restore({ path: { orgSlug } })
+      const detail = yield* client.org.restore({ params: { orgSlug } })
       get.refresh(orgDetailBaseAtom(orgSlug))
       get.refresh(userOrgsAtom)
       get.refresh(meAtom)
@@ -177,7 +178,7 @@ export const inviteOrgMemberAtom = Atom.family((orgSlug: string) =>
       ) {
         const detail = get(orgDetailBaseAtom(orgSlug))
         if (!Result.isSuccess(detail)) {
-          return yield* Effect.dieMessage("org detail not loaded")
+          return yield* Effect.die(new Error("org detail not loaded"))
         }
         const organizationId = detail.value.id
         yield* Effect.tryPromise(() =>
@@ -216,7 +217,7 @@ export const updateOrgMemberRoleAtom = Atom.family((memberKey: string) => {
       Effect.fn(function* (input: { role: AssignableRole }, get) {
         const detail = get(orgDetailBaseAtom(orgSlug))
         if (!Result.isSuccess(detail)) {
-          return yield* Effect.dieMessage("org detail not loaded")
+          return yield* Effect.die(new Error("org detail not loaded"))
         }
         const organizationId = detail.value.id
         yield* Effect.tryPromise(() =>
@@ -253,9 +254,9 @@ export const removeOrgMemberAtom = Atom.family((memberKey: string) => {
       Effect.fn(function* (_input: void, get) {
         const detail = get(
           orgDetailBaseAtom(orgSlug)
-        ) as Result.Result<OrgDetail>
+        ) as Result.AsyncResult<OrgDetail>
         if (!Result.isSuccess(detail)) {
-          return yield* Effect.dieMessage("org detail not loaded")
+          return yield* Effect.die(new Error("org detail not loaded"))
         }
         const organizationId = detail.value.id
         yield* Effect.tryPromise(() =>
@@ -301,9 +302,11 @@ export const cancelOrgInvitationAtom = Atom.family((invitationKey: string) => {
 export const leaveOrgAtom = Atom.family((orgSlug: string) =>
   runtime.fn(
     Effect.fn(function* (_input: void, get) {
-      const detail = get(orgDetailBaseAtom(orgSlug)) as Result.Result<OrgDetail>
+      const detail = get(
+        orgDetailBaseAtom(orgSlug)
+      ) as Result.AsyncResult<OrgDetail>
       if (!Result.isSuccess(detail)) {
-        return yield* Effect.dieMessage("org detail not loaded")
+        return yield* Effect.die(new Error("org detail not loaded"))
       }
       const organizationId = detail.value.id
       yield* Effect.tryPromise(() =>
@@ -342,7 +345,7 @@ export const transferOrgOwnershipAtom = Atom.family((orgSlug: string) =>
       ) {
         const detail = get(orgDetailBaseAtom(orgSlug))
         if (!Result.isSuccess(detail)) {
-          return yield* Effect.dieMessage("org detail not loaded")
+          return yield* Effect.die(new Error("org detail not loaded"))
         }
         const organizationId = detail.value.id
         yield* Effect.gen(function* () {

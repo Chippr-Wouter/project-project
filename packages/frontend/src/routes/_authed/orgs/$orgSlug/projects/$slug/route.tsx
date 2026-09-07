@@ -1,4 +1,5 @@
-import { Result, useAtomSet, useAtomValue } from "@effect-atom/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import {
   createFileRoute,
   Link,
@@ -241,7 +242,7 @@ function ProjectSetupRail({
           icon: UserPlus,
           dismiss: () =>
             updateSetup({
-              invitePeopleDismissedAt: DateTime.toDate(DateTime.unsafeNow())
+              invitePeopleDismissedAt: DateTime.toDate(DateTime.nowUnsafe())
             })
         }
       : null,
@@ -256,7 +257,7 @@ function ProjectSetupRail({
             : () =>
                 updateSetup({
                   connectGithubDismissedAt: DateTime.toDate(
-                    DateTime.unsafeNow()
+                    DateTime.nowUnsafe()
                   )
                 })
         }
@@ -699,7 +700,7 @@ function TicketsBreakdown({
 
 function SprintsBreakdown({ sprints }: { sprints: ReadonlyArray<Group> }) {
   const counts = { active: 0, planned: 0, completed: 0 }
-  const now = DateTime.toDate(DateTime.unsafeNow())
+  const now = DateTime.toDate(DateTime.nowUnsafe())
   for (const s of sprints) counts[sprintState(s, now)]++
   const order: ReadonlyArray<keyof typeof counts> = [
     "active",

@@ -88,6 +88,6 @@ export interface S3StorageShape {
   ) => Effect.Effect<void, S3Unavailable>
 }
 
-export class S3Storage extends Context.Tag(
+export class S3Storage extends Context.Service<S3Storage, S3StorageShape>()(
   "@projectproject/backend/Services/S3Storage"
-)<S3Storage, S3StorageShape>() {}
+) {}

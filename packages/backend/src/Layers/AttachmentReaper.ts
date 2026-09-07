@@ -15,13 +15,11 @@ export const reapAttachments = Effect.gen(function* () {
     yield* Effect.logInfo("attachment reap complete", { deleted })
   }
 }).pipe(
-  Effect.catchAllCause((cause) =>
-    Effect.logError("attachment reap failed", cause)
-  )
+  Effect.catchCause((cause) => Effect.logError("attachment reap failed", cause))
 )
 
 export const AttachmentReaperLive = Layer.effectDiscard(
-  Effect.forkDaemon(
+  Effect.forkDetach(
     Effect.repeat(
       reapAttachments,
       Schedule.spaced(Duration.millis(REAPER_INTERVAL_MS))

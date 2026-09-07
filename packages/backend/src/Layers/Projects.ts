@@ -2,7 +2,7 @@ import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import * as SqlClient from "@effect/sql/SqlClient"
+import * as SqlClient from "effect/unstable/sql/SqlClient"
 import { and, asc, eq } from "drizzle-orm"
 import { ulid } from "ulid"
 import {
@@ -39,8 +39,6 @@ import type {
 } from "@projectproject/shared"
 import {
   invitation,
-  member as orgMember,
-  organization,
   organizationGithubIntegration,
   organizationIntegration,
   projectGithubRepository,
@@ -67,7 +65,7 @@ import {
 const MAX_SLUG_ATTEMPTS = 100
 const makeRole = Schema.decodeUnknownSync(Role)
 const makeAssignableRole = Schema.decodeUnknownSync(
-  Schema.Literal("admin", "member")
+  Schema.Literals(["admin", "member"])
 )
 const makeProjectKey = Schema.decodeUnknownSync(ProjectKey)
 const makeProjectIcon = Schema.decodeUnknownSync(ProjectIcon)
@@ -135,7 +133,9 @@ export const ProjectsLive = Layer.effect(
       db.query.organization
         .findFirst({
           columns: { id: true },
-          where: eq(organization.slug, orgSlug)
+          where: {
+            RAW: (table, _operators) => _operators.eq(table.slug, orgSlug)!
+          }
         })
         .pipe(
           Effect.orDie,
@@ -152,10 +152,13 @@ export const ProjectsLive = Layer.effect(
         const organizationId = yield* orgIdFromSlug(orgSlug)
         const row = yield* db.query.projectIndex
           .findFirst({
-            where: and(
-              eq(projectIndex.slug, slug),
-              eq(projectIndex.organizationId, organizationId)
-            )
+            where: {
+              RAW: (table, _operators) =>
+                _operators.and(
+                  _operators.eq(table.slug, slug),
+                  _operators.eq(table.organizationId, organizationId)
+                )!
+            }
           })
           .pipe(Effect.orDie)
         return row ?? (yield* new NotFound())
@@ -168,10 +171,13 @@ export const ProjectsLive = Layer.effect(
       db.query.member
         .findFirst({
           columns: { role: true },
-          where: and(
-            eq(orgMember.organizationId, organizationId),
-            eq(orgMember.userId, userId)
-          )
+          where: {
+            RAW: (table, _operators) =>
+              _operators.and(
+                _operators.eq(table.organizationId, organizationId),
+                _operators.eq(table.userId, userId)
+              )!
+          }
         })
         .pipe(
           Effect.map((row) => (row ? makeRole(row.role) : null)),
@@ -186,7 +192,10 @@ export const ProjectsLive = Layer.effect(
           const existing = yield* db.query.projectIndex
             .findFirst({
               columns: { slug: true },
-              where: eq(projectIndex.slug, candidate)
+              where: {
+                RAW: (table, _operators) =>
+                  _operators.eq(table.slug, candidate)!
+              }
             })
             .pipe(Effect.orDie)
           if (!existing) return candidate
@@ -199,7 +208,9 @@ export const ProjectsLive = Layer.effect(
     const loadMembers = (slug: string): Effect.Effect<ReadonlyArray<Member>> =>
       db.query.projectMember
         .findMany({
-          where: eq(projectMember.projectSlug, slug),
+          where: {
+            RAW: (table, _operators) => _operators.eq(table.projectSlug, slug)!
+          },
           columns: { role: true },
           with: {
             user: {
@@ -500,10 +511,13 @@ export const ProjectsLive = Layer.effect(
           const explicit = yield* db.query.projectMember
             .findFirst({
               columns: { role: true },
-              where: and(
-                eq(projectMember.projectSlug, slug),
-                eq(projectMember.userId, userId)
-              )
+              where: {
+                RAW: (table, _operators) =>
+                  _operators.and(
+                    _operators.eq(table.projectSlug, slug),
+                    _operators.eq(table.userId, userId)
+                  )!
+              }
             })
             .pipe(Effect.orDie)
           const explicitRole = explicit ? makeRole(explicit.role) : null
@@ -614,10 +628,13 @@ export const ProjectsLive = Layer.effect(
           const existingKey = yield* db.query.projectIndex
             .findFirst({
               columns: { slug: true },
-              where: and(
-                eq(projectIndex.organizationId, organizationId),
-                eq(projectIndex.key, input.key)
-              )
+              where: {
+                RAW: (table, _operators) =>
+                  _operators.and(
+                    _operators.eq(table.organizationId, organizationId),
+                    _operators.eq(table.key, input.key)
+                  )!
+              }
             })
             .pipe(Effect.orDie)
           if (existingKey) {
@@ -638,7 +655,7 @@ export const ProjectsLive = Layer.effect(
             })
             .returning()
             .pipe(
-              Effect.catchAll((cause) =>
+              Effect.catch((cause) =>
                 uniqueConstraint(cause, "project_index_organization_key_uidx")
                   ? Effect.fail(new Conflict({ reason: "project_key_taken" }))
                   : Effect.die(cause)
@@ -708,8 +725,8 @@ export const ProjectsLive = Layer.effect(
             null,
             defaultSetup()
           ).pipe(
-            Effect.catchAll((cause) =>
-              rollback.pipe(Effect.zipRight(Effect.die(cause)))
+            Effect.catch((cause) =>
+              rollback.pipe(Effect.andThen(Effect.die(cause)))
             )
           )
 
@@ -1047,11 +1064,14 @@ export const ProjectsLive = Layer.effect(
         const expiresAt = DateTime.toDate(DateTime.add(now, { hours: 48 }))
         const existing = yield* db.query.invitation
           .findFirst({
-            where: and(
-              eq(invitation.organizationId, organizationId),
-              eq(invitation.email, normalizedEmail),
-              eq(invitation.status, "pending")
-            )
+            where: {
+              RAW: (table, _operators) =>
+                _operators.and(
+                  _operators.eq(table.organizationId, organizationId),
+                  _operators.eq(table.email, normalizedEmail),
+                  _operators.eq(table.status, "pending")
+                )!
+            }
           })
           .pipe(Effect.orDie)
         const invite =
@@ -1084,10 +1104,13 @@ export const ProjectsLive = Layer.effect(
         const existingGrant = yield* db.query.projectInviteGrant
           .findFirst({
             columns: { role: true },
-            where: and(
-              eq(projectInviteGrant.invitationId, invite.id),
-              eq(projectInviteGrant.projectSlug, indexRow.slug)
-            )
+            where: {
+              RAW: (table, _operators) =>
+                _operators.and(
+                  _operators.eq(table.invitationId, invite.id),
+                  _operators.eq(table.projectSlug, indexRow.slug)
+                )!
+            }
           })
           .pipe(Effect.orDie)
         if (
@@ -1150,10 +1173,13 @@ export const ProjectsLive = Layer.effect(
               : yield* db.query.member
                   .findFirst({
                     columns: { id: true },
-                    where: and(
-                      eq(orgMember.organizationId, organizationId),
-                      eq(orgMember.userId, target.id)
-                    )
+                    where: {
+                      RAW: (table, _operators) =>
+                        _operators.and(
+                          _operators.eq(table.organizationId, organizationId),
+                          _operators.eq(table.userId, target.id)
+                        )!
+                    }
                   })
                   .pipe(Effect.orDie)
 
@@ -1172,10 +1198,13 @@ export const ProjectsLive = Layer.effect(
           const existing = yield* db.query.projectMember
             .findFirst({
               columns: { role: true },
-              where: and(
-                eq(projectMember.projectSlug, slug),
-                eq(projectMember.userId, target.id)
-              )
+              where: {
+                RAW: (table, _operators) =>
+                  _operators.and(
+                    _operators.eq(table.projectSlug, slug),
+                    _operators.eq(table.userId, target.id)
+                  )!
+              }
             })
             .pipe(Effect.orDie)
 
@@ -1271,7 +1300,10 @@ export const ProjectsLive = Layer.effect(
           const remaining = yield* db.query.projectInviteGrant
             .findFirst({
               columns: { invitationId: true },
-              where: eq(projectInviteGrant.invitationId, invitationId)
+              where: {
+                RAW: (table, _operators) =>
+                  _operators.eq(table.invitationId, invitationId)!
+              }
             })
             .pipe(Effect.orDie)
           if (!remaining) {
@@ -1301,10 +1333,13 @@ export const ProjectsLive = Layer.effect(
           const existing = yield* db.query.projectMember
             .findFirst({
               columns: { role: true },
-              where: and(
-                eq(projectMember.projectSlug, slug),
-                eq(projectMember.userId, targetUserId)
-              )
+              where: {
+                RAW: (table, _operators) =>
+                  _operators.and(
+                    _operators.eq(table.projectSlug, slug),
+                    _operators.eq(table.userId, targetUserId)
+                  )!
+              }
             })
             .pipe(Effect.orDie)
           if (!existing) return yield* new NotFound()
@@ -1344,10 +1379,13 @@ export const ProjectsLive = Layer.effect(
           const callerProjectRole = yield* db.query.projectMember
             .findFirst({
               columns: { role: true },
-              where: and(
-                eq(projectMember.projectSlug, slug),
-                eq(projectMember.userId, userId)
-              )
+              where: {
+                RAW: (table, _operators) =>
+                  _operators.and(
+                    _operators.eq(table.projectSlug, slug),
+                    _operators.eq(table.userId, userId)
+                  )!
+              }
             })
             .pipe(Effect.orDie)
           const callerOrgRole = yield* orgRoleForUser(organizationId, userId)
@@ -1358,10 +1396,13 @@ export const ProjectsLive = Layer.effect(
           const owners = yield* db.query.projectMember
             .findMany({
               columns: { userId: true },
-              where: and(
-                eq(projectMember.projectSlug, slug),
-                eq(projectMember.role, "owner")
-              )
+              where: {
+                RAW: (table, _operators) =>
+                  _operators.and(
+                    _operators.eq(table.projectSlug, slug),
+                    _operators.eq(table.role, "owner")
+                  )!
+              }
             })
             .pipe(Effect.orDie)
           if (owners.length !== 1) {
@@ -1379,10 +1420,13 @@ export const ProjectsLive = Layer.effect(
           const target = yield* db.query.projectMember
             .findFirst({
               columns: { userId: true },
-              where: and(
-                eq(projectMember.projectSlug, slug),
-                eq(projectMember.userId, targetUserId)
-              )
+              where: {
+                RAW: (table, _operators) =>
+                  _operators.and(
+                    _operators.eq(table.projectSlug, slug),
+                    _operators.eq(table.userId, targetUserId)
+                  )!
+              }
             })
             .pipe(Effect.orDie)
           if (!target) return yield* new NotFound()
@@ -1393,10 +1437,13 @@ export const ProjectsLive = Layer.effect(
                 const currentOwners = yield* db.query.projectMember
                   .findMany({
                     columns: { userId: true },
-                    where: and(
-                      eq(projectMember.projectSlug, slug),
-                      eq(projectMember.role, "owner")
-                    )
+                    where: {
+                      RAW: (table, _operators) =>
+                        _operators.and(
+                          _operators.eq(table.projectSlug, slug),
+                          _operators.eq(table.role, "owner")
+                        )!
+                    }
                   })
                   .pipe(Effect.orDie)
                 if (
@@ -1411,10 +1458,13 @@ export const ProjectsLive = Layer.effect(
                 const currentTarget = yield* db.query.projectMember
                   .findFirst({
                     columns: { userId: true },
-                    where: and(
-                      eq(projectMember.projectSlug, slug),
-                      eq(projectMember.userId, targetUserId)
-                    )
+                    where: {
+                      RAW: (table, _operators) =>
+                        _operators.and(
+                          _operators.eq(table.projectSlug, slug),
+                          _operators.eq(table.userId, targetUserId)
+                        )!
+                    }
                   })
                   .pipe(Effect.orDie)
                 if (!currentTarget) return yield* new NotFound()
@@ -1482,10 +1532,13 @@ export const ProjectsLive = Layer.effect(
           const existing = yield* db.query.projectMember
             .findFirst({
               columns: { role: true },
-              where: and(
-                eq(projectMember.projectSlug, slug),
-                eq(projectMember.userId, targetUserId)
-              )
+              where: {
+                RAW: (table, _operators) =>
+                  _operators.and(
+                    _operators.eq(table.projectSlug, slug),
+                    _operators.eq(table.userId, targetUserId)
+                  )!
+              }
             })
             .pipe(Effect.orDie)
           if (!existing) return yield* new NotFound()
@@ -1621,7 +1674,7 @@ export const ProjectsLive = Layer.effect(
                   })
                   .returning()
                   .pipe(
-                    Effect.catchAll((cause) =>
+                    Effect.catch((cause) =>
                       uniqueConstraint(
                         cause,
                         "project_integration_link_active_provider_uidx"
@@ -1648,7 +1701,7 @@ export const ProjectsLive = Layer.effect(
                       next.defaultBaseBranch ?? verified.defaultBranch
                   })
                   .pipe(
-                    Effect.catchAll((cause) =>
+                    Effect.catch((cause) =>
                       uniqueConstraint(
                         cause,
                         "project_github_repository_active_repo_uidx"

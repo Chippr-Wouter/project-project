@@ -1,5 +1,3 @@
-import * as ParseResult from "effect/ParseResult"
-
 export interface McpToolErrorResult {
   readonly content: ReadonlyArray<{
     readonly type: "text"
@@ -57,11 +55,11 @@ export const mapToolError = (e: unknown): McpToolErrorResult => {
           : "Mention error."
       )
     }
-    case "ParseError":
+    case "SchemaError":
       return text(
-        `Validation error: ${ParseResult.TreeFormatter.formatErrorSync(
-          e as ParseResult.ParseError
-        )}`
+        e instanceof Error
+          ? `Validation error: ${e.message}`
+          : "Validation error."
       )
     case "MarkdownError":
       return text("Document read failed.")

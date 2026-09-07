@@ -12,8 +12,8 @@ export const RebuildTicketIndexOutput = Schema.Struct({
   orgSlug: Slug,
   projectSlug: Slug,
   rebuilt: Schema.Boolean,
-  indexed: Schema.Number,
-  skipped: Schema.Number,
+  indexed: Schema.Finite,
+  skipped: Schema.Finite,
   drift: TicketIndexDrift
 })
 export type RebuildTicketIndexOutput = typeof RebuildTicketIndexOutput.Type

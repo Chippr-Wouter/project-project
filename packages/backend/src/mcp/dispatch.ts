@@ -85,9 +85,7 @@ function registerOne<R, K extends McpToolName>(
     input: InputOf<K>
   ) => Effect.Effect<OutputOf<K>, SpecErrors<K>, R | CurrentUser>
 
-  const inputZod = effectToZodObject(
-    spec.input as unknown as Schema.Schema<unknown, unknown, never>
-  )
+  const inputZod = effectToZodObject(spec.input)
 
   server.registerTool(
     name,
@@ -101,12 +99,22 @@ function registerOne<R, K extends McpToolName>(
         return mapToolError(new Unauthorized())
       }
 
-      const decodeInput = Schema.decodeUnknown(
-        spec.input as unknown as Schema.Schema<InputOf<K>, unknown, never>
-      )
-      const encodeOutput = Schema.encode(
-        spec.output as unknown as Schema.Schema<OutputOf<K>, unknown, never>
-      )
+      const decodeInput = (
+        value: unknown
+      ): Effect.Effect<InputOf<K>, Schema.SchemaError, never> =>
+        Schema.decodeUnknownEffect(spec.input)(value) as Effect.Effect<
+          InputOf<K>,
+          Schema.SchemaError,
+          never
+        >
+      const encodeOutput = (
+        value: OutputOf<K>
+      ): Effect.Effect<unknown, Schema.SchemaError, never> =>
+        Schema.encodeEffect(spec.output)(value) as Effect.Effect<
+          unknown,
+          Schema.SchemaError,
+          never
+        >
 
       const program: Effect.Effect<
         JsonContentResult | McpToolErrorResult,
@@ -116,11 +124,11 @@ function registerOne<R, K extends McpToolName>(
         Effect.flatMap(handler),
         Effect.flatMap(encodeOutput),
         Effect.map(asJsonContent),
-        Effect.catchAll((e) => Effect.succeed(mapToolError(e))),
+        Effect.catch((e) => Effect.succeed(mapToolError(e))),
         Effect.tapDefect((cause) =>
           Effect.logError(`mcp tool defect: ${name}`, cause)
         ),
-        Effect.catchAllDefect((e) => Effect.succeed(mapToolError(e))),
+        Effect.catchDefect((e) => Effect.succeed(mapToolError(e))),
         Effect.provideService(CurrentUser, user),
         Effect.withSpan(`mcp.tool.${name}`)
       )

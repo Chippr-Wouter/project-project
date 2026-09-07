@@ -33,7 +33,7 @@ import { registerAllTools } from "./dispatch"
 import { handlers } from "./handlers"
 
 const decodeTicketId = Schema.decodeUnknownSync(TicketId)
-const isoDate = (s: string) => DateTime.toDate(DateTime.unsafeMake(s))
+const isoDate = (s: string) => DateTime.toDate(DateTime.makeUnsafe(s))
 
 const fakeTicket = {
   id: decodeTicketId("T-1"),

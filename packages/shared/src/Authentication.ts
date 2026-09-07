@@ -53,23 +53,24 @@
 
 import * as Context from "effect/Context"
 import type { User } from "./schemas/User"
-import { HttpApiMiddleware, HttpApiSecurity } from "@effect/platform"
+import { HttpApiMiddleware, HttpApiSecurity } from "effect/unstable/httpapi"
 import { Unauthorized } from "./errors"
 
-export class CurrentUser extends Context.Tag(
+export class CurrentUser extends Context.Service<CurrentUser, User>()(
   "@projectproject/shared/Authentication/CurrentUser"
-)<CurrentUser, User>() {}
+) {}
 
 const sessionCookie = HttpApiSecurity.apiKey({
   in: "cookie",
   key: "better-auth.session_token"
 })
 
-export class Authentication extends HttpApiMiddleware.Tag<Authentication>()(
-  "Authentication",
+export class Authentication extends HttpApiMiddleware.Service<
+  Authentication,
   {
-    provides: CurrentUser,
-    security: { sessionCookie },
-    failure: Unauthorized
+    provides: CurrentUser
   }
-) {}
+>()("Authentication", {
+  error: Unauthorized,
+  security: { sessionCookie }
+}) {}

@@ -1,10 +1,8 @@
-import type { PgRemoteDatabase } from "drizzle-orm/pg-proxy"
+import type { EffectPgDatabase } from "drizzle-orm/effect-postgres"
 import * as Context from "effect/Context"
-import * as schema from "../db/schema"
+import type { relations } from "../db/schema"
 
-type Schema = typeof schema
-
-export class Db extends Context.Tag("@projectproject/backend/Services/Db")<
+export class Db extends Context.Service<
   Db,
-  PgRemoteDatabase<Schema>
->() {}
+  EffectPgDatabase<typeof relations>
+>()("@projectproject/backend/Services/Db") {}

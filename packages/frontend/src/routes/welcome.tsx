@@ -1,10 +1,6 @@
-import {
-  Registry,
-  RegistryContext,
-  Result,
-  useAtomSet,
-  useAtomValue
-} from "@effect-atom/atom-react"
+import { RegistryContext, useAtomSet, useAtomValue } from "@effect/atom-react"
+import * as Registry from "effect/unstable/reactivity/AtomRegistry"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
 import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router"
 import * as Cause from "effect/Cause"
 import * as Effect from "effect/Effect"

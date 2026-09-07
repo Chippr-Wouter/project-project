@@ -1,7 +1,7 @@
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import * as SqlClient from "@effect/sql/SqlClient"
+import * as SqlClient from "effect/unstable/sql/SqlClient"
 import { and, eq, inArray } from "drizzle-orm"
 import { ulid } from "ulid"
 import {

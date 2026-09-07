@@ -10,7 +10,7 @@ import {
 const encryptionKey = Effect.suspend(() => {
   const raw = process.env.USER_SECRET_ENCRYPTION_KEY
   if (!raw) {
-    return Effect.zipRight(
+    return Effect.andThen(
       Effect.logWarning(
         "secret encryption is not configured: USER_SECRET_ENCRYPTION_KEY is missing"
       ),
@@ -19,7 +19,7 @@ const encryptionKey = Effect.suspend(() => {
   }
   const key = Buffer.from(raw, "base64")
   if (key.byteLength !== 32) {
-    return Effect.zipRight(
+    return Effect.andThen(
       Effect.logWarning(
         "secret encryption is not configured: USER_SECRET_ENCRYPTION_KEY must be a base64-encoded 32-byte key"
       ),

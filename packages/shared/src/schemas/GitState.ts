@@ -1,13 +1,13 @@
 import * as Schema from "effect/Schema"
 import { StatusSlug } from "./Status"
 
-export const ChecksStatus = Schema.Literal(
+export const ChecksStatus = Schema.Literals([
   "passing",
   "failing",
   "pending",
   "neutral",
   "none"
-)
+])
 export type ChecksStatus = typeof ChecksStatus.Type
 
 const NoBranch = Schema.Struct({
@@ -25,14 +25,14 @@ const BranchPending = Schema.Struct({
   tag: Schema.Literal("branch_pending"),
   name: Schema.String,
   baseBranch: Schema.String,
-  pendingOperation: Schema.optional(Schema.Literal("create", "connect"))
+  pendingOperation: Schema.optional(Schema.Literals(["create", "connect"]))
 })
 
 const PrPending = Schema.Struct({
   tag: Schema.Literal("pr_pending"),
   branch: Schema.String,
   baseBranch: Schema.String,
-  number: Schema.Number,
+  number: Schema.Finite,
   url: Schema.String
 })
 
@@ -40,7 +40,7 @@ const PrOpen = Schema.Struct({
   tag: Schema.Literal("pr_open"),
   branch: Schema.String,
   baseBranch: Schema.String,
-  number: Schema.Number,
+  number: Schema.Finite,
   url: Schema.String,
   draft: Schema.Boolean,
   title: Schema.String,
@@ -51,17 +51,17 @@ const PrMerged = Schema.Struct({
   tag: Schema.Literal("pr_merged"),
   branch: Schema.String,
   baseBranch: Schema.String,
-  number: Schema.Number,
+  number: Schema.Finite,
   url: Schema.String,
   title: Schema.String,
-  mergedAt: Schema.NullOr(Schema.Date)
+  mergedAt: Schema.NullOr(Schema.DateFromString)
 })
 
 const PrClosed = Schema.Struct({
   tag: Schema.Literal("pr_closed"),
   branch: Schema.String,
   baseBranch: Schema.String,
-  number: Schema.Number,
+  number: Schema.Finite,
   url: Schema.String,
   title: Schema.String
 })
@@ -71,7 +71,7 @@ const StaleBranch = Schema.Struct({
   name: Schema.String
 })
 
-export const GitState = Schema.Union(
+export const GitState = Schema.Union([
   NoBranch,
   BranchPending,
   PrPending,
@@ -80,29 +80,33 @@ export const GitState = Schema.Union(
   PrMerged,
   PrClosed,
   StaleBranch
-)
+])
 export type GitState = typeof GitState.Type
 
-export const GitStateTokenStatus = Schema.Literal(
+export const GitStateTokenStatus = Schema.Literals([
   "ok",
   "expired",
   "scope_insufficient"
-)
+])
 export type GitStateTokenStatus = typeof GitStateTokenStatus.Type
 
-export const GitStateRepoStatus = Schema.Literal("ok", "gone", "not_connected")
+export const GitStateRepoStatus = Schema.Literals([
+  "ok",
+  "gone",
+  "not_connected"
+])
 export type GitStateRepoStatus = typeof GitStateRepoStatus.Type
 
 export const TransitionRecord = Schema.Struct({
   ticketId: Schema.String,
   fromStatus: StatusSlug,
   toStatus: StatusSlug,
-  prNumber: Schema.Number
+  prNumber: Schema.Finite
 })
 export type TransitionRecord = typeof TransitionRecord.Type
 
 export const GitStatesResponse = Schema.Struct({
-  states: Schema.Record({ key: Schema.String, value: GitState }),
+  states: Schema.Record(Schema.String, GitState),
   transitioned: Schema.Array(TransitionRecord),
   tokenStatus: GitStateTokenStatus,
   repoStatus: GitStateRepoStatus
@@ -110,14 +114,20 @@ export const GitStatesResponse = Schema.Struct({
 export type GitStatesResponse = typeof GitStatesResponse.Type
 
 export const CreateBranchInput = Schema.Struct({
-  name: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(255)),
+  name: Schema.String.pipe(
+    Schema.check(Schema.isMinLength(1)),
+    Schema.check(Schema.isMaxLength(255))
+  ),
   baseBranch: Schema.optional(Schema.String)
 })
 export type CreateBranchInput = typeof CreateBranchInput.Type
 
 export const OpenPrInput = Schema.Struct({
   title: Schema.optional(
-    Schema.String.pipe(Schema.minLength(1), Schema.maxLength(255))
+    Schema.String.pipe(
+      Schema.check(Schema.isMinLength(1)),
+      Schema.check(Schema.isMaxLength(255))
+    )
   ),
   body: Schema.optional(Schema.String),
   draft: Schema.optional(Schema.Boolean)
@@ -125,13 +135,16 @@ export const OpenPrInput = Schema.Struct({
 export type OpenPrInput = typeof OpenPrInput.Type
 
 export const OpenPrResult = Schema.Struct({
-  number: Schema.Number,
+  number: Schema.Finite,
   url: Schema.String
 })
 export type OpenPrResult = typeof OpenPrResult.Type
 
 export const AttachBranchInput = Schema.Struct({
-  name: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(255))
+  name: Schema.String.pipe(
+    Schema.check(Schema.isMinLength(1)),
+    Schema.check(Schema.isMaxLength(255))
+  )
 })
 export type AttachBranchInput = typeof AttachBranchInput.Type
 

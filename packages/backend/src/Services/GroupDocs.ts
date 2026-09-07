@@ -47,6 +47,6 @@ export interface GroupDocsShape {
   >
 }
 
-export class GroupDocs extends Context.Tag(
+export class GroupDocs extends Context.Service<GroupDocs, GroupDocsShape>()(
   "@projectproject/backend/Services/GroupDocs"
-)<GroupDocs, GroupDocsShape>() {}
+) {}

@@ -71,6 +71,7 @@ export interface EverhourTimeTrackingShape {
   ) => Effect.Effect<void>
 }
 
-export class EverhourTimeTracking extends Context.Tag(
-  "@projectproject/backend/Services/EverhourTimeTracking"
-)<EverhourTimeTracking, EverhourTimeTrackingShape>() {}
+export class EverhourTimeTracking extends Context.Service<
+  EverhourTimeTracking,
+  EverhourTimeTrackingShape
+>()("@projectproject/backend/Services/EverhourTimeTracking") {}

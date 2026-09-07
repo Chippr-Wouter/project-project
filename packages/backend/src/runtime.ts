@@ -1,4 +1,5 @@
-import { BunContext } from "@effect/platform-bun"
+import * as BunFileSystem from "@effect/platform-bun/BunFileSystem"
+import * as BunPath from "@effect/platform-bun/BunPath"
 import * as Layer from "effect/Layer"
 import { AttachmentsLive } from "./Layers/Attachments"
 import { AuthenticationLive } from "./Layers/Auth"
@@ -31,7 +32,8 @@ import { UsersLive } from "./Layers/Users"
 export const BackendInfrastructureLive = Layer.mergeAll(
   BetterAuthLive,
   DbLive.pipe(Layer.provideMerge(PgLive)),
-  BunContext.layer
+  BunFileSystem.layer,
+  BunPath.layer
 )
 
 // @effect-diagnostics-next-line unnecessaryPipeChain:off

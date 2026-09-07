@@ -86,7 +86,7 @@ export const GitHubLive = Layer.effect(
     const installationTokenFor = (
       installationId: string
     ): Effect.Effect<string, GitHubError> =>
-      installationTokenCache.get(installationId)
+      Cache.get(installationTokenCache, installationId)
 
     const appToken = (): Effect.Effect<string, GitHubError> =>
       Effect.gen(function* () {

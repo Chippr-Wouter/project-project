@@ -16,7 +16,7 @@ import { McpHttp } from "../Services/McpHttp"
 import { McpServer } from "../Services/McpServer"
 import { Users } from "../Services/Users"
 
-export const McpHttpLive = Layer.scoped(
+export const McpHttpLive = Layer.effect(
   McpHttp,
   Effect.gen(function* () {
     const { createServer, runtime } = yield* McpServer

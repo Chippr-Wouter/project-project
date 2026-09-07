@@ -8,7 +8,7 @@ import {
   type RawInvitation
 } from "./invitations"
 
-const isoDate = (value: string) => DateTime.toDate(DateTime.unsafeMake(value))
+const isoDate = (value: string) => DateTime.toDate(DateTime.makeUnsafe(value))
 const now = isoDate("2026-05-17T12:00:00Z")
 
 describe("filterActionableInvitations", () => {

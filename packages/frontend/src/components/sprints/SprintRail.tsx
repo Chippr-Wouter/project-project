@@ -1,4 +1,5 @@
-import { Result, useAtomSet, useAtomValue } from "@effect-atom/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import { Link, useNavigate, useParams } from "@tanstack/react-router"
 import * as DateTime from "effect/DateTime"
 import * as Exit from "effect/Exit"
@@ -50,7 +51,7 @@ function sprintProjectLayoutId(orgSlug: string, slug: string) {
 }
 
 function defaultSprintRange(): DateRange {
-  const now = DateTime.unsafeNow()
+  const now = DateTime.nowUnsafe()
   const today = DateTime.toDate(now)
   const end = DateTime.toDate(DateTime.add(now, { days: 14 }))
   return { from: today, to: end }
@@ -77,7 +78,7 @@ export function SprintRail({
   const params = useParams({ strict: false }) as { groupId?: string }
   const selectedSprintId =
     params.groupId ?? pickSprintNavigationTarget(sprints)?.id
-  const now = DateTime.toDate(DateTime.unsafeNow())
+  const now = DateTime.toDate(DateTime.nowUnsafe())
 
   const active: Array<Group> = []
   const planned: Array<Group> = []
@@ -348,7 +349,7 @@ function CreateSprintFields({
               if (r) setRange(r)
             }}
             numberOfMonths={1}
-            defaultMonth={range.from ?? DateTime.toDate(DateTime.unsafeNow())}
+            defaultMonth={range.from ?? DateTime.toDate(DateTime.nowUnsafe())}
           />
         </PopoverContent>
       </Popover>

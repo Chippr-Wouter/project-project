@@ -10,11 +10,11 @@ export const reconcileTicketIndexOnBoot = Effect.gen(function* () {
     reconciled: summary.reconciled
   })
 }).pipe(
-  Effect.catchAllCause((cause) =>
+  Effect.catchCause((cause) =>
     Effect.logError("ticket index reconciliation failed", cause)
   )
 )
 
 export const TicketIndexReconcilerLive = Layer.effectDiscard(
-  Effect.forkDaemon(reconcileTicketIndexOnBoot)
+  Effect.forkDetach(reconcileTicketIndexOnBoot)
 )

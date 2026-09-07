@@ -26,13 +26,11 @@ export const BaseTicketFilterParams = Schema.Struct({
   q: Schema.optional(Schema.String)
 })
 
-export const TicketListParams = Schema.extend(
-  BaseTicketFilterParams,
-  Schema.Struct({
-    sort: Schema.optional(Schema.String),
-    cursor: Schema.optional(Schema.String)
-  })
-)
+export const TicketListParams = Schema.Struct({
+  ...BaseTicketFilterParams.fields,
+  sort: Schema.optional(Schema.String),
+  cursor: Schema.optional(Schema.String)
+})
 
 export const TicketCountParams = BaseTicketFilterParams
 

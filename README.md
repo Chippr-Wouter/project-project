@@ -97,10 +97,8 @@ step.
 
 Root `overrides` map `vite` onto Vite Plus's Vite distribution so every plugin
 resolves a single Vite, and pin `vitest` to the 4.1.11 that Vite Plus bundles.
-`@effect/vitest` stays at 0.29.0 for Effect v3 and declares a Vitest 3 peer
-range; the pin overrides it, with compatibility covered by the backend Effect
-test suite. Upgrade the Vitest pin together with Vite Plus and rerun the full
-suite. Effect itself remains on v3.
+Every Effect package, `@effect/vitest` included, is pinned to `4.0.0-rc.112`.
+Upgrade the Vitest pin together with Vite Plus and rerun the full suite.
 
 Frontend tests run in forked workers with Node's native web storage disabled,
 so jsdom supplies browser-local storage.
@@ -151,6 +149,6 @@ migrations, reverse proxy) see [`docs/deploy.md`](docs/deploy.md).
 
 ## Conventions
 
-- **Effect v3 stable.** All Effect code targets v3; `Schema` is imported from `effect`.
+- **Effect v4 release candidate.** Core APIs come from `effect`; HTTP, SQL, and atom modules live under `effect/unstable`. See [the migration handoff](docs/migrations/effect-v4-handoff.md).
 - **The shared package is the contract.** Endpoints declared in `packages/shared/src/api.ts` drive both the backend implementation and the frontend's typed client.
 - **Markdown is the source of truth.** Postgres holds only auth + a thin project index; everything else lives under `data/projects/`.

@@ -1,4 +1,4 @@
-import { Result } from "@effect-atom/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
 import * as DateTime from "effect/DateTime"
 import * as Schema from "effect/Schema"
 import { describe, expect, it } from "vite-plus/test"
@@ -16,7 +16,7 @@ const timer = (id: ActiveTimer["ticketId"]): ActiveTimer => ({
   workTypeKey: "development",
   workTypeLabel: "Development",
   everhourTaskId: "task-1",
-  startedAt: DateTime.toDate(DateTime.unsafeMake("2026-06-22T10:00:00Z"))
+  startedAt: DateTime.toDate(DateTime.makeUnsafe("2026-06-22T10:00:00Z"))
 })
 
 describe("ticketTimeKeysForTimers", () => {

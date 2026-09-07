@@ -10,6 +10,7 @@ export interface EverhourWebhooksShape {
   readonly handle: (delivery: EverhourWebhookDelivery) => Effect.Effect<void>
 }
 
-export class EverhourWebhooks extends Context.Tag(
-  "@projectproject/backend/Services/EverhourWebhooks"
-)<EverhourWebhooks, EverhourWebhooksShape>() {}
+export class EverhourWebhooks extends Context.Service<
+  EverhourWebhooks,
+  EverhourWebhooksShape
+>()("@projectproject/backend/Services/EverhourWebhooks") {}

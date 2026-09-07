@@ -43,6 +43,7 @@ export interface GitHubIntegrationsShape {
   >
 }
 
-export class GitHubIntegrations extends Context.Tag(
-  "@projectproject/backend/Services/GitHubIntegrations"
-)<GitHubIntegrations, GitHubIntegrationsShape>() {}
+export class GitHubIntegrations extends Context.Service<
+  GitHubIntegrations,
+  GitHubIntegrationsShape
+>()("@projectproject/backend/Services/GitHubIntegrations") {}

@@ -1,4 +1,4 @@
-import { useAtomSet } from "@effect-atom/atom-react"
+import { useAtomSet } from "@effect/atom-react"
 import { createFileRoute } from "@tanstack/react-router"
 import { useState } from "react"
 import { projectKey, updateProjectAtom } from "@/atoms/projects"

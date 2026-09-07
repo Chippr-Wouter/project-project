@@ -1,4 +1,5 @@
-import { Result, useAtomValue } from "@effect-atom/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import { useAtomValue } from "@effect/atom-react"
 import { useDebouncer } from "@tanstack/react-pacer"
 import * as DateTime from "effect/DateTime"
 import { useEffect, useMemo, useRef, useState } from "react"
@@ -586,7 +587,7 @@ function FiltersMenu({
     sprintsListAtom(sprintsProjectKey(orgSlug, slug))
   )
   const allSprints = Result.isSuccess(sprintsList) ? sprintsList.value : []
-  const now = DateTime.toDate(DateTime.unsafeNow())
+  const now = DateTime.toDate(DateTime.nowUnsafe())
   const sprintOptions = showSprintFilter
     ? allSprints.filter((s) => {
         const st = sprintState(s, now)

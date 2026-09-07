@@ -11,8 +11,8 @@ export const ticketMentionProvider: MentionProvider = {
       if (!scope.orgSlug || !scope.slug) return []
       const client = yield* ApiClient
       const page = yield* client.tickets.list({
-        path: { orgSlug: scope.orgSlug, slug: scope.slug },
-        urlParams: ticketListQueryToSearch({
+        params: { orgSlug: scope.orgSlug, slug: scope.slug },
+        query: ticketListQueryToSearch({
           q: query.length > 0 ? query : undefined
         })
       })

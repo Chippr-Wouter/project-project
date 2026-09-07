@@ -1,8 +1,4 @@
-import {
-  HttpRouter,
-  HttpServerRequest,
-  HttpServerResponse
-} from "@effect/platform"
+import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { parseAttachmentUrl } from "@projectproject/shared"
 import * as Effect from "effect/Effect"
 import { toWebHeaders } from "./toWebHeaders"
@@ -39,22 +35,26 @@ const serveAttachment = Effect.gen(function* () {
   })
 }).pipe(
   Effect.catchTags({
-    NotFound: () => notFound,
-    Forbidden: () => notFound,
-    StorageNotConnected: () => notFound,
+    NotFound: () => Effect.succeed(notFound),
+    Forbidden: () => Effect.succeed(notFound),
+    StorageNotConnected: () => Effect.succeed(notFound),
     StorageConfigMissing: () =>
-      HttpServerResponse.text("Storage unavailable", { status: 503 }),
+      Effect.succeed(
+        HttpServerResponse.text("Storage unavailable", { status: 503 })
+      ),
     StorageError: () =>
-      HttpServerResponse.text("Storage unavailable", { status: 502 })
+      Effect.succeed(
+        HttpServerResponse.text("Storage unavailable", { status: 502 })
+      )
   }),
-  Effect.catchAllCause((cause) =>
-    Effect.zipRight(
+  Effect.catchCause((cause) =>
+    Effect.andThen(
       Effect.logError("attachment route failure", cause),
-      HttpServerResponse.text("Attachment failed", { status: 500 })
+      Effect.succeed(
+        HttpServerResponse.text("Attachment failed", { status: 500 })
+      )
     )
   )
 )
 
-export const attachmentRoutes = HttpRouter.empty.pipe(
-  HttpRouter.get("/:orgSlug/:attachmentId", serveAttachment)
-)
+export const attachmentRoutes = serveAttachment

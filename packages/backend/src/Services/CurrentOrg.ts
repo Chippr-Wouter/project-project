@@ -33,6 +33,6 @@ export const requireOrgAdmin = (
       )
     )
 
-export class CurrentOrg extends Context.Tag(
+export class CurrentOrg extends Context.Service<CurrentOrg, CurrentOrgShape>()(
   "@projectproject/backend/Services/CurrentOrg"
-)<CurrentOrg, CurrentOrgShape>() {}
+) {}

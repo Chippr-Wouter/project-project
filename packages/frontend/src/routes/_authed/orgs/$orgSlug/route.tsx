@@ -13,12 +13,12 @@ export const Route = createFileRoute("/_authed/orgs/$orgSlug")({
     const exit = await Effect.runPromiseExit(
       Effect.gen(function* () {
         const client = yield* ApiClient
-        return yield* client.org.get({ path: { orgSlug: params.orgSlug } })
+        return yield* client.org.get({ params: { orgSlug: params.orgSlug } })
       }).pipe(Effect.provide(AppLayer))
     )
 
     if (Exit.isFailure(exit)) {
-      const failure = Cause.failureOption(exit.cause)
+      const failure = Cause.findErrorOption(exit.cause)
       if (Option.isSome(failure) && failure.value._tag === "NotFound") {
         throw notFound()
       }

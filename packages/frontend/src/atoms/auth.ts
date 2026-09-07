@@ -1,3 +1,5 @@
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import * as Atom from "effect/unstable/reactivity/Atom"
 // packages/frontend/src/atoms/auth.ts
 //
 // AUTH-RELATED ATOMS.
@@ -35,7 +37,7 @@
 // CHAPTER 3 STEPS
 // ----------------------------------------------------------------------------
 //   1. Imports:
-//        import { Atom } from "@effect-atom/atom-react"
+//        import * as Atom from "effect/unstable/reactivity/Atom"
 //        import { Effect } from "effect"
 //        import { runtime } from "@/runtime"
 //        import { ApiClient } from "@/services/ApiClient"
@@ -69,7 +71,7 @@
 //
 // READING THESE FROM A COMPONENT
 // ----------------------------------------------------------------------------
-//   import { useAtomValue, useAtomSet, Result } from "@effect-atom/atom-react"
+//   import { useAtomValue, useAtomSet } from "@effect/atom-react"
 //
 //   const me = useAtomValue(meAtom)               // Result<User, Unauthorized>
 //   const logout = useAtomSet(logoutAtom)         // (input: void) => Promise<void>
@@ -97,7 +99,6 @@
 // `Result.match` with `onFailure: (failure) => ...` is fine — just remember
 // the argument is the Failure variant, not the error.
 
-import { Atom, Result } from "@effect-atom/atom-react"
 import type { EditorPreference } from "@projectproject/shared"
 import type { BetterFetchError } from "better-auth/react"
 import * as Effect from "effect/Effect"

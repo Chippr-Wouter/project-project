@@ -122,7 +122,7 @@ const makeSink = (calls: Array<Call>): GitHubWebhookMutationSink => ({
 const delivery = (event: string, body: unknown) => ({
   event,
   deliveryId: "delivery-1",
-  body: Schema.encodeSync(Schema.parseJson())(body)
+  body: Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(body)
 })
 
 it.effect("dispatches installation.deleted", () =>
@@ -550,7 +550,7 @@ it.effect("maps check_suite status and conclusion to check state", () =>
           headSha: "sha-1",
           checks: input.checks,
           updatedAt: DateTime.toDate(
-            DateTime.unsafeMake("2026-07-04T10:00:00.000Z")
+            DateTime.makeUnsafe("2026-07-04T10:00:00.000Z")
           )
         }
       }))
@@ -620,7 +620,7 @@ it.effect(
             headSha: "sha-1",
             checks: input.checks,
             updatedAt: DateTime.toDate(
-              DateTime.unsafeMake("2026-07-04T10:00:00.000Z")
+              DateTime.makeUnsafe("2026-07-04T10:00:00.000Z")
             )
           }
         }))
@@ -714,8 +714,8 @@ const baseDocument = (
   assignees: [],
   archivedAt: null,
   createdBy: "user-1",
-  createdAt: DateTime.toDate(DateTime.unsafeMake("2026-05-01T00:00:00.000Z")),
-  updatedAt: DateTime.toDate(DateTime.unsafeMake("2026-05-01T00:00:00.000Z")),
+  createdAt: DateTime.toDate(DateTime.makeUnsafe("2026-05-01T00:00:00.000Z")),
+  updatedAt: DateTime.toDate(DateTime.makeUnsafe("2026-05-01T00:00:00.000Z")),
   body: "",
   ...overrides
 })
@@ -855,7 +855,7 @@ it.effect(
           Effect.gen(function* () {
             activeReads += 1
             maxActiveReads = Math.max(maxActiveReads, activeReads)
-            yield* Effect.yieldNow()
+            yield* Effect.yieldNow
             return yield* docs.shape.read(org, slug, id)
           }).pipe(
             Effect.ensuring(

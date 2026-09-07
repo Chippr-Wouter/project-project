@@ -1,5 +1,6 @@
+import * as Result from "effect/unstable/reactivity/AsyncResult"
 import { type FormEvent, useEffect, useRef, useState } from "react"
-import { Result, useAtomSet, useAtomValue } from "@effect-atom/atom-react"
+import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"

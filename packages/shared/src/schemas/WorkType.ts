@@ -1,9 +1,12 @@
 import * as Schema from "effect/Schema"
 
 export const WorkType = Schema.Struct({
-  key: Schema.String.pipe(Schema.pattern(/^[a-z][a-z0-9_]*$/)),
-  label: Schema.String.pipe(Schema.minLength(1), Schema.maxLength(100)),
-  order: Schema.Number,
+  key: Schema.String.pipe(Schema.check(Schema.isPattern(/^[a-z][a-z0-9_]*$/))),
+  label: Schema.String.pipe(
+    Schema.check(Schema.isMinLength(1)),
+    Schema.check(Schema.isMaxLength(100))
+  ),
+  order: Schema.Finite,
   isDefault: Schema.Boolean
 })
 export type WorkType = typeof WorkType.Type

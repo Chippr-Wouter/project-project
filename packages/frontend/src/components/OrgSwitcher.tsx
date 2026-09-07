@@ -1,4 +1,5 @@
-import { Result, useAtomSet, useAtomValue } from "@effect-atom/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import { Link, useNavigate, useParams } from "@tanstack/react-router"
 import { Check, ChevronsUpDown, Plus } from "lucide-react"
 import { meAtom, setActiveOrganizationAtom } from "@/atoms/auth"
