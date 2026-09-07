@@ -241,7 +241,7 @@ export function SprintTicketCreator({
             )}
           >
             <TypeIcon className="size-4 shrink-0" strokeWidth={1.75} />
-            <CollapsingLabel show={expanded} contentKey={type}>
+            <CollapsingLabel show={expanded} contentKey={type} gap={6}>
               <span className="text-xs">{TYPE_LABELS[type]()}</span>
             </CollapsingLabel>
           </button>

@@ -161,7 +161,7 @@ export function BacklogTicketCreator({
             )}
           >
             <TypeIcon className="size-4 shrink-0" strokeWidth={1.75} />
-            <CollapsingLabel show={expanded} contentKey={type}>
+            <CollapsingLabel show={expanded} contentKey={type} gap={6}>
               <span className="text-xs">{TYPE_LABELS[type]()}</span>
             </CollapsingLabel>
           </button>
@@ -238,6 +238,7 @@ export function BacklogTicketCreator({
           <CollapsingLabel
             show={expanded}
             contentKey={selectedSprint?.id ?? "none"}
+            gap={6}
           >
             <span className="max-w-[10ch] truncate text-xs">
               {selectedSprint

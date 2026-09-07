@@ -244,7 +244,11 @@ export function SectionTicketCreator({
           ) : (
             <Plus className="size-4 shrink-0" strokeWidth={1.75} />
           )}
-          <CollapsingLabel show contentKey={selectedSprint?.id ?? "none"}>
+          <CollapsingLabel
+            show
+            contentKey={selectedSprint?.id ?? "none"}
+            gap={6}
+          >
             <span className="max-w-[10ch] truncate text-xs">
               {selectedSprint
                 ? selectedSprint.name
@@ -285,7 +289,7 @@ export function SectionTicketCreator({
               )}
             >
               <TypeIcon className="size-4 shrink-0" strokeWidth={1.75} />
-              <CollapsingLabel show contentKey={type}>
+              <CollapsingLabel show contentKey={type} gap={6}>
                 <span className="text-xs">{TYPE_LABELS[type]()}</span>
               </CollapsingLabel>
             </button>

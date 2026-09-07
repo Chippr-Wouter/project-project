@@ -39,6 +39,7 @@ export type SegmentedVariant = "default" | "inline"
 type VariantTokens = {
   container: string
   innerGap: string
+  innerGapPx: number
   iconSize: string
   pillRounding: string
   itemBase: string
@@ -49,6 +50,7 @@ const VARIANTS: Record<SegmentedVariant, VariantTokens> = {
     container:
       "inline-flex items-center gap-0.5 rounded-xl border border-border bg-background p-1",
     innerGap: "gap-1.5",
+    innerGapPx: 6,
     iconSize: "size-3.5",
     pillRounding: "rounded-lg",
     itemBase: "h-7 rounded-lg px-2.5 text-sm"
@@ -56,6 +58,7 @@ const VARIANTS: Record<SegmentedVariant, VariantTokens> = {
   inline: {
     container: "inline-flex items-center gap-0.5",
     innerGap: "gap-1",
+    innerGapPx: 4,
     iconSize: "size-3",
     pillRounding: "rounded-md",
     itemBase: "h-6 rounded-md px-1.5 text-xs"
@@ -116,7 +119,9 @@ export function SegmentedTabs<K extends string>({
                     strokeWidth={1.75}
                   />
                 )}
-                <CollapsingLabel show={!compact}>{it.label}</CollapsingLabel>
+                <CollapsingLabel show={!compact} gap={v.innerGapPx}>
+                  {it.label}
+                </CollapsingLabel>
                 {it.badgeNode ??
                   (it.badge !== undefined && it.badge !== null && (
                     <span
@@ -144,27 +149,16 @@ export function SegmentedTabs<K extends string>({
   )
 }
 
-// Smoothly collapses a label to zero width when `show` is false.
-//
-// The `marginLeft: -8` on the hidden states is load-bearing: every parent
-// using this component lays out its children with `gap-2` (8px). When the
-// label's width animates to 0, flex still keeps that 8px gap on both sides,
-// so once AnimatePresence finishes its exit and unmounts the label, the
-// surrounding siblings *jump* 8px closer. Animating `marginLeft` from 0 to
-// -8 in lockstep with the width absorbs the leading gap throughout the
-// animation — by the time the label unmounts, the gap is already at zero,
-// and there's nothing left to snap.
-//
-// Tween rather than spring: springs settle with a tiny overshoot that reads
-// as a snap once the exit completes. A flat easeOut is calmer here.
 export function CollapsingLabel({
   show,
   children,
-  contentKey
+  contentKey,
+  gap = 8
 }: {
   show: boolean
   children: ReactNode
   contentKey?: string | number
+  gap?: number
 }) {
   const innerRef = useRef<HTMLSpanElement>(null)
   const [width, setWidth] = useState<number | "auto">("auto")
@@ -180,9 +174,9 @@ export function CollapsingLabel({
       {show && (
         <motion.span
           key="label"
-          initial={{ width: 0, opacity: 0, marginLeft: -8 }}
+          initial={{ width: 0, opacity: 0, marginLeft: -gap }}
           animate={{ width, opacity: 1, marginLeft: 0 }}
-          exit={{ width: 0, opacity: 0, marginLeft: -8 }}
+          exit={{ width: 0, opacity: 0, marginLeft: -gap }}
           transition={transitions.presence}
           className="inline-flex items-center overflow-hidden whitespace-nowrap"
         >
