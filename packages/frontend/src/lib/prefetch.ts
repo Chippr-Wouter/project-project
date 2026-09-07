@@ -13,6 +13,10 @@ import {
 } from "@/atoms/tickets"
 import type { TicketId } from "@projectproject/shared"
 
+export function preloadTicketPage(): Promise<unknown> {
+  return import("@/components/TicketPage")
+}
+
 export function projectPrefetchAtoms(
   orgSlug: string,
   slug: string

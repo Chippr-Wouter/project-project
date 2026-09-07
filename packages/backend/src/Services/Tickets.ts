@@ -80,7 +80,7 @@ export interface TicketsShape {
     ownerId: string,
     slug: string,
     input: QuickCreateTicketInput
-  ) => Effect.Effect<Ticket, NotFound | Validation | MarkdownError>
+  ) => Effect.Effect<TicketDetail, NotFound | Validation | MarkdownError>
   readonly create: (
     orgSlug: string,
     ownerId: string,

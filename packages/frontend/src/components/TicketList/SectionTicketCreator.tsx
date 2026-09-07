@@ -30,7 +30,11 @@ import {
   sprintsListAtom,
   useAddTicketsToSprint
 } from "@/atoms/sprints"
-import { quickCreateTicketAtom, ticketsListKeyForStatus } from "@/atoms/tickets"
+import {
+  quickCreateTicketAtom,
+  ticketsListKeyForStatus
+} from "@/atoms/tickets"
+import { preloadTicketPage } from "@/lib/prefetch"
 import { cn } from "@/lib/utils"
 import { TYPE_LABELS, TYPE_META } from "@/lib/ticket-meta"
 import { m } from "@/paraglide/messages"
@@ -323,6 +327,7 @@ export function SectionTicketCreator({
         type="text"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
+        onFocus={() => void preloadTicketPage()}
         onKeyDown={onKeyDown}
         placeholder={m.tickets_section_create_placeholder()}
         aria-label={m.tickets_section_create_placeholder()}

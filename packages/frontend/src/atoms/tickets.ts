@@ -369,7 +369,20 @@ const ticketDetailBaseAtom = Atom.family((key: string) =>
 )
 
 export const ticketAtom = Atom.family((key: string) =>
-  Atom.optimistic(ticketDetailBaseAtom(key))
+  Atom.optimistic(ticketDetailBaseAtom(key)).pipe(Atom.setIdleTTL("2 minutes"))
+)
+
+export const hydrateTicketAtom = Atom.family((key: string) =>
+  Atom.optimisticFn(ticketAtom(key), {
+    reducer: (_current, ticket: TicketDetail) => Result.success(ticket),
+    fn: runtime.fn(
+      Effect.fn(function* (_ticket: TicketDetail, get) {
+        return yield* get.result(ticketRemoteAtom(key), {
+          suspendOnWaiting: true
+        })
+      })
+    )
+  })
 )
 
 export const ticketUpdatePreviewAtom = Atom.family((key: string) =>
@@ -464,6 +477,10 @@ export const quickCreateTicketAtom = Atom.family((sectionKey: string) => {
         })
         get.refresh(ticketsListBaseAtom(sectionKey))
         yield* Reactivity.invalidate(["tickets", orgSlug, slug])
+        get.set(
+          hydrateTicketAtom(ticketKey(orgSlug, slug, created.id)),
+          created
+        )
         return created
       })
     )

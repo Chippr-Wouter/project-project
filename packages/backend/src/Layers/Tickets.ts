@@ -551,7 +551,7 @@ export const TicketsLive = Layer.effect(
       ownerId: string,
       slug: string,
       input: QuickCreateTicketInput
-    ): Effect.Effect<Ticket, NotFound | Validation | MarkdownError> =>
+    ): Effect.Effect<TicketDetail, NotFound | Validation | MarkdownError> =>
       Effect.gen(function* () {
         yield* ensureAccess(orgSlug, ownerId, slug)
         if (input.status !== undefined) {
@@ -597,7 +597,7 @@ export const TicketsLive = Layer.effect(
           ownerId,
           slug
         )
-        return documentToTicket(document, projectGithub)
+        return documentToDetail(document, projectGithub)
       })
 
     const create = (

@@ -10,6 +10,8 @@ import {
 import {
   applyOptimisticTicketPreview,
   applyOptimisticTicketUpdate,
+  hydrateTicketAtom,
+  ticketAtom,
   ticketKey,
   ticketUpdatePreviewAtom,
   updateTicketAtom,
@@ -101,5 +103,25 @@ describe("applyOptimisticTicketUpdate", () => {
       waiting: true
     })
     dispose()
+  })
+
+  it("publishes a created ticket into the detail atom synchronously", () => {
+    const scheduled: Array<() => void> = []
+    const registry = Registry.make({
+      scheduleTask: (task) => scheduled.push(task),
+      timeoutResolution: 1
+    })
+    const key = ticketKey("org", "project", ticket.id)
+    const detail = ticketAtom(key)
+
+    registry.set(hydrateTicketAtom(key), ticket)
+    while (scheduled.length > 0) scheduled.shift()?.()
+
+    expect(registry.get(detail)).toMatchObject({
+      _tag: "Success",
+      value: ticket,
+      waiting: true
+    })
+    registry.dispose()
   })
 })
