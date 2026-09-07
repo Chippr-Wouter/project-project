@@ -305,7 +305,7 @@ export const TicketsLive = Layer.effect(
               .get(orgSlug, userId, slug, options.excludeGroupId)
               .pipe(
                 Effect.catchTag("NotFound", () =>
-                  Effect.succeed({ tickets: [] as ReadonlyArray<string> })
+                  Effect.succeed({ tickets: [] })
                 )
               )).tickets
           : undefined
@@ -375,7 +375,7 @@ export const TicketsLive = Layer.effect(
         })
         return {
           total: counts.total,
-          byStatus: counts.byStatus as TicketCounts["byStatus"]
+          byStatus: counts.byStatus
         }
       })
 
