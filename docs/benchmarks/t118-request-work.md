@@ -35,3 +35,5 @@ Run from the corresponding package directories:
 # packages/frontend
 NODE_OPTIONS=--no-experimental-webstorage ../../node_modules/.bin/vitest run src/atoms/tickets.test.ts
 ```
+
+Follow-up: [real authorization and edit latency measurements](t118-real-context-performance.md) now measure these revisions with real PostgreSQL-backed project and attachment services, plus before/after frontend request counts.
