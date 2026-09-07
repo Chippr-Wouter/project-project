@@ -9,6 +9,7 @@ import { m } from "@/paraglide/messages"
 import { Button } from "@/components/ui/button"
 import { DitherShell } from "@/components/ui/dither-shell"
 import { Logo, Wordmark } from "@/components/Logo"
+import { oauthConsentErrorMessage } from "@/lib/errorMessage"
 import { rawQueryFromSearch } from "@/lib/oauthQuery"
 
 type Search = {
@@ -64,7 +65,12 @@ function ConsentForm({
   })
   const submitState = useAtomValue(submitConsentAtom(oauthQuery))
   const [pending, setPending] = useState<"accept" | "deny" | null>(null)
-  const error = Result.isFailure(submitState) ? m.error_unknown() : null
+  const error = Result.matchWithError(submitState, {
+    onInitial: () => null,
+    onSuccess: () => null,
+    onError: oauthConsentErrorMessage,
+    onDefect: oauthConsentErrorMessage
+  })
 
   const onSubmit = async (accept: boolean) => {
     setPending(accept ? "accept" : "deny")
@@ -129,7 +135,12 @@ function ConsentForm({
       </div>
 
       {error ? (
-        <p className="text-center text-xs text-destructive">{error}</p>
+        <p
+          role="alert"
+          className="text-center text-xs leading-relaxed text-destructive"
+        >
+          {error}
+        </p>
       ) : (
         <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
           {m.auth_oauth_consent_footnote()}

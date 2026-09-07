@@ -6,9 +6,12 @@ import { toWebHeaders } from "../http/toWebHeaders"
 import { BetterAuth, type BetterAuthError } from "../Services/BetterAuth"
 import { OAuthApplications } from "../Services/OAuthApplications"
 
-const consentErrorToFailure = (e: BetterAuthError) => {
+export const consentErrorToFailure = (e: BetterAuthError) => {
   const cause = e.cause as
-    | { statusCode?: unknown; body?: { message?: unknown; code?: unknown } }
+    | {
+        statusCode?: unknown
+        body?: { message?: unknown; code?: unknown; error?: unknown }
+      }
     | undefined
   const status =
     cause && typeof cause.statusCode === "number" ? cause.statusCode : undefined
@@ -18,7 +21,9 @@ const consentErrorToFailure = (e: BetterAuthError) => {
         ? cause.body.message
         : typeof cause?.body?.code === "string"
           ? cause.body.code
-          : "consent_failed"
+          : typeof cause?.body?.error === "string"
+            ? cause.body.error
+            : "consent_failed"
     return Effect.fail(new Validation({ reason: message }))
   }
   return Effect.die(e)
