@@ -396,6 +396,11 @@ const everhourIntegrationRoutes = HttpRouter.add(
   everhourWebhookRoute
 )
 
+export const ApiRouterLive = Layer.effect(
+  HttpRouter.HttpRouter,
+  Effect.map(HttpRouter.HttpRouter, (router) => router.prefixed("/api"))
+)
+
 const RouteLive = Layer.mergeAll(
   HttpRouter.add("*", "/api/auth/*", betterAuthApp),
   HttpRouter.add("*", "/.well-known/*", betterAuthApp),
@@ -407,8 +412,7 @@ const RouteLive = Layer.mergeAll(
     attachmentRoutes
   ),
   HttpRouter.add("*", "/mcp", mcpRoute),
-  ApiLive,
-  SwaggerLive
+  Layer.mergeAll(ApiLive, SwaggerLive).pipe(Layer.provide(ApiRouterLive))
 )
 
 const ServerLive = HttpRouter.serve(RouteLive).pipe(

@@ -39,7 +39,7 @@
 import { it } from "@effect/vitest"
 import { FetchHttpClient, HttpRouter, HttpServer } from "effect/unstable/http"
 import { HttpApi, HttpApiBuilder, HttpApiClient } from "effect/unstable/httpapi"
-import { AppApi } from "@projectproject/shared"
+import { AppApi, Authentication, Unauthorized } from "@projectproject/shared"
 import * as ConfigProvider from "effect/ConfigProvider"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
@@ -53,6 +53,7 @@ vi.mock("./auth", () => ({
   mcpResource: "http://localhost:3000/mcp"
 }))
 import {
+  ApiRouterLive,
   GITHUB_WEBHOOK_MAX_BODY_BYTES,
   HealthHandlerLive,
   githubWebhookRoute,
@@ -63,15 +64,27 @@ import {
   GitHubWebhooks,
   type GitHubWebhooksShape
 } from "./Services/GitHubWebhooks"
+import { AuthHandlerLive } from "./handlers/auth"
 
 const healthGroup = Object.values(AppApi.groups).find(
   (group) => group.identifier === "health"
 )
 if (!healthGroup) throw new Error("Health API group not found")
 
+const authGroup = AppApi.groups.auth
+
 const ApiUnderTestLive = HttpApiBuilder.layer(
-  HttpApi.make(AppApi.identifier).add(healthGroup)
-).pipe(Layer.provide(HealthHandlerLive))
+  HttpApi.make(AppApi.identifier).add(healthGroup).add(authGroup)
+).pipe(
+  Layer.provide(HealthHandlerLive),
+  Layer.provide(AuthHandlerLive),
+  Layer.provide(
+    Layer.succeed(Authentication, {
+      sessionCookie: () => Effect.fail(new Unauthorized())
+    })
+  ),
+  Layer.provide(ApiRouterLive)
+)
 
 // One shared web handler for the whole suite.
 const { handler, dispose } = HttpRouter.toWebHandler(
@@ -79,6 +92,14 @@ const { handler, dispose } = HttpRouter.toWebHandler(
 )
 
 afterAll(() => dispose())
+
+it.effect("GET /api/me reaches authentication instead of returning 404", () =>
+  Effect.promise(async () => {
+    const response = await handler(new Request("http://localhost/api/me"))
+    expect(response.status).toBe(401)
+    expect(await response.json()).toEqual({ _tag: "Unauthorized" })
+  })
+)
 
 // Layer that lets `HttpApiClient.make(AppApi)` reach our in-process handler
 // instead of the network. We override the `FetchHttpClient.Fetch` service —
@@ -95,10 +116,10 @@ const TestHttpClientLayer = FetchHttpClient.layer.pipe(
 // 1. The test you wrote: happy path through the raw web handler.
 // ----------------------------------------------------------------------------
 
-it.effect("GET /health responds with { status: 'ok' } and a 200", () =>
+it.effect("GET /api/health responds with { status: 'ok' } and a 200", () =>
   Effect.gen(function* () {
     const response = yield* Effect.promise(() =>
-      handler(new Request("http://localhost/health"))
+      handler(new Request("http://localhost/api/health"))
     )
 
     expect(response.status).toBe(200)
@@ -114,10 +135,10 @@ it.effect("GET /health responds with { status: 'ok' } and a 200", () =>
 //    pass the body check but fail this one.
 // ----------------------------------------------------------------------------
 
-it.effect("GET /health sets Content-Type to JSON", () =>
+it.effect("GET /api/health sets Content-Type to JSON", () =>
   Effect.gen(function* () {
     const response = yield* Effect.promise(() =>
-      handler(new Request("http://localhost/health"))
+      handler(new Request("http://localhost/api/health"))
     )
 
     // The platform sets `application/json` with charset/profile suffixes
@@ -135,7 +156,7 @@ it.effect("GET /health sets Content-Type to JSON", () =>
 it.effect("GET /unknown returns 404", () =>
   Effect.gen(function* () {
     const response = yield* Effect.promise(() =>
-      handler(new Request("http://localhost/unknown"))
+      handler(new Request("http://localhost/api/unknown"))
     )
 
     expect(response.status).toBe(404)
@@ -159,7 +180,7 @@ it.effect("GET /unknown returns 404", () =>
 it.effect("HttpApiClient.health.get() returns { status: 'ok' }", () =>
   Effect.gen(function* () {
     const client = yield* HttpApiClient.make(AppApi, {
-      baseUrl: "http://localhost"
+      baseUrl: "http://localhost/api"
     })
     const result = yield* client.health.get()
 
