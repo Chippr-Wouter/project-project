@@ -38,6 +38,7 @@
   "auth_oauth_consent_capability_read": "Read your projects, tickets, comments, and docs",
   "auth_oauth_consent_capability_write_comments": "Post comments on tickets",
   "auth_oauth_consent_capability_write_tickets": "Create and update tickets",
+  "auth_oauth_consent_client_fallback": "An agent",
   "auth_oauth_consent_deny_button": "Cancel",
   "auth_oauth_consent_deny_pending": "Cancelling…",
   "auth_oauth_consent_footnote": "You can revoke this access any time from your profile.",
