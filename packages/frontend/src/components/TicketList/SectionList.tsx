@@ -53,6 +53,7 @@ export function SectionList({
   showSprintCol,
   showExtraActionsCol,
   activePreviewId,
+  onPreviewPointerEnter,
   onPreviewOpenChange
 }: {
   orgSlug: string
@@ -69,6 +70,7 @@ export function SectionList({
   showSprintCol: boolean
   showExtraActionsCol: boolean
   activePreviewId: TicketId | null
+  onPreviewPointerEnter: (ticketId: TicketId) => void
   onPreviewOpenChange: (ticketId: TicketId, open: boolean) => void
 }) {
   const sectionKey = ticketsListKeyForStatus(orgSlug, slug, query, status)
@@ -192,7 +194,13 @@ export function SectionList({
                 —
               </div>
             ) : (
-              <ul className={gridCols}>
+              <ul
+                className={gridCols}
+                style={{
+                  contentVisibility: "auto",
+                  containIntrinsicBlockSize: `auto ${Math.max(0, items.length * 56 - 4)}px`
+                }}
+              >
                 <AnimatePresence initial={false}>
                   {items.map((t, idx) => {
                     const membership = sprintMembership?.get(t.id) ?? null
@@ -219,7 +227,8 @@ export function SectionList({
                           sprintMembership={membership}
                           extraRowActions={extraRowActions}
                           pending={rowState.pending}
-                          activePreviewId={activePreviewId}
+                          previewOpen={activePreviewId === t.id}
+                          onPreviewPointerEnter={onPreviewPointerEnter}
                           onPreviewOpenChange={onPreviewOpenChange}
                         />
                       </motion.li>

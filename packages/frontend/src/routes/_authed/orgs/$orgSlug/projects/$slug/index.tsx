@@ -9,6 +9,7 @@ import {
   ticketsListAtom,
   ticketsListKeyForStatus
 } from "@/atoms/tickets"
+import { useMemo } from "react"
 import { createFileRoute } from "@tanstack/react-router"
 import { useAtomValue } from "@effect/atom-react"
 import {
@@ -81,9 +82,9 @@ export const Route = createFileRoute("/_authed/orgs/$orgSlug/projects/$slug/")({
 
 function TicketsTab() {
   const { orgSlug, slug } = Route.useParams()
-  const search = Route.useSearch()
+  const search = Route.useSearch({ structuralSharing: true })
   const project = useProject()
-  const query = ticketListQueryFromSearch(search)
+  const query = useMemo(() => ticketListQueryFromSearch(search), [search])
   const sprintMembership = useAtomValue(
     sprintMembershipAtom(projectKey(orgSlug, slug))
   )

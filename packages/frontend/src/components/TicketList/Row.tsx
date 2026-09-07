@@ -39,7 +39,8 @@ function RowImpl({
   sprintMembership,
   extraRowActions,
   pending,
-  activePreviewId,
+  previewOpen,
+  onPreviewPointerEnter,
   onPreviewOpenChange
 }: {
   orgSlug: string
@@ -52,7 +53,8 @@ function RowImpl({
   sprintMembership: Group | null
   extraRowActions?: (ticket: Ticket) => ReactNode
   pending?: boolean
-  activePreviewId: Ticket["id"] | null
+  previewOpen: boolean
+  onPreviewPointerEnter: (ticketId: Ticket["id"]) => void
   onPreviewOpenChange: (ticketId: Ticket["id"], open: boolean) => void
 }) {
   const dashIdx = ticket.id.lastIndexOf("-")
@@ -78,9 +80,7 @@ function RowImpl({
     open()
   }
   const handleTitlePointerEnter = () => {
-    if (activePreviewId !== null && activePreviewId !== ticket.id) {
-      onPreviewOpenChange(activePreviewId, false)
-    }
+    onPreviewPointerEnter(ticket.id)
   }
   const handleTitlePointerLeave = () => {
     onPreviewOpenChange(ticket.id, false)
@@ -89,7 +89,7 @@ function RowImpl({
     <div className="group/list-row col-span-full grid grid-cols-subgrid">
       <DeferredDropdownMenus>
         <Popover
-          open={activePreviewId === ticket.id}
+          open={previewOpen}
           onOpenChange={(nextOpen) => {
             if (nextOpen) setPreviewMounted(true)
             onPreviewOpenChange(ticket.id, nextOpen)
