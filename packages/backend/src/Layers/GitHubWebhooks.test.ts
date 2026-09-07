@@ -762,6 +762,11 @@ const makeFakeIndex = (overrides: Partial<TicketIndexShape> = {}) => {
     projectFor: () =>
       Effect.die(new Error("unexpected TicketIndex.projectFor call")),
     list: () => Effect.succeed([]),
+    query: () => Effect.succeed([]),
+    count: () => Effect.succeed({ total: 0, byStatus: {} }),
+    existingIds: () => Effect.succeed(new Set<string>()),
+    reserveTicketNumber: () => Effect.succeed(1),
+    getBranchDeletedAt: () => Effect.succeed(null),
     listIds: () => Effect.succeed([]),
     tagUsageCounts: () => Effect.succeed({}),
     findTicketIdsByTag: () => Effect.succeed([]),
