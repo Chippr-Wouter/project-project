@@ -14,22 +14,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: voidzero-dev/setup-vp@v1.19.0
         with:
           node-version-file: .node-version
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.13
+          cache: true
+          run-install: false
 
       - name: Install
-        run: bun install --frozen-lockfile
+        run: vp install --frozen-lockfile
 
       - name: Check
-        run: bun run check
+        run: vp run check
 
       - name: Test
-        run: bun run test
+        run: vp run test
 
       - name: Build
-        run: bun run build
+        run: vp run build
