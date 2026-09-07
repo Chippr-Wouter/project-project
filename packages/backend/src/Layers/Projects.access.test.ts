@@ -70,11 +70,11 @@ for (const scenario of [
               })
             } as never),
             Layer.succeed(SqlClient.SqlClient, {} as never),
-            Layer.succeed(ProjectDocs, {} as never),
-            Layer.succeed(TicketDocs, {} as never),
-            Layer.succeed(TicketIndex, {} as never),
-            Layer.succeed(Users, {} as never),
-            Layer.succeed(GitHub, {} as never)
+            Layer.mock(ProjectDocs, {}),
+            Layer.mock(TicketDocs, {}),
+            Layer.mock(TicketIndex, {}),
+            Layer.mock(Users, {}),
+            Layer.mock(GitHub, {})
           )
         )
       )
