@@ -5,16 +5,16 @@ export const BASELINE_STATUS_SLUGS = ["todo", "in_progress", "done"] as const
 export type BaselineStatusSlug = (typeof BASELINE_STATUS_SLUGS)[number]
 
 export const StatusSlug = Schema.String.pipe(
-  Schema.pattern(/^[a-z0-9_]+$/),
-  Schema.minLength(1),
-  Schema.maxLength(40),
+  Schema.check(Schema.isPattern(/^[a-z0-9_]+$/)),
+  Schema.check(Schema.isMinLength(1)),
+  Schema.check(Schema.isMaxLength(40)),
   Schema.brand("StatusSlug")
 )
 export type StatusSlug = typeof StatusSlug.Type
 
 export const StatusLabel = Schema.String.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(40),
+  Schema.check(Schema.isMinLength(1)),
+  Schema.check(Schema.isMaxLength(40)),
   Schema.brand("StatusLabel")
 )
 export type StatusLabel = typeof StatusLabel.Type
@@ -56,15 +56,15 @@ export const STATUS_ICONS = [
 ] as const
 export type StatusIconName = (typeof STATUS_ICONS)[number]
 
-export const StatusIcon = Schema.Literal(...STATUS_ICONS)
+export const StatusIcon = Schema.Literals(STATUS_ICONS)
 
 export const StatusIconValue = Schema.String
 
 export const StatusColor = TagColor
 
 export const OrderKey = Schema.String.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(64),
+  Schema.check(Schema.isMinLength(1)),
+  Schema.check(Schema.isMaxLength(64)),
   Schema.brand("OrderKey")
 )
 export type OrderKey = typeof OrderKey.Type
@@ -76,7 +76,7 @@ export const ProjectStatus = Schema.Struct({
   color: StatusColor,
   orderKey: OrderKey,
   createdBy: Schema.String,
-  createdAt: Schema.Date
+  createdAt: Schema.DateFromString
 })
 export type ProjectStatus = typeof ProjectStatus.Type
 

@@ -11,8 +11,7 @@
     "test": "vp test run"
   },
   "dependencies": {
-    "@effect/platform": "0.96.1",
-    "effect": "3.21.2"
+    "effect": "4.0.0-rc.112"
   },
   "devDependencies": {
     "vite-plus": "0.3.0"

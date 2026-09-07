@@ -35,13 +35,13 @@ it.effect(
       const capture: Capture = {}
       const result = yield* CurrentOrg.pipe(
         Effect.flatMap((currentOrg) =>
-          Effect.either(currentOrg.resolve("acme", "user-1"))
+          Effect.result(currentOrg.resolve("acme", "user-1"))
         ),
         Effect.provide(CurrentOrgLive.pipe(Layer.provide(makeDb([], capture))))
       )
-      expect(result._tag).toBe("Left")
-      if (result._tag === "Left") {
-        expect(result.left._tag).toBe("NotFound")
+      expect(result._tag).toBe("Failure")
+      if (result._tag === "Failure") {
+        expect(result.failure._tag).toBe("NotFound")
       }
       const where = sqlOf(capture.where)
       expect(where).toContain("deleted_at")

@@ -141,6 +141,6 @@ export interface MarkdownShape {
   ) => Effect.Effect<ReadonlyArray<string>, MarkdownError>
 }
 
-export class Markdown extends Context.Tag(
+export class Markdown extends Context.Service<Markdown, MarkdownShape>()(
   "@projectproject/backend/Services/Markdown"
-)<Markdown, MarkdownShape>() {}
+) {}

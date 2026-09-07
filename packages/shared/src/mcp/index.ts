@@ -47,9 +47,9 @@ export * from "./MeOutput"
 export * from "./RebuildTicketIndexOutput"
 
 export interface McpToolSpec<
-  Input extends Schema.Schema.Any,
-  Output extends Schema.Schema.Any,
-  Errors extends ReadonlyArray<Schema.Schema.Any>
+  Input extends Schema.Top,
+  Output extends Schema.Top,
+  Errors extends ReadonlyArray<Schema.Top>
 > {
   readonly description: string
   readonly input: Input

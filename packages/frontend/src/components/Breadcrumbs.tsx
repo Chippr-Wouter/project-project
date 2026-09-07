@@ -1,3 +1,4 @@
+import * as Result from "effect/unstable/reactivity/AsyncResult"
 // Breadcrumbs aggregated from active route matches.
 //
 // PATTERN
@@ -16,7 +17,7 @@
 // returns `[{project}, {ticket}]` so navigating directly to a ticket URL
 // still renders the project crumb above it.
 
-import { Result, useAtomValue } from "@effect-atom/atom-react"
+import { useAtomValue } from "@effect/atom-react"
 import { Link, useMatches } from "@tanstack/react-router"
 import { ChevronRight } from "lucide-react"
 import { Fragment } from "react"

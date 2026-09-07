@@ -140,6 +140,6 @@ export interface EverhourShape {
   ) => Effect.Effect<void, EverhourClientError>
 }
 
-export class Everhour extends Context.Tag(
+export class Everhour extends Context.Service<Everhour, EverhourShape>()(
   "@projectproject/backend/Services/Everhour"
-)<Everhour, EverhourShape>() {}
+) {}

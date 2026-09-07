@@ -24,36 +24,36 @@ const TicketFrontmatter = Schema.Struct({
   id: TicketId,
   title: Schema.String,
   status: TicketStatus,
-  type: Schema.Literal("feat", "bug", "chore", "other"),
-  priority: Schema.optionalWith(Schema.Literal("low", "med", "high"), {
-    default: () => "med" as const
-  }),
-  tags: Schema.optionalWith(Schema.Array(TagName), {
-    default: () => []
-  }),
+  type: Schema.Literals(["feat", "bug", "chore", "other"]),
+  priority: Schema.Literals(["low", "med", "high"]).pipe(
+    Schema.withDecodingDefaultTypeKey(Effect.succeed("med" as const))
+  ),
+  tags: Schema.Array(TagName).pipe(
+    Schema.withDecodingDefaultTypeKey(Effect.succeed([]))
+  ),
   branch: Schema.NullOr(Schema.String),
-  pr: Schema.optionalWith(Schema.NullOr(Schema.Number), {
-    default: () => null
-  }),
-  prState: Schema.optionalWith(Schema.NullOr(PullRequestState), {
-    default: () => null
-  }),
-  lastTransitionedPr: Schema.optionalWith(Schema.NullOr(Schema.Number), {
-    default: () => null
-  }),
-  assignees: Schema.optionalWith(Schema.Array(Schema.String), {
-    default: () => []
-  }),
-  archivedAt: Schema.optionalWith(Schema.NullOr(Schema.Date), {
-    default: () => null
-  }),
+  pr: Schema.NullOr(Schema.Number).pipe(
+    Schema.withDecodingDefaultTypeKey(Effect.succeed(null))
+  ),
+  prState: Schema.NullOr(PullRequestState).pipe(
+    Schema.withDecodingDefaultTypeKey(Effect.succeed(null))
+  ),
+  lastTransitionedPr: Schema.NullOr(Schema.Number).pipe(
+    Schema.withDecodingDefaultTypeKey(Effect.succeed(null))
+  ),
+  assignees: Schema.Array(Schema.String).pipe(
+    Schema.withDecodingDefaultTypeKey(Effect.succeed([]))
+  ),
+  archivedAt: Schema.NullOr(Schema.DateFromString).pipe(
+    Schema.withDecodingDefaultTypeKey(Effect.succeed(null))
+  ),
   createdBy: Schema.String,
-  createdAt: Schema.Date,
-  updatedAt: Schema.Date
+  createdAt: Schema.DateFromString,
+  updatedAt: Schema.DateFromString
 })
 
-const decodeFrontmatter = Schema.decodeUnknown(TicketFrontmatter)
-const decodeTicketId = Schema.decodeUnknown(TicketId)
+const decodeFrontmatter = Schema.decodeUnknownEffect(TicketFrontmatter)
+const decodeTicketId = Schema.decodeUnknownEffect(TicketId)
 
 function decodeFrontmatterCompat(raw: unknown) {
   if (raw && typeof raw === "object") {

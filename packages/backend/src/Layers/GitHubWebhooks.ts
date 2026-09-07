@@ -2,7 +2,8 @@ import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import * as SqlClient from "@effect/sql/SqlClient"
+import * as Semaphore from "effect/Semaphore"
+import * as SqlClient from "effect/unstable/sql/SqlClient"
 import type { ChecksStatus } from "@projectproject/shared"
 import { and, eq, inArray } from "drizzle-orm"
 import {
@@ -36,7 +37,7 @@ export interface PullRequestWebhookMatch {
   readonly branch: string
 }
 
-const pullRequestTicketLocks = new Map<string, Effect.Semaphore>()
+const pullRequestTicketLocks = new Map<string, Semaphore.Semaphore>()
 
 const pullRequestTicketLockKey = (match: PullRequestWebhookMatch) =>
   `${match.orgSlug}:${match.projectSlug}:${match.ticketId}`
@@ -46,7 +47,7 @@ const pullRequestTicketLockFor = (match: PullRequestWebhookMatch) =>
     const key = pullRequestTicketLockKey(match)
     const cached = pullRequestTicketLocks.get(key)
     if (cached) return cached
-    const created = yield* Effect.makeSemaphore(1)
+    const created = yield* Semaphore.make(1)
     pullRequestTicketLocks.set(key, created)
     return created
   })
@@ -185,7 +186,7 @@ export const applyPullRequestWebhookToTicket = (
     })
   )
 
-const GitHubId = Schema.Union(Schema.Number, Schema.String)
+const GitHubId = Schema.Union([Schema.Number, Schema.String])
 
 const InstallationPayload = Schema.Struct({
   action: Schema.String,
@@ -334,7 +335,7 @@ const repositoryMetadata = (
 }
 
 const parseJson = (body: string) =>
-  Schema.decodeUnknown(Schema.parseJson())(body)
+  Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))(body)
 
 const logIgnored = (
   message: string,
@@ -365,24 +366,22 @@ const logMalformed = (
     })
   )
 
-const decodePayload = <A, I, R>(
-  schema: Schema.Schema<A, I, R>,
+const decodePayload = <S extends Schema.ConstraintDecoder<unknown>>(
+  schema: S,
   delivery: GitHubWebhookDelivery
-): Effect.Effect<A | null, never, R> =>
+): Effect.Effect<S["Type"] | null> =>
   Effect.gen(function* () {
-    const json = yield* parseJson(delivery.body).pipe(Effect.either)
-    if (json._tag === "Left") {
+    const json = yield* parseJson(delivery.body).pipe(Effect.result)
+    if (json._tag === "Failure") {
       yield* logMalformed(delivery, "invalid_json")
       return null
     }
-    const decoded = yield* Schema.decodeUnknown(schema)(json.right).pipe(
-      Effect.either
-    )
-    if (decoded._tag === "Left") {
+    const decoded = Schema.decodeUnknownExit(schema)(json.success)
+    if (decoded._tag === "Failure") {
       yield* logMalformed(delivery, "invalid_payload")
       return null
     }
-    return decoded.right
+    return decoded.value
   })
 
 const handleInstallation = (

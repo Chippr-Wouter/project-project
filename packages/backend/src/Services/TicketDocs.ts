@@ -81,6 +81,6 @@ export interface TicketDocsShape {
   >
 }
 
-export class TicketDocs extends Context.Tag(
+export class TicketDocs extends Context.Service<TicketDocs, TicketDocsShape>()(
   "@projectproject/backend/Services/TicketDocs"
-)<TicketDocs, TicketDocsShape>() {}
+) {}

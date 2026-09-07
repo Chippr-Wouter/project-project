@@ -1,53 +1,15 @@
-// packages/shared/src/errors.ts
-//
-// SHARED, OVER-THE-WIRE TAGGED ERRORS.
-// ============================================================================
-// Anything declared here is part of the API contract — both backend (which
-// `addError(...)`s these on endpoints) and frontend (which pattern-matches on
-// them after a typed-client call) import from this file.
-//
-// THE Schema.TaggedError vs Data.TaggedError DIVIDE
-// ----------------------------------------------------------------------------
-// Read this once and keep it in mind every time you create a new tagged error:
-//
-//   - `Schema.TaggedError` — has an underlying Schema. Encodes/decodes across
-//     the wire. Required for any error referenced by `addError(...)` on an
-//     `HttpApiEndpoint`. Lives in *this* file (or a sibling in `shared/`).
-//
-//   - `Data.TaggedError`   — plain class with structural equality. No Schema.
-//     Used for *boundary* errors that get caught and translated before they
-//     reach the wire. Lives next to the code that throws them, often in
-//     `packages/backend/src/services/*.ts`.
-//
-// Concretely: `Unauthorized` here is `Schema.TaggedError` because it's
-// returned to the client as a 401 body. `BetterAuthError` in
-// `services/BetterAuth.ts` is `Data.TaggedError` because it's caught by the
-// auth middleware and translated to `Unauthorized` before any response.
-//
-// HTTP STATUS BINDING
-// ----------------------------------------------------------------------------
-// `HttpApiSchema.annotations({ status: 401 })` tells `HttpApiBuilder` that
-// when a handler fails with this error, the response should be a 401 with
-// the error's encoded body as JSON. Without this, errors default to 500.
-//
-// CHAPTER 2 GOAL
-// ----------------------------------------------------------------------------
-// One error: `Unauthorized`, mapped to 401, no fields. Future chapters will
-// add `NotFound`, `Forbidden`, `Conflict`, `ValidationError` here.
-
-import { HttpApiSchema } from "@effect/platform"
 import * as Schema from "effect/Schema"
 
 export class Unauthorized extends Schema.TaggedError<Unauthorized>()(
   "Unauthorized",
   {},
-  HttpApiSchema.annotations({ status: 401 })
+  { httpApiStatus: 401 }
 ) {}
 
 export class NotFound extends Schema.TaggedError<NotFound>()(
   "NotFound",
   {},
-  HttpApiSchema.annotations({ status: 404 })
+  { httpApiStatus: 404 }
 ) {}
 
 // 403 — caller is authenticated and the resource exists, but their role
@@ -57,7 +19,7 @@ export class NotFound extends Schema.TaggedError<NotFound>()(
 export class Forbidden extends Schema.TaggedError<Forbidden>()(
   "Forbidden",
   {},
-  HttpApiSchema.annotations({ status: 403 })
+  { httpApiStatus: 403 }
 ) {}
 
 // 409 — request conflicts with current state (e.g. branch already exists, repo
@@ -65,7 +27,7 @@ export class Forbidden extends Schema.TaggedError<Forbidden>()(
 export class Conflict extends Schema.TaggedError<Conflict>()(
   "Conflict",
   { reason: Schema.String },
-  HttpApiSchema.annotations({ status: 409 })
+  { httpApiStatus: 409 }
 ) {}
 
 // 400 — caller-supplied input violates a domain invariant the schema can't
@@ -74,7 +36,7 @@ export class Conflict extends Schema.TaggedError<Conflict>()(
 export class Validation extends Schema.TaggedError<Validation>()(
   "Validation",
   { reason: Schema.String },
-  HttpApiSchema.annotations({ status: 400 })
+  { httpApiStatus: 400 }
 ) {}
 
 // 400 — a `[label](mention:...)` link in a body field failed mention
@@ -87,12 +49,12 @@ export class Validation extends Schema.TaggedError<Validation>()(
 //     mentions must always have a visible label.
 //   - `unknown_user`   — the user id isn't a member of this project.
 //   - `unknown_ticket` — the ticket id doesn't exist in this project.
-export const MentionInvalidKind = Schema.Literal(
+export const MentionInvalidKind = Schema.Literals([
   "malformed_href",
   "empty_label",
   "unknown_user",
   "unknown_ticket"
-)
+])
 export type MentionInvalidKind = typeof MentionInvalidKind.Type
 
 export class MentionInvalid extends Schema.TaggedError<MentionInvalid>()(
@@ -101,13 +63,13 @@ export class MentionInvalid extends Schema.TaggedError<MentionInvalid>()(
     kind: MentionInvalidKind,
     href: Schema.String
   },
-  HttpApiSchema.annotations({ status: 400 })
+  { httpApiStatus: 400 }
 ) {}
 
 export class ProjectOwnerRemovalBlocked extends Schema.TaggedError<ProjectOwnerRemovalBlocked>()(
   "ProjectOwnerRemovalBlocked",
   { projectSlugs: Schema.Array(Schema.String) },
-  HttpApiSchema.annotations({ status: 409 })
+  { httpApiStatus: 409 }
 ) {}
 
 // --- GitHub-side errors -----------------------------------------------------
@@ -118,38 +80,38 @@ export class ProjectOwnerRemovalBlocked extends Schema.TaggedError<ProjectOwnerR
 export class GitHubTokenExpired extends Schema.TaggedError<GitHubTokenExpired>()(
   "GitHubTokenExpired",
   {},
-  HttpApiSchema.annotations({ status: 401 })
+  { httpApiStatus: 401 }
 ) {}
 
 export class GitHubScopeInsufficient extends Schema.TaggedError<GitHubScopeInsufficient>()(
   "GitHubScopeInsufficient",
   {},
-  HttpApiSchema.annotations({ status: 403 })
+  { httpApiStatus: 403 }
 ) {}
 
 export class RepoGone extends Schema.TaggedError<RepoGone>()(
   "RepoGone",
   {},
-  HttpApiSchema.annotations({ status: 410 })
+  { httpApiStatus: 410 }
 ) {}
 
 export class BranchExists extends Schema.TaggedError<BranchExists>()(
   "BranchExists",
   { branch: Schema.String },
-  HttpApiSchema.annotations({ status: 409 })
+  { httpApiStatus: 409 }
 ) {}
 
 export class BranchProtected extends Schema.TaggedError<BranchProtected>()(
   "BranchProtected",
   { branch: Schema.String },
-  HttpApiSchema.annotations({ status: 422 })
+  { httpApiStatus: 422 }
 ) {}
 
 // Carries the unix-seconds reset timestamp so the UI can show a countdown.
 export class RateLimited extends Schema.TaggedError<RateLimited>()(
   "RateLimited",
-  { resetAt: Schema.Number },
-  HttpApiSchema.annotations({ status: 429 })
+  { resetAt: Schema.Finite },
+  { httpApiStatus: 429 }
 ) {}
 
 // Catch-all for unexpected GitHub failures. `message` is whatever GitHub
@@ -157,7 +119,7 @@ export class RateLimited extends Schema.TaggedError<RateLimited>()(
 export class GitHubError extends Schema.TaggedError<GitHubError>()(
   "GitHubError",
   { message: Schema.String },
-  HttpApiSchema.annotations({ status: 502 })
+  { httpApiStatus: 502 }
 ) {}
 
 // 404 — caller asked us to attach an existing branch but it isn't on the
@@ -166,83 +128,83 @@ export class GitHubError extends Schema.TaggedError<GitHubError>()(
 export class BranchNotFound extends Schema.TaggedError<BranchNotFound>()(
   "BranchNotFound",
   { name: Schema.String },
-  HttpApiSchema.annotations({ status: 404 })
+  { httpApiStatus: 404 }
 ) {}
 
 export class SprintCompletedImmutable extends Schema.TaggedError<SprintCompletedImmutable>()(
   "SprintCompletedImmutable",
   {},
-  HttpApiSchema.annotations({ status: 409 })
+  { httpApiStatus: 409 }
 ) {}
 
 export class EverhourApiKeyMissing extends Schema.TaggedError<EverhourApiKeyMissing>()(
   "EverhourApiKeyMissing",
   {},
-  HttpApiSchema.annotations({ status: 401 })
+  { httpApiStatus: 401 }
 ) {}
 
 export class EverhourAuthInvalid extends Schema.TaggedError<EverhourAuthInvalid>()(
   "EverhourAuthInvalid",
   {},
-  HttpApiSchema.annotations({ status: 401 })
+  { httpApiStatus: 401 }
 ) {}
 
 export class EverhourRateLimited extends Schema.TaggedError<EverhourRateLimited>()(
   "EverhourRateLimited",
-  { retryAfterSeconds: Schema.Number },
-  HttpApiSchema.annotations({ status: 429 })
+  { retryAfterSeconds: Schema.Finite },
+  { httpApiStatus: 429 }
 ) {}
 
 export class EverhourConfigMissing extends Schema.TaggedError<EverhourConfigMissing>()(
   "EverhourConfigMissing",
   {},
-  HttpApiSchema.annotations({ status: 503 })
+  { httpApiStatus: 503 }
 ) {}
 
 export class EverhourError extends Schema.TaggedError<EverhourError>()(
   "EverhourError",
   { message: Schema.String },
-  HttpApiSchema.annotations({ status: 502 })
+  { httpApiStatus: 502 }
 ) {}
 
 export class StorageNotConnected extends Schema.TaggedError<StorageNotConnected>()(
   "StorageNotConnected",
   {},
-  HttpApiSchema.annotations({ status: 409 })
+  { httpApiStatus: 409 }
 ) {}
 
 export class StorageAuthInvalid extends Schema.TaggedError<StorageAuthInvalid>()(
   "StorageAuthInvalid",
   {},
-  HttpApiSchema.annotations({ status: 401 })
+  { httpApiStatus: 401 }
 ) {}
 
 export class StorageConfigMissing extends Schema.TaggedError<StorageConfigMissing>()(
   "StorageConfigMissing",
   {},
-  HttpApiSchema.annotations({ status: 503 })
+  { httpApiStatus: 503 }
 ) {}
 
 export class StorageError extends Schema.TaggedError<StorageError>()(
   "StorageError",
   { reason: Schema.String },
-  HttpApiSchema.annotations({ status: 502 })
+  { httpApiStatus: 502 }
 ) {}
 
 export class AttachmentTooLarge extends Schema.TaggedError<AttachmentTooLarge>()(
   "AttachmentTooLarge",
-  { maxBytes: Schema.Number },
-  HttpApiSchema.annotations({ status: 413 })
+  { maxBytes: Schema.Finite },
+  { httpApiStatus: 413 }
 ) {}
 
 export class AttachmentTypeRejected extends Schema.TaggedError<AttachmentTypeRejected>()(
   "AttachmentTypeRejected",
   { contentType: Schema.String },
-  HttpApiSchema.annotations({ status: 415 })
+  { httpApiStatus: 415 }
 ) {}
 
 export class AttachmentNotUploaded extends Schema.TaggedError<AttachmentNotUploaded>()(
   "AttachmentNotUploaded",
   {},
-  HttpApiSchema.annotations({ status: 409 })
+  { httpApiStatus: 409 }
 ) {}

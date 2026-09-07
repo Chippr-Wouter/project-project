@@ -1,4 +1,4 @@
-import { HttpApiBuilder } from "@effect/platform"
+import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { AppApi, CurrentUser, Validation } from "@projectproject/shared"
 import * as Effect from "effect/Effect"
 import { Comments } from "../Services/Comments"
@@ -10,26 +10,31 @@ export const CommentsHandlerLive = HttpApiBuilder.group(
   "ticketComments",
   (handlers) =>
     handlers
-      .handle("list", ({ path }) =>
+      .handle("list", ({ params }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const comments = yield* Comments
-          return yield* comments.list(org.orgSlug, user.id, path.slug, path.id)
+          return yield* comments.list(
+            org.orgSlug,
+            user.id,
+            params.slug,
+            params.id
+          )
         }).pipe(dieOnMarkdown)
       )
-      .handle("create", ({ path, payload }) =>
+      .handle("create", ({ params, payload }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const comments = yield* Comments
           return yield* comments.create(
             org.orgSlug,
             user.id,
-            path.slug,
-            path.id,
+            params.slug,
+            params.id,
             payload
           )
         }).pipe(
@@ -39,18 +44,18 @@ export const CommentsHandlerLive = HttpApiBuilder.group(
           dieOnMarkdown
         )
       )
-      .handle("update", ({ path, payload }) =>
+      .handle("update", ({ params, payload }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const comments = yield* Comments
           return yield* comments.edit(
             org.orgSlug,
             user.id,
-            path.slug,
-            path.id,
-            path.commentId,
+            params.slug,
+            params.id,
+            params.commentId,
             payload
           )
         }).pipe(
@@ -60,18 +65,18 @@ export const CommentsHandlerLive = HttpApiBuilder.group(
           dieOnMarkdown
         )
       )
-      .handle("delete", ({ path }) =>
+      .handle("delete", ({ params }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const comments = yield* Comments
           yield* comments.remove(
             org.orgSlug,
             user.id,
-            path.slug,
-            path.id,
-            path.commentId
+            params.slug,
+            params.id,
+            params.commentId
           )
         }).pipe(dieOnMarkdown)
       )

@@ -7,7 +7,7 @@
 //
 // You should not need to touch this file in Chapter 0.
 
-import { RegistryContext } from "@effect-atom/atom-react"
+import { RegistryContext } from "@effect/atom-react"
 import { StrictMode } from "react"
 import ReactDOM from "react-dom/client"
 import { createRouter, RouterProvider } from "@tanstack/react-router"

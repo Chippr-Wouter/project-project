@@ -12,6 +12,7 @@ export interface OAuthApplicationsShape {
   ) => Effect.Effect<void, NotFound>
 }
 
-export class OAuthApplications extends Context.Tag(
-  "@projectproject/backend/Services/OAuthApplications"
-)<OAuthApplications, OAuthApplicationsShape>() {}
+export class OAuthApplications extends Context.Service<
+  OAuthApplications,
+  OAuthApplicationsShape
+>()("@projectproject/backend/Services/OAuthApplications") {}

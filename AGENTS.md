@@ -40,7 +40,7 @@ When you hit one of these, **stop and ask**. Present the options with tradeoffs;
 ## Frontend stack
 
 - **TanStack Start + TanStack Router** as already wired up.
-- **`@effect-rx/rx-react`** for Effect-aware state (`Atom.runtime`, atom families, etc.).
+- **`@effect/atom-react`** for Effect-aware state (`Atom.runtime`, atom families, etc.).
 - **shadcn/ui (Radix-backed)** as the component foundation. Install via the shadcn CLI.
 - **Fluid Functionalism components** from <https://www.fluidfunctionalism.com>, installed through the shadcn registry (`npx shadcn@latest registry add @fluid`). Also Radix-backed, so they coexist cleanly with shadcn defaults. Prefer these where they exist for richer motion-aware primitives before reaching for something custom.
 - Don't add other UI libraries (Headless UI, Mantine, Chakra, etc.) without asking — see the architecture rule above.
@@ -114,7 +114,7 @@ Within each message file, group keys by prefix in the order listed above, then s
 
 **Default to optimistic.** Any mutation that updates a list or aggregate the user is staring at should flip the UI synchronously and let the server resolve in the background. We use Effect-Atom's first-party `Atom.optimistic` + `Atom.optimisticFn` — don't invent custom optimistic layers.
 
-**Every mutation atom is family-keyed** by the resource it affects — `projectKey(orgSlug, slug)` for project-scoped, `ticketKey(orgSlug, slug, id)` for ticket-scoped, `orgSlug` for org-scoped. This applies to both optimistic mutations (`Atom.optimisticFn`) and plain ones (`runtime.fn`). The reason: a mutation atom's `Result` (waiting / failure) is per-key, so concurrent mutations on different resources don't share status, and a stale failure on one resource doesn't bleed onto another. Path fields (`orgSlug`, `slug`, `id`) come from the key, not the input — keep input shapes equal to the API payload.
+**Every mutation atom is family-keyed** by the resource it affects — `projectKey(orgSlug, slug)` for project-scoped, `ticketKey(orgSlug, slug, id)` for ticket-scoped, `orgSlug` for org-scoped. This applies to both optimistic mutations (`Atom.optimisticFn`) and plain ones (`runtime.fn`). The reason: a mutation atom's `AsyncResult` (waiting / failure) is per-key, so concurrent mutations on different resources don't share status, and a stale failure on one resource doesn't bleed onto another. Path fields (`orgSlug`, `slug`, `id`) come from the key, not the input — keep input shapes equal to the API payload.
 
 ```ts
 export const updateTicketAtom = Atom.family((key: string) => {
@@ -150,8 +150,8 @@ update({ status: "in_progress" })
    export const mutateAtom = Atom.family((key: string) =>
      Atom.optimisticFn(xAtom(key), {
        reducer: (current, input) => {
-         if (!Result.isSuccess(current)) return current
-         return Result.success(applyOptimistically(current.value, input), {
+         if (!AsyncResult.isSuccess(current)) return current
+         return AsyncResult.success(applyOptimistically(current.value, input), {
            waiting: true
          })
        },
@@ -173,8 +173,8 @@ update({ status: "in_progress" })
 
    ```ts
    reducer: (current, _input) =>
-     Result.isSuccess(current)
-       ? Result.success(current.value, { waiting: true })
+     AsyncResult.isSuccess(current)
+       ? AsyncResult.success(current.value, { waiting: true })
        : current
    ```
 
@@ -182,13 +182,13 @@ update({ status: "in_progress" })
 
 5. **Surface `waiting` in the UI.** The optimistic atom carries `result.waiting: true` while the mutation is in flight. Apply `animate-pulse` (or equivalent) on the elements that just changed so the user sees their action land but knows it's not confirmed yet. Don't pulse idle controls, only the data display.
 
-6. **Submitting / error state.** A form that owns its mutation atom directly reads `result.waiting` and `Result.isFailure(result)` from `useAtomValue(mutationAtom(key))` rather than mirroring into `useState`:
+6. **Submitting / error state.** A form that owns its mutation atom directly reads `result.waiting` and `AsyncResult.isFailure(result)` from `useAtomValue(mutationAtom(key))` rather than mirroring into `useState`:
 
    ```ts
    const create = useAtomSet(createTicketAtom(projKey), { mode: "promiseExit" })
    const createState = useAtomValue(createTicketAtom(projKey))
    const submitting = createState.waiting
-   const error = Result.isFailure(createState)
+   const error = AsyncResult.isFailure(createState)
      ? m.tickets_create_error_fallback()
      : null
    ```
@@ -197,22 +197,23 @@ update({ status: "in_progress" })
 
 Reference: `packages/frontend/src/atoms/github.ts` (`createBranchAtom`, `attachBranchAtom`); `packages/frontend/src/components/CreateTicketRow.tsx` for the direct-form pattern.
 
-## Rendering atom Results — `Result.matchWithError` + `ErrorPage`
+## Rendering atom AsyncResults — `AsyncResult.matchWithError` + `ErrorPage`
 
-A `useAtomValue` on a runtime atom returns a `Result<A, E>` with four variants: `Initial`, `Success`, `Failure-with-typed-error`, `Failure-with-defect`. **Always handle all four — never just check `Result.isSuccess` and render a forever-loading state on anything else.** That swallows real errors silently and makes failures invisible.
+A `useAtomValue` on a runtime atom returns a `AsyncResult<A, E>` with four variants: `Initial`, `Success`, `Failure-with-typed-error`, `Failure-with-defect`. **Always handle all four — never just check `AsyncResult.isSuccess` and render a forever-loading state on anything else.** That swallows real errors silently and makes failures invisible.
 
-**The canonical helper is `Result.matchWithError`** from `@effect-atom/atom-react`. It splits the failure path into `onError` (your typed `E` channel — `NotFound`, `Unauthorized`, etc.) and `onDefect` (unexpected throws, decode failures, interruptions). Failed renders use the shared `ErrorPage` component (`packages/frontend/src/components/ErrorPage.tsx`), which wraps the dither shell with a retry button and a home link. Pass `contained` when rendering inside a settings panel or any non-full-page surface.
+**The canonical helper is `AsyncResult.matchWithError`** from `effect/unstable/reactivity/AsyncResult`. It splits the failure path into `onError` (your typed `E` channel — `NotFound`, `Unauthorized`, etc.) and `onDefect` (unexpected throws, decode failures, interruptions). Failed renders use the shared `ErrorPage` component (`packages/frontend/src/components/ErrorPage.tsx`), which wraps the dither shell with a retry button and a home link. Pass `contained` when rendering inside a settings panel or any non-full-page surface.
 
 The minimal pattern:
 
 ```tsx
-import { Result, useAtomValue } from "@effect-atom/atom-react"
+import { useAtomValue } from "@effect/atom-react"
+import * as AsyncResult from "effect/unstable/reactivity/AsyncResult"
 import { ErrorPage } from "@/components/ErrorPage"
 
 function ProjectStatusesSettings() {
   const result = useAtomValue(projectStatusesAtom(projectKey(orgSlug, slug)))
 
-  return Result.matchWithError(result, {
+  return AsyncResult.matchWithError(result, {
     onInitial: () => <LoadingSkeleton />,
     onError: (error) => <ErrorPage error={error} contained />,
     onDefect: (defect) => <ErrorPage error={defect} contained />,
@@ -226,10 +227,10 @@ A few details worth knowing:
 - **`onError` receives the typed error itself** (the value from the `E` channel, with its `_tag`), not the Failure variant. Narrow on `error._tag` if you want to render different messages per error kind — but `ErrorPage` already does this via `lib/errorMessage.ts` for any `AppError`, so most callsites just pass `error` through.
 - **`onDefect` receives the unknown cause** (a Cause defect, a thrown JS error, a decode failure). Treat it the same way — pass it to `ErrorPage`, which falls back to `String(defect)` for the detail line.
 - **`onSuccess` argument is the Success variant** (`{ value, waiting }`), not the raw value. Destructure `value` to get your data. The `waiting: true` flag is set during an in-flight optimistic mutation (per the optimistic-mutation conventions above) — useful when you want to pulse the success view while a refresh is happening.
-- **Don't combine `Result.matchWithError` with a separate `if (!Result.isSuccess) ...` early return.** Pick one. The `match` form handles every case; mixing both is dead code and a refactor hazard.
-- **For tiny callsites where you only care about success vs anything else** (e.g. a sidebar count that defaults to 0), `Result.isSuccess(result) ? result.value : fallback` is fine. The match form pays for itself once the failure case needs visible UI.
+- **Don't combine `AsyncResult.matchWithError` with a separate `if (!AsyncResult.isSuccess) ...` early return.** Pick one. The `match` form handles every case; mixing both is dead code and a refactor hazard.
+- **For tiny callsites where you only care about success vs anything else** (e.g. a sidebar count that defaults to 0), `AsyncResult.isSuccess(result) ? result.value : fallback` is fine. The match form pays for itself once the failure case needs visible UI.
 
-Reference: `packages/frontend/src/routes/_authed/orgs/$orgSlug/projects/index.tsx` for the standard project-list pattern; `packages/frontend/src/atoms/auth.ts` for the long-form docstring explaining the Result variants.
+Reference: `packages/frontend/src/routes/_authed/orgs/$orgSlug/projects/index.tsx` for the standard project-list pattern; `packages/frontend/src/atoms/auth.ts` for the long-form docstring explaining the AsyncResult variants.
 
 ## Backend stack
 
@@ -286,3 +287,7 @@ npx opensrc <owner>/<repo>      # GitHub repo (e.g., npx opensrc vercel/ai)
 ```
 
 <!-- opensrc:end -->
+
+## Learning more about Effect
+
+This repository uses Effect v4. Before writing Effect code, read `node_modules/effect/AGENTS.md` completely and follow its linked guides as needed. Search `node_modules/effect/src` for API definitions. See `docs/migrations/effect-v4-handoff.md` for migration guidance.

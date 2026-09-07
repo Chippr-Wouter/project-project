@@ -1,4 +1,5 @@
-import { Result, useAtomSet, useAtomValue } from "@effect-atom/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as DateTime from "effect/DateTime"
 import { useState, type FormEvent } from "react"
 import type { GroupId, TicketId, WorkTypeOption } from "@projectproject/shared"
@@ -29,7 +30,7 @@ export const parseDurationToSeconds = (input: string): number | null => {
 }
 
 const todayIso = () => {
-  const now = DateTime.toDate(DateTime.unsafeNow())
+  const now = DateTime.toDate(DateTime.nowUnsafe())
   const month = `${now.getMonth() + 1}`.padStart(2, "0")
   const day = `${now.getDate()}`.padStart(2, "0")
   return `${now.getFullYear()}-${month}-${day}`

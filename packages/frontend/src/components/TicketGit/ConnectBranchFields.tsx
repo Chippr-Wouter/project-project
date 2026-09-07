@@ -2,12 +2,8 @@
 // scrollable result list below, footer with cancel + connect. Hand-rolled
 // (no cmdk in this workspace) but keyboard-navigable.
 
-import {
-  Result,
-  useAtomRefresh,
-  useAtomSet,
-  useAtomValue
-} from "@effect-atom/atom-react"
+import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
 import { useDebouncedValue } from "@tanstack/react-pacer"
 import * as Cause from "effect/Cause"
 import * as Exit from "effect/Exit"
@@ -165,7 +161,7 @@ export function ConnectBranchFields({
     setBusy(false)
     // BranchNotFound: clear stale selection and refresh the branch list so
     // the picker reflects what the server now believes exists.
-    const failure = Cause.failureOption(exit.cause)
+    const failure = Cause.findErrorOption(exit.cause)
     if (Option.isSome(failure) && failure.value._tag === "BranchNotFound") {
       setSelected(null)
       refreshBranches()

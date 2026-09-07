@@ -4,12 +4,7 @@ import { drizzle } from "drizzle-orm/node-postgres"
 import { and, eq } from "drizzle-orm"
 import { auth } from "../auth"
 import * as schema from "../db/schema"
-import {
-  account,
-  member,
-  organization,
-  userEverhourIntegration
-} from "../db/schema"
+import { member, organization } from "../db/schema"
 import {
   NotFound,
   paginateSorted,
@@ -27,7 +22,9 @@ import {
 export const BetterAuthLive = Layer.effect(
   BetterAuth,
   Effect.sync(() => {
-    const db = drizzle(process.env.DATABASE_URL!, { schema })
+    const db = drizzle(process.env.DATABASE_URL!, {
+      relations: schema.relations
+    })
 
     return {
       handler: (request) =>
@@ -46,10 +43,7 @@ export const BetterAuthLive = Layer.effect(
             try: () =>
               db.query.account.findFirst({
                 columns: { accessToken: true },
-                where: and(
-                  eq(account.userId, userId),
-                  eq(account.providerId, "github")
-                )
+                where: { userId, providerId: "github" }
               }),
             catch: (cause) => new BetterAuthError({ cause })
           })
@@ -62,10 +56,7 @@ export const BetterAuthLive = Layer.effect(
             try: () =>
               db.query.account.findFirst({
                 columns: { id: true },
-                where: and(
-                  eq(account.userId, userId),
-                  eq(account.providerId, "github")
-                )
+                where: { userId, providerId: "github" }
               }),
             catch: (cause) => new BetterAuthError({ cause })
           })
@@ -85,7 +76,7 @@ export const BetterAuthLive = Layer.effect(
                   lastVerifiedAt: true,
                   lastCheckError: true
                 },
-                where: eq(userEverhourIntegration.userId, userId)
+                where: { userId }
               }),
             catch: (cause) => new BetterAuthError({ cause })
           })
@@ -209,7 +200,7 @@ export const BetterAuthLive = Layer.effect(
             try: () =>
               db.query.organization.findFirst({
                 columns: { slug: true },
-                where: eq(organization.id, organizationId)
+                where: { id: organizationId }
               }),
             catch: (cause) => new BetterAuthError({ cause })
           })
@@ -217,13 +208,13 @@ export const BetterAuthLive = Layer.effect(
         }),
       submitConsent: (headers, input) =>
         Effect.tryPromise({
-          try: async () => {
-            const result = await auth.api.oauth2Consent({
-              body: input,
-              headers
-            })
-            return { redirectURI: result.url }
-          },
+          try: () =>
+            auth.api
+              .oauth2Consent({
+                body: input,
+                headers
+              })
+              .then((result) => ({ redirectURI: result.url })),
           catch: (cause) => new BetterAuthError({ cause })
         })
     } satisfies BetterAuthShape

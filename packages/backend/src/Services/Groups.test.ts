@@ -3,7 +3,7 @@ import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import * as TestClock from "effect/TestClock"
+import * as TestClock from "effect/testing/TestClock"
 import { expect } from "vite-plus/test"
 import {
   Forbidden,
@@ -28,8 +28,10 @@ import {
   type TicketDocument
 } from "./TicketDocs"
 
-const isoDate = (s: string) => DateTime.toDate(DateTime.unsafeMake(s))
-const setTestNow = TestClock.setTime("2026-05-19T00:00:00.000Z")
+const isoDate = (s: string) => DateTime.toDate(DateTime.makeUnsafe(s))
+const setTestNow = TestClock.setTime(
+  DateTime.toEpochMillis(DateTime.makeUnsafe("2026-05-19T00:00:00.000Z"))
+)
 
 const groupId = Schema.decodeUnknownSync(GroupId)
 const ticketId = Schema.decodeUnknownSync(TicketId)
@@ -307,15 +309,15 @@ it.effect("create + list returns the new group", () =>
 it.effect("create with kind=sprint fails for non-admin member", () =>
   Effect.gen(function* () {
     const groups = yield* Groups
-    const result = yield* Effect.either(
+    const result = yield* Effect.result(
       groups.create("org", "user-1", "p", {
         name: "Sprint 1",
         kind: "sprint"
       })
     )
-    expect(result._tag).toBe("Left")
-    if (result._tag === "Left") {
-      expect(result.left._tag).toBe("Forbidden")
+    expect(result._tag).toBe("Failure")
+    if (result._tag === "Failure") {
+      expect(result.failure._tag).toBe("Forbidden")
     }
   }).pipe(Effect.provide(makeGroupsLayer(undefined, { role: "member" })))
 )
@@ -337,14 +339,14 @@ it.effect("updateTickets rejects unknown ticket ids", () =>
     const created = yield* groups.create("org", "user-1", "p", {
       name: "G"
     })
-    const result = yield* Effect.either(
+    const result = yield* Effect.result(
       groups.updateTickets("org", "user-1", "p", created.id, {
         tickets: [ticketId("T-99")]
       })
     )
-    expect(result._tag).toBe("Left")
-    if (result._tag === "Left") {
-      expect(result.left._tag).toBe("NotFound")
+    expect(result._tag).toBe("Failure")
+    if (result._tag === "Failure") {
+      expect(result.failure._tag).toBe("NotFound")
     }
   }).pipe(
     Effect.provide(makeGroupsLayer({ ticketIds: ["T-1"] }, { role: "member" }))
@@ -354,14 +356,14 @@ it.effect("updateTickets rejects unknown ticket ids", () =>
 it.effect("updateTickets returns NotFound before validating tickets", () =>
   Effect.gen(function* () {
     const groups = yield* Groups
-    const result = yield* Effect.either(
+    const result = yield* Effect.result(
       groups.updateTickets("org", "user-1", "p", "G-404", {
         tickets: [ticketId("T-99")]
       })
     )
-    expect(result._tag).toBe("Left")
-    if (result._tag === "Left") {
-      expect(result.left._tag).toBe("NotFound")
+    expect(result._tag).toBe("Failure")
+    if (result._tag === "Failure") {
+      expect(result.failure._tag).toBe("NotFound")
     }
   }).pipe(
     Effect.provide(makeGroupsLayer({ ticketIds: ["T-1"] }, { role: "member" }))
@@ -371,16 +373,16 @@ it.effect("updateTickets returns NotFound before validating tickets", () =>
 it.effect("create rejects endsAt before startsAt", () =>
   Effect.gen(function* () {
     const groups = yield* Groups
-    const result = yield* Effect.either(
+    const result = yield* Effect.result(
       groups.create("org", "user-1", "p", {
         name: "G",
         startsAt: isoDate("2026-06-01"),
         endsAt: isoDate("2026-05-01")
       })
     )
-    expect(result._tag).toBe("Left")
-    if (result._tag === "Left") {
-      expect(result.left._tag).toBe("Validation")
+    expect(result._tag).toBe("Failure")
+    if (result._tag === "Failure") {
+      expect(result.failure._tag).toBe("Validation")
     }
   }).pipe(Effect.provide(makeGroupsLayer(undefined, { role: "member" })))
 )
@@ -393,14 +395,14 @@ it.effect("update rejects endsAt before existing startsAt", () =>
       startsAt: isoDate("2026-06-01"),
       endsAt: isoDate("2026-07-01")
     })
-    const result = yield* Effect.either(
+    const result = yield* Effect.result(
       groups.update("org", "user-1", "p", created.id, {
         endsAt: isoDate("2026-05-15")
       })
     )
-    expect(result._tag).toBe("Left")
-    if (result._tag === "Left") {
-      expect(result.left._tag).toBe("Validation")
+    expect(result._tag).toBe("Failure")
+    if (result._tag === "Failure") {
+      expect(result.failure._tag).toBe("Validation")
     }
   }).pipe(Effect.provide(makeGroupsLayer(undefined, { role: "member" })))
 )
@@ -410,16 +412,16 @@ it.effect("update rejects completedAt in the future", () =>
     const groups = yield* Groups
     const created = yield* groups.create("org", "user-1", "p", { name: "G" })
     const future = DateTime.toDate(
-      DateTime.add(DateTime.unsafeNow(), { days: 1 })
+      DateTime.add(DateTime.nowUnsafe(), { days: 1 })
     )
-    const result = yield* Effect.either(
+    const result = yield* Effect.result(
       groups.update("org", "user-1", "p", created.id, {
         completedAt: future
       })
     )
-    expect(result._tag).toBe("Left")
-    if (result._tag === "Left") {
-      expect(result.left._tag).toBe("Validation")
+    expect(result._tag).toBe("Failure")
+    if (result._tag === "Failure") {
+      expect(result.failure._tag).toBe("Validation")
     }
   }).pipe(Effect.provide(makeGroupsLayer(undefined, { role: "member" })))
 )
@@ -432,14 +434,14 @@ it.effect("update rejects completedAt before startsAt", () =>
       startsAt: isoDate("2026-04-01"),
       endsAt: isoDate("2026-04-30")
     })
-    const result = yield* Effect.either(
+    const result = yield* Effect.result(
       groups.update("org", "user-1", "p", created.id, {
         completedAt: isoDate("2026-03-01")
       })
     )
-    expect(result._tag).toBe("Left")
-    if (result._tag === "Left") {
-      expect(result.left._tag).toBe("Validation")
+    expect(result._tag).toBe("Failure")
+    if (result._tag === "Failure") {
+      expect(result.failure._tag).toBe("Validation")
     }
   }).pipe(Effect.provide(makeGroupsLayer(undefined, { role: "member" })))
 )
@@ -504,14 +506,14 @@ it.effect(
       yield* groups.update("org", "user-1", "p", sprint.id, {
         completedAt: isoDate("2026-04-15")
       })
-      const result = yield* Effect.either(
+      const result = yield* Effect.result(
         groups.updateTickets("org", "user-1", "p", sprint.id, {
           tickets: [ticketId("T-1")]
         })
       )
-      expect(result._tag).toBe("Left")
-      if (result._tag === "Left") {
-        expect(result.left._tag).toBe("SprintCompletedImmutable")
+      expect(result._tag).toBe("Failure")
+      if (result._tag === "Failure") {
+        expect(result.failure._tag).toBe("SprintCompletedImmutable")
       }
     }).pipe(
       Effect.provide(makeGroupsLayer({ ticketIds: ["T-1"] }, { role: "admin" }))
@@ -663,15 +665,15 @@ it.effect(
         completedAt: isoDate("2026-03-15")
       })
 
-      const result = yield* Effect.either(
+      const result = yield* Effect.result(
         groups.complete("org", "user-1", "p", sprint.id, {
           destination: { kind: "backlog" }
         })
       )
 
-      expect(result._tag).toBe("Left")
-      if (result._tag === "Left") {
-        expect(result.left._tag).toBe("SprintCompletedImmutable")
+      expect(result._tag).toBe("Failure")
+      if (result._tag === "Failure") {
+        expect(result.failure._tag).toBe("SprintCompletedImmutable")
       }
     }).pipe(
       Effect.provide(makeGroupsLayer({ ticketIds: [] }, { role: "admin" }))
@@ -700,15 +702,15 @@ it.effect(
         completedAt: isoDate("2026-03-29")
       })
 
-      const result = yield* Effect.either(
+      const result = yield* Effect.result(
         groups.complete("org", "user-1", "p", source.id, {
           destination: { kind: "sprint", groupId: dest.id }
         })
       )
 
-      expect(result._tag).toBe("Left")
-      if (result._tag === "Left") {
-        expect(result.left._tag).toBe("SprintCompletedImmutable")
+      expect(result._tag).toBe("Failure")
+      if (result._tag === "Failure") {
+        expect(result.failure._tag).toBe("SprintCompletedImmutable")
       }
     }).pipe(
       Effect.provide(makeGroupsLayer({ ticketIds: [] }, { role: "admin" }))
@@ -723,15 +725,15 @@ it.effect("complete fails with Validation when source is not a sprint", () =>
       kind: "epic"
     })
 
-    const result = yield* Effect.either(
+    const result = yield* Effect.result(
       groups.complete("org", "user-1", "p", epic.id, {
         destination: { kind: "backlog" }
       })
     )
 
-    expect(result._tag).toBe("Left")
-    if (result._tag === "Left") {
-      expect(result.left._tag).toBe("Validation")
+    expect(result._tag).toBe("Failure")
+    if (result._tag === "Failure") {
+      expect(result.failure._tag).toBe("Validation")
     }
   }).pipe(Effect.provide(makeGroupsLayer(undefined, { role: "admin" })))
 )
@@ -752,15 +754,15 @@ it.effect(
         kind: "epic"
       })
 
-      const result = yield* Effect.either(
+      const result = yield* Effect.result(
         groups.complete("org", "user-1", "p", source.id, {
           destination: { kind: "sprint", groupId: epic.id }
         })
       )
 
-      expect(result._tag).toBe("Left")
-      if (result._tag === "Left") {
-        expect(result.left._tag).toBe("Validation")
+      expect(result._tag).toBe("Failure")
+      if (result._tag === "Failure") {
+        expect(result.failure._tag).toBe("Validation")
       }
     }).pipe(Effect.provide(makeGroupsLayer(undefined, { role: "admin" })))
 )
@@ -768,15 +770,15 @@ it.effect(
 it.effect("complete fails for non-admin members", () =>
   Effect.gen(function* () {
     const groups = yield* Groups
-    const result = yield* Effect.either(
+    const result = yield* Effect.result(
       groups.complete("org", "user-1", "p", "G-1", {
         destination: { kind: "backlog" }
       })
     )
 
-    expect(result._tag).toBe("Left")
-    if (result._tag === "Left") {
-      expect(["Forbidden", "NotFound"]).toContain(result.left._tag)
+    expect(result._tag).toBe("Failure")
+    if (result._tag === "Failure") {
+      expect(["Forbidden", "NotFound"]).toContain(result.failure._tag)
     }
   }).pipe(Effect.provide(makeGroupsLayer(undefined, { role: "member" })))
 )
@@ -867,15 +869,15 @@ it.effect("updateTicketOrder rejects when ticket is not in the group", () =>
       name: "G",
       tickets: [ticketId("T-1")]
     })
-    const result = yield* Effect.either(
+    const result = yield* Effect.result(
       groups.updateTicketOrder("org", "user-1", "p", created.id, {
         ticketId: ticketId("T-2"),
         after: null
       })
     )
-    expect(result._tag).toBe("Left")
-    if (result._tag === "Left") {
-      expect(result.left._tag).toBe("NotFound")
+    expect(result._tag).toBe("Failure")
+    if (result._tag === "Failure") {
+      expect(result.failure._tag).toBe("NotFound")
     }
   }).pipe(
     Effect.provide(
@@ -891,15 +893,15 @@ it.effect("updateTicketOrder rejects when after refers to itself", () =>
       name: "G",
       tickets: [ticketId("T-1"), ticketId("T-2")]
     })
-    const result = yield* Effect.either(
+    const result = yield* Effect.result(
       groups.updateTicketOrder("org", "user-1", "p", created.id, {
         ticketId: ticketId("T-1"),
         after: ticketId("T-1")
       })
     )
-    expect(result._tag).toBe("Left")
-    if (result._tag === "Left") {
-      expect(result.left._tag).toBe("Validation")
+    expect(result._tag).toBe("Failure")
+    if (result._tag === "Failure") {
+      expect(result.failure._tag).toBe("Validation")
     }
   }).pipe(
     Effect.provide(
@@ -919,15 +921,15 @@ it.effect("updateTicketOrder rejects on completed sprint", () =>
     yield* groups.complete("org", "user-1", "p", created.id, {
       destination: { kind: "backlog" }
     })
-    const result = yield* Effect.either(
+    const result = yield* Effect.result(
       groups.updateTicketOrder("org", "user-1", "p", created.id, {
         ticketId: ticketId("T-1"),
         after: null
       })
     )
-    expect(result._tag).toBe("Left")
-    if (result._tag === "Left") {
-      expect(result.left._tag).toBe("SprintCompletedImmutable")
+    expect(result._tag).toBe("Failure")
+    if (result._tag === "Failure") {
+      expect(result.failure._tag).toBe("SprintCompletedImmutable")
     }
   }).pipe(
     Effect.provide(
@@ -1277,12 +1279,12 @@ it.effect("addTickets refuses to mutate a completed sprint", () =>
     yield* groups.complete("org", "user-1", "p", created.id, {
       destination: { kind: "backlog" }
     })
-    const outcome = yield* Effect.either(
+    const outcome = yield* Effect.result(
       groups.addTickets("org", "user-1", "p", created.id, [ticketId("T-2")])
     )
-    expect(outcome._tag).toBe("Left")
-    if (outcome._tag === "Left") {
-      expect(outcome.left._tag).toBe("SprintCompletedImmutable")
+    expect(outcome._tag).toBe("Failure")
+    if (outcome._tag === "Failure") {
+      expect(outcome.failure._tag).toBe("SprintCompletedImmutable")
     }
   }).pipe(
     Effect.provide(

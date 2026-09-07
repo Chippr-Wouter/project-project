@@ -1,5 +1,5 @@
-import type { Atom } from "@effect-atom/atom-react"
-import { RegistryContext } from "@effect-atom/atom-react"
+import * as Atom from "effect/unstable/reactivity/Atom"
+import { RegistryContext } from "@effect/atom-react"
 import { useCallback, useContext, useEffect, useRef } from "react"
 
 export function usePrefetch(getAtoms: () => Array<Atom.Atom<unknown>>) {

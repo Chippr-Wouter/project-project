@@ -46,7 +46,10 @@ export default defineConfig(({ mode }) => ({
         target: "http://localhost:3000",
         changeOrigin: true
       },
-      // Preserve the full discovery path for Better Auth's root well-known routes.
+      "/mcp": {
+        target: "http://localhost:3000",
+        changeOrigin: true
+      },
       "/.well-known/": {
         target: "http://localhost:3000",
         changeOrigin: true

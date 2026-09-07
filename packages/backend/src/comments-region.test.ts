@@ -10,7 +10,7 @@ import {
   validateCommentBody
 } from "./comments-region"
 
-const isoDate = (s: string) => DateTime.toDate(DateTime.unsafeMake(s))
+const isoDate = (s: string) => DateTime.toDate(DateTime.makeUnsafe(s))
 
 const sample = (): ReadonlyArray<CommentBlock> => [
   {

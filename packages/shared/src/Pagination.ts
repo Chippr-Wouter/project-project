@@ -8,11 +8,15 @@ import * as Schema from "effect/Schema"
 
 export const Pagination = Schema.Struct({
   cursor: Schema.optional(Schema.String),
-  limit: Schema.optional(Schema.Int.pipe(Schema.between(1, 200)))
+  limit: Schema.optional(
+    Schema.Int.pipe(
+      Schema.check(Schema.isBetween({ minimum: 1, maximum: 200 }))
+    )
+  )
 })
 export type Pagination = typeof Pagination.Type
 
-export const Page = <A, I>(item: Schema.Schema<A, I>) =>
+export const Page = <S extends Schema.Top>(item: S) =>
   Schema.Struct({
     items: Schema.Array(item),
     nextCursor: Schema.NullOr(Schema.String)

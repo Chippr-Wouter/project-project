@@ -1,3 +1,5 @@
+import * as Registry from "effect/unstable/reactivity/AtomRegistry"
+import * as Atom from "effect/unstable/reactivity/Atom"
 // packages/frontend/src/runtime.ts
 //
 // THE FRONTEND'S EFFECT RUNTIME, EXPRESSED AS AN ATOM RUNTIME.
@@ -43,7 +45,7 @@
 // ----------------------------------------------------------------------------
 //   1. Imports:
 //        import { Layer } from "effect"
-//        import { Atom } from "@effect-atom/atom-react"
+//        import * as Atom from "effect/unstable/reactivity/Atom"
 //        import { ApiClient } from "@/services/ApiClient"
 //
 //   2. Compose the AppLayer:
@@ -61,7 +63,6 @@
 
 import * as Layer from "effect/Layer"
 import { ApiClient } from "@/services/ApiClient"
-import { Atom, Registry } from "@effect-atom/atom-react"
 
 export const AppLayer = Layer.mergeAll(ApiClient.Default)
 

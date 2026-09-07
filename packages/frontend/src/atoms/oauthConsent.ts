@@ -1,4 +1,4 @@
-import { Atom } from "@effect-atom/atom-react"
+import * as Atom from "effect/unstable/reactivity/Atom"
 import * as Effect from "effect/Effect"
 import { runtime } from "@/runtime"
 import { ApiClient } from "@/services/ApiClient"

@@ -20,7 +20,7 @@ const makeRole = Schema.decodeUnknownSync(Role)
 
 const purgeAtFor = (deletedAt: Date): Date =>
   DateTime.toDate(
-    DateTime.add(DateTime.unsafeFromDate(deletedAt), {
+    DateTime.add(DateTime.fromDateUnsafe(deletedAt), {
       days: ORG_DELETE_GRACE_DAYS
     })
   )

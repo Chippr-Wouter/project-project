@@ -1,4 +1,5 @@
-import { Atom, Result } from "@effect-atom/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import * as Atom from "effect/unstable/reactivity/Atom"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
@@ -50,7 +51,7 @@ const commentsBaseAtom = Atom.family((key: string) => {
       Effect.gen(function* () {
         const client = yield* ApiClient
         return yield* client.ticketComments.list({
-          path: { orgSlug, slug, id }
+          params: { orgSlug, slug, id }
         })
       })
     )
@@ -72,7 +73,7 @@ export const createCommentAtom = Atom.family((key: string) => {
       Effect.fn(function* (input: CreateCommentInput, get) {
         const client = yield* ApiClient
         const created = yield* client.ticketComments.create({
-          path: { orgSlug, slug, id },
+          params: { orgSlug, slug, id },
           payload: input
         })
         get.refresh(commentsBaseAtom(key))
@@ -88,7 +89,7 @@ export const editCommentAtom = Atom.family((key: string) => {
   return Atom.optimisticFn(commentsAtom(listKey), {
     reducer: (current, input: UpdateCommentInput) => {
       if (!Result.isSuccess(current)) return current
-      const editedAt = DateTime.toDate(DateTime.unsafeNow())
+      const editedAt = DateTime.toDate(DateTime.nowUnsafe())
       const next = current.value.map((c) =>
         c.id === commentId ? { ...c, body: input.body, editedAt } : c
       )
@@ -98,7 +99,7 @@ export const editCommentAtom = Atom.family((key: string) => {
       Effect.fn(function* (input: UpdateCommentInput, get) {
         const client = yield* ApiClient
         const updated = yield* client.ticketComments.update({
-          path: { orgSlug, slug, id, commentId },
+          params: { orgSlug, slug, id, commentId },
           payload: { body: input.body }
         })
         get.refresh(commentsBaseAtom(listKey))
@@ -123,7 +124,7 @@ export const deleteCommentAtom = Atom.family((key: string) => {
       Effect.fn(function* (_input: void, get) {
         const client = yield* ApiClient
         yield* client.ticketComments.delete({
-          path: { orgSlug, slug, id, commentId }
+          params: { orgSlug, slug, id, commentId }
         })
         get.refresh(commentsBaseAtom(listKey))
         return commentId

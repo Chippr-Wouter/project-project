@@ -1,4 +1,5 @@
-import { Result, useAtomValue } from "@effect-atom/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import { useAtomValue } from "@effect/atom-react"
 import { createFileRoute } from "@tanstack/react-router"
 import { meAtom } from "@/atoms/auth"
 import { orgDetailAtom, orgMembersAtom } from "@/atoms/orgs"

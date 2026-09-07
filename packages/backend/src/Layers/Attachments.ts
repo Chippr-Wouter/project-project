@@ -29,11 +29,7 @@ import {
   type AttachmentRow,
   type AttachmentTicketRef
 } from "@projectproject/shared"
-import {
-  attachmentIndex,
-  attachmentReference,
-  projectIndex
-} from "../db/schema"
+import { attachmentIndex, attachmentReference } from "../db/schema"
 import { CurrentOrg, requireOrgAdmin } from "../Services/CurrentOrg"
 import { Db } from "../Services/Db"
 import { OrgStorage } from "../Services/OrgStorage"
@@ -78,7 +74,9 @@ export const AttachmentsLive = Layer.effect(
         const row = yield* db.query.projectIndex
           .findFirst({
             columns: { organizationId: true },
-            where: eq(projectIndex.slug, slug)
+            where: {
+              RAW: (table, _operators) => _operators.eq(table.slug, slug)!
+            }
           })
           .pipe(Effect.orDie)
         if (!row) return yield* new NotFound()
@@ -303,7 +301,7 @@ export const AttachmentsLive = Layer.effect(
           yield* s3
             .deleteObject(connection, row.objectKey)
             .pipe(
-              Effect.catchAll((error) =>
+              Effect.catch((error) =>
                 Effect.logError(
                   "attachment dedupe left a duplicate object in the bucket",
                   { attachmentId: row.id, objectKey: row.objectKey, error }
@@ -659,7 +657,7 @@ export const AttachmentsLive = Layer.effect(
             .pipe(Effect.orDie)
         }
       }).pipe(
-        Effect.catchAllCause((cause) =>
+        Effect.catchCause((cause) =>
           Effect.logError("attachment reconciliation failed", cause)
         )
       )
@@ -708,7 +706,7 @@ export const AttachmentsLive = Layer.effect(
 
         return { orphaned: orphaned.length }
       }).pipe(
-        Effect.catchAllCause((cause) =>
+        Effect.catchCause((cause) =>
           Effect.as(
             Effect.logError("orphaning project attachments failed", cause),
             { orphaned: 0 }
@@ -754,17 +752,17 @@ export const AttachmentsLive = Layer.effect(
         for (const [orgSlug, orgRows] of byOrg) {
           const connectionResult = yield* orgStorage
             .requireConnection(orgSlug)
-            .pipe(Effect.either)
+            .pipe(Effect.result)
 
-          if (connectionResult._tag === "Left") {
+          if (connectionResult._tag === "Failure") {
             yield* Effect.logError(
               "attachment reap failed to resolve org storage",
-              { orgSlug, error: connectionResult.left }
+              { orgSlug, error: connectionResult.failure }
             )
             continue
           }
 
-          const connection = connectionResult.right
+          const connection = connectionResult.success
 
           for (const row of orgRows) {
             const claimed = yield* db
@@ -781,17 +779,17 @@ export const AttachmentsLive = Layer.effect(
             if (claimed.length === 0) continue
 
             const outcome = yield* deleteObjectIfUnshared(connection, row).pipe(
-              Effect.either
+              Effect.result
             )
 
-            if (outcome._tag === "Left") {
+            if (outcome._tag === "Failure") {
               yield* Effect.logError(
                 "attachment reap left an orphaned object in the bucket",
                 {
                   attachmentId: row.id,
                   objectKey: row.objectKey,
                   orgSlug,
-                  error: outcome.left
+                  error: outcome.failure
                 }
               )
               continue
@@ -803,8 +801,8 @@ export const AttachmentsLive = Layer.effect(
 
         return { deleted }
       }).pipe(
-        Effect.catchAllCause((cause) =>
-          Effect.zipRight(
+        Effect.catchCause((cause) =>
+          Effect.andThen(
             Effect.logError("attachment reap failed", cause),
             Effect.succeed({ deleted: 0 })
           )
@@ -851,18 +849,18 @@ export const AttachmentsLive = Layer.effect(
         for (const row of unhashed) {
           const connection = yield* orgStorage
             .requireConnection(row.orgSlug)
-            .pipe(Effect.either)
-          if (connection._tag === "Left") continue
+            .pipe(Effect.result)
+          if (connection._tag === "Failure") continue
 
           const head = yield* s3
-            .headObject(connection.right, row.objectKey)
-            .pipe(Effect.either)
-          if (head._tag === "Left" || head.right === null) continue
-          if (head.right.contentHash === null) continue
+            .headObject(connection.success, row.objectKey)
+            .pipe(Effect.result)
+          if (head._tag === "Failure" || head.success === null) continue
+          if (head.success.contentHash === null) continue
 
           yield* db
             .update(attachmentIndex)
-            .set({ contentHash: head.right.contentHash })
+            .set({ contentHash: head.success.contentHash })
             .where(eq(attachmentIndex.id, row.id))
             .pipe(Effect.orDie)
           hashed += 1
@@ -932,8 +930,8 @@ export const AttachmentsLive = Layer.effect(
 
           const connection = yield* orgStorage
             .requireConnection(orgSlug)
-            .pipe(Effect.either)
-          if (connection._tag === "Left") continue
+            .pipe(Effect.result)
+          if (connection._tag === "Failure") continue
 
           for (const repoint of repoints) {
             yield* db
@@ -942,19 +940,19 @@ export const AttachmentsLive = Layer.effect(
               .where(eq(attachmentIndex.id, repoint.id))
               .pipe(Effect.orDie)
 
-            const freed = yield* deleteObjectIfUnshared(connection.right, {
+            const freed = yield* deleteObjectIfUnshared(connection.success, {
               id: repoint.id,
               objectKey: repoint.fromKey
-            }).pipe(Effect.either)
+            }).pipe(Effect.result)
 
-            if (freed._tag === "Left") {
+            if (freed._tag === "Failure") {
               yield* Effect.logError(
                 "attachment dedupe left a duplicate object in the bucket",
                 {
                   attachmentId: repoint.id,
                   objectKey: repoint.fromKey,
                   orgSlug,
-                  error: freed.left
+                  error: freed.failure
                 }
               )
               continue
@@ -965,8 +963,8 @@ export const AttachmentsLive = Layer.effect(
 
         return { hashed, deduped }
       }).pipe(
-        Effect.catchAllCause((cause) =>
-          Effect.zipRight(
+        Effect.catchCause((cause) =>
+          Effect.andThen(
             Effect.logError("attachment dedupe failed", cause),
             Effect.succeed({ hashed: 0, deduped: 0 })
           )

@@ -22,18 +22,15 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1124.0",
     "@aws-sdk/s3-request-presigner": "^3.1124.0",
-    "@effect/platform": "0.96.1",
-    "@effect/platform-bun": "0.90.0",
-    "@effect/sql": "^0.51.1",
-    "@effect/sql-drizzle": "^0.50.0",
-    "@effect/sql-pg": "^0.52.1",
+    "@effect/platform-bun": "4.0.0-rc.112",
+    "@effect/sql-pg": "4.0.0-rc.112",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@octokit/auth-app": "^8.2.0",
     "@octokit/graphql": "^9.0.3",
     "@projectproject/shared": "workspace:*",
     "better-auth": "1.7.3",
-    "drizzle-orm": "^0.45.2",
-    "effect": "3.21.2",
+    "drizzle-orm": "1.0.0-rc.5-169397b",
+    "effect": "4.0.0-rc.112",
     "fractional-indexing": "^3.2.0",
     "gray-matter": "^4.0.3",
     "octokit": "^5.0.5",
@@ -43,11 +40,11 @@
     "@better-auth/mcp": "1.7.3"
   },
   "devDependencies": {
-    "@effect/vitest": "0.29.0",
+    "@effect/vitest": "4.0.0-rc.112",
     "@types/bun": "latest",
     "@types/pg": "^8.20.0",
     "dotenv": "^17.4.2",
-    "drizzle-kit": "^0.31.10",
+    "drizzle-kit": "1.0.0-rc.5-ab785fc",
     "vite-plus": "0.3.0"
   }
 }

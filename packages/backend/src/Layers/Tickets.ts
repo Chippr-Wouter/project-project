@@ -57,8 +57,6 @@ import {
   type TicketIndexProject
 } from "../Services/TicketIndex"
 import { Db } from "../Services/Db"
-import { projectIndex, projectStatus, projectTag } from "../db/schema"
-import { eq } from "drizzle-orm"
 import {
   MalformedTicketDocument,
   TicketDocs,
@@ -496,14 +494,19 @@ export const TicketsLive = Layer.effect(
         const projectRow = yield* db.query.projectIndex
           .findFirst({
             columns: { id: true },
-            where: eq(projectIndex.slug, slug)
+            where: {
+              RAW: (table, _operators) => _operators.eq(table.slug, slug)!
+            }
           })
           .pipe(Effect.orDie)
         if (!projectRow) return yield* new NotFound()
         const rows = yield* db.query.projectTag
           .findMany({
             columns: { name: true },
-            where: eq(projectTag.projectId, projectRow.id)
+            where: {
+              RAW: (table, _operators) =>
+                _operators.eq(table.projectId, projectRow.id)!
+            }
           })
           .pipe(Effect.orDie)
         const known = new Set<string>(rows.map((r) => r.name))
@@ -523,14 +526,19 @@ export const TicketsLive = Layer.effect(
         const projectRow = yield* db.query.projectIndex
           .findFirst({
             columns: { id: true },
-            where: eq(projectIndex.slug, slug)
+            where: {
+              RAW: (table, _operators) => _operators.eq(table.slug, slug)!
+            }
           })
           .pipe(Effect.orDie)
         if (!projectRow) return yield* new NotFound()
         const rows = yield* db.query.projectStatus
           .findMany({
             columns: { slug: true },
-            where: eq(projectStatus.projectId, projectRow.id)
+            where: {
+              RAW: (table, _operators) =>
+                _operators.eq(table.projectId, projectRow.id)!
+            }
           })
           .pipe(Effect.orDie)
         const known = new Set<string>(rows.map((r) => r.slug))

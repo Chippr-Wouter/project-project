@@ -1,7 +1,6 @@
-import * as SqlClient from "@effect/sql/SqlClient"
+import { and, eq, sql } from "drizzle-orm"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import { and, eq, max } from "drizzle-orm"
 import { NotFound, type OAuthApplication } from "@projectproject/shared"
 import {
   oauthAccessToken,
@@ -19,16 +18,17 @@ export const OAuthApplicationsLive = Layer.effect(
   OAuthApplications,
   Effect.gen(function* () {
     const db = yield* Db
-    const sql = yield* SqlClient.SqlClient
 
     const listForUser = (
       userId: string
     ): Effect.Effect<ReadonlyArray<OAuthApplication>> =>
-      Effect.tryPromise(() => {
+      Effect.suspend(() => {
         const access = db
           .select({
             clientId: oauthAccessToken.clientId,
-            lastUsedAt: max(oauthAccessToken.createdAt).as("last_access_at")
+            lastUsedAt: sql<Date | null>`max(${oauthAccessToken.createdAt})`.as(
+              "last_access_at"
+            )
           })
           .from(oauthAccessToken)
           .where(eq(oauthAccessToken.userId, userId))
@@ -37,7 +37,10 @@ export const OAuthApplicationsLive = Layer.effect(
         const refresh = db
           .select({
             clientId: oauthRefreshToken.clientId,
-            lastUsedAt: max(oauthRefreshToken.createdAt).as("last_refresh_at")
+            lastUsedAt:
+              sql<Date | null>`max(${oauthRefreshToken.createdAt})`.as(
+                "last_refresh_at"
+              )
           })
           .from(oauthRefreshToken)
           .where(eq(oauthRefreshToken.userId, userId))
@@ -105,58 +108,55 @@ export const OAuthApplicationsLive = Layer.effect(
       applicationId: string
     ): Effect.Effect<void, NotFound> =>
       Effect.gen(function* () {
-        const existing = yield* Effect.tryPromise(() =>
-          db
-            .select({ clientId: oauthClient.clientId })
-            .from(oauthClient)
-            .innerJoin(
-              oauthConsent,
-              eq(oauthConsent.clientId, oauthClient.clientId)
+        const existing = yield* db
+          .select({ clientId: oauthClient.clientId })
+          .from(oauthClient)
+          .innerJoin(
+            oauthConsent,
+            eq(oauthConsent.clientId, oauthClient.clientId)
+          )
+          .where(
+            and(
+              eq(oauthClient.id, applicationId),
+              eq(oauthConsent.userId, userId)
             )
-            .where(
-              and(
-                eq(oauthClient.id, applicationId),
-                eq(oauthConsent.userId, userId)
-              )
-            )
-            .limit(1)
-        ).pipe(Effect.orDie)
-        const clientId = existing[0]?.clientId
-        if (!clientId) return yield* new NotFound()
+          )
+          .limit(1)
+          .pipe(Effect.orDie)
 
-        yield* sql
-          .withTransaction(
+        const row = existing[0]
+        if (!row) return yield* new NotFound()
+
+        yield* db
+          .transaction((tx) =>
             Effect.gen(function* () {
-              yield* db
+              yield* tx
                 .delete(oauthRefreshToken)
                 .where(
                   and(
-                    eq(oauthRefreshToken.clientId, clientId),
+                    eq(oauthRefreshToken.clientId, row.clientId),
                     eq(oauthRefreshToken.userId, userId)
                   )
                 )
-                .pipe(Effect.asVoid, Effect.orDie)
-              yield* db
+              yield* tx
                 .delete(oauthAccessToken)
                 .where(
                   and(
-                    eq(oauthAccessToken.clientId, clientId),
+                    eq(oauthAccessToken.clientId, row.clientId),
                     eq(oauthAccessToken.userId, userId)
                   )
                 )
-                .pipe(Effect.asVoid, Effect.orDie)
-              yield* db
+              yield* tx
                 .delete(oauthConsent)
                 .where(
                   and(
-                    eq(oauthConsent.clientId, clientId),
+                    eq(oauthConsent.clientId, row.clientId),
                     eq(oauthConsent.userId, userId)
                   )
                 )
-                .pipe(Effect.asVoid, Effect.orDie)
             })
           )
-          .pipe(Effect.catchTag("SqlError", Effect.die))
+          .pipe(Effect.orDie)
       })
 
     return { listForUser, revokeForUser } satisfies OAuthApplicationsShape

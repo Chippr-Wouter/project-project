@@ -44,26 +44,26 @@ const ProjectDocMember = Schema.Struct({
 })
 
 const ProjectDocGithub = Schema.Struct({
-  repoId: Schema.optionalWith(Schema.String, {
-    default: () => ""
-  }),
+  repoId: Schema.String.pipe(
+    Schema.withDecodingDefaultTypeKey(Effect.succeed(""))
+  ),
   repoOwner: Schema.String,
   repoName: Schema.String,
-  defaultBaseBranch: Schema.optionalWith(Schema.NullOr(Schema.String), {
-    default: () => null
-  })
+  defaultBaseBranch: Schema.NullOr(Schema.String).pipe(
+    Schema.withDecodingDefaultTypeKey(Effect.succeed(null))
+  )
 })
 
 const ProjectDocSetup = Schema.Struct({
-  workflowReviewedAt: Schema.optionalWith(Schema.NullOr(Schema.Date), {
-    default: () => null
-  }),
-  invitePeopleDismissedAt: Schema.optionalWith(Schema.NullOr(Schema.Date), {
-    default: () => null
-  }),
-  connectGithubDismissedAt: Schema.optionalWith(Schema.NullOr(Schema.Date), {
-    default: () => null
-  })
+  workflowReviewedAt: Schema.NullOr(Schema.DateFromString).pipe(
+    Schema.withDecodingDefaultTypeKey(Effect.succeed(null))
+  ),
+  invitePeopleDismissedAt: Schema.NullOr(Schema.DateFromString).pipe(
+    Schema.withDecodingDefaultTypeKey(Effect.succeed(null))
+  ),
+  connectGithubDismissedAt: Schema.NullOr(Schema.DateFromString).pipe(
+    Schema.withDecodingDefaultTypeKey(Effect.succeed(null))
+  )
 })
 
 const ProjectFrontmatter = Schema.Struct({
@@ -74,23 +74,25 @@ const ProjectFrontmatter = Schema.Struct({
   icon: Schema.optional(Schema.String),
   color: Schema.optional(Schema.String),
   createdBy: Schema.optional(Schema.String),
-  createdAt: Schema.Date,
-  members: Schema.optionalWith(Schema.Array(ProjectDocMember), {
-    default: () => []
-  }),
-  github: Schema.optionalWith(Schema.NullOr(ProjectDocGithub), {
-    default: () => null
-  }),
-  setup: Schema.optionalWith(ProjectDocSetup, {
-    default: () => ({
-      workflowReviewedAt: null,
-      invitePeopleDismissedAt: null,
-      connectGithubDismissedAt: null
-    })
-  })
+  createdAt: Schema.DateFromString,
+  members: Schema.Array(ProjectDocMember).pipe(
+    Schema.withDecodingDefaultTypeKey(Effect.succeed([]))
+  ),
+  github: Schema.NullOr(ProjectDocGithub).pipe(
+    Schema.withDecodingDefaultTypeKey(Effect.succeed(null))
+  ),
+  setup: ProjectDocSetup.pipe(
+    Schema.withDecodingDefaultTypeKey(
+      Effect.succeed({
+        workflowReviewedAt: null,
+        invitePeopleDismissedAt: null,
+        connectGithubDismissedAt: null
+      })
+    )
+  )
 })
 
-const decodeProjectFrontmatter = Schema.decodeUnknown(ProjectFrontmatter)
+const decodeProjectFrontmatter = Schema.decodeUnknownEffect(ProjectFrontmatter)
 
 function toFrontmatter(
   document: ProjectDocumentWrite
@@ -158,7 +160,7 @@ export const ProjectDocsLive = Layer.effect(
           const file = yield* markdown.readProjectFile(orgSlug, slug)
           yield* checkOrgFrontmatter(orgSlug, file.data)
           const frontmatter = yield* decodeProjectFrontmatter(file.data).pipe(
-            Effect.tapErrorCause((cause) =>
+            Effect.tapCause((cause) =>
               Effect.logWarning("project frontmatter decode failed").pipe(
                 Effect.annotateLogs({ cause: Cause.pretty(cause) })
               )

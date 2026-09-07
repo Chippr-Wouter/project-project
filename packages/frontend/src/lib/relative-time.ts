@@ -19,7 +19,7 @@ const UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
 export function formatRelative(date: Date): string {
   const rtf = new Intl.RelativeTimeFormat(getLocale(), { numeric: "auto" })
   const diff =
-    (date.getTime() - DateTime.toEpochMillis(DateTime.unsafeNow())) / 1000
+    (date.getTime() - DateTime.toEpochMillis(DateTime.nowUnsafe())) / 1000
   for (const [unit, secs] of UNITS) {
     if (Math.abs(diff) >= secs) {
       return rtf.format(Math.round(diff / secs), unit)

@@ -1,4 +1,5 @@
-import { Result, useAtomValue } from "@effect-atom/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import { useAtomValue } from "@effect/atom-react"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import * as DateTime from "effect/DateTime"
 import { ArrowRight, Plus } from "lucide-react"
@@ -50,7 +51,7 @@ function Dashboard() {
 }
 
 function greet(): string {
-  const h = DateTime.toDate(DateTime.unsafeNow()).getHours()
+  const h = DateTime.toDate(DateTime.nowUnsafe()).getHours()
   if (h < 5) return m.org_dashboard_greeting_late()
   if (h < 12) return m.org_dashboard_greeting_morning()
   if (h < 18) return m.org_dashboard_greeting_afternoon()

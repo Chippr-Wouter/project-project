@@ -1,4 +1,4 @@
-import type { Atom } from "@effect-atom/atom-react"
+import * as Atom from "effect/unstable/reactivity/Atom"
 import {
   projectKey as statusKey,
   projectStatusesAtom

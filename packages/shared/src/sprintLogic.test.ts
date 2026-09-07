@@ -17,7 +17,7 @@ import { StatusSlug } from "./schemas/Status"
 
 const groupId = Schema.decodeUnknownSync(GroupId)
 const groupColor = Schema.decodeUnknownSync(GroupColor)
-const isoDate = (s: string): Date => DateTime.toDate(DateTime.unsafeMake(s))
+const isoDate = (s: string): Date => DateTime.toDate(DateTime.makeUnsafe(s))
 
 const makeSprint = (
   id: string,

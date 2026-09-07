@@ -64,6 +64,7 @@ export interface EverhourIntegrationsShape {
   ) => Effect.Effect<void>
 }
 
-export class EverhourIntegrations extends Context.Tag(
-  "@projectproject/backend/Services/EverhourIntegrations"
-)<EverhourIntegrations, EverhourIntegrationsShape>() {}
+export class EverhourIntegrations extends Context.Service<
+  EverhourIntegrations,
+  EverhourIntegrationsShape
+>()("@projectproject/backend/Services/EverhourIntegrations") {}

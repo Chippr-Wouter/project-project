@@ -122,6 +122,6 @@ export interface GitHubShape {
   ) => Effect.Effect<boolean, RepoGone | RateLimited | GitHubError>
 }
 
-export class GitHub extends Context.Tag(
+export class GitHub extends Context.Service<GitHub, GitHubShape>()(
   "@projectproject/backend/Services/GitHub"
-)<GitHub, GitHubShape>() {}
+) {}

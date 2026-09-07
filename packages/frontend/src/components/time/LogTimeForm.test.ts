@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
+import * as AsyncResult from "effect/unstable/reactivity/AsyncResult"
 import * as Schema from "effect/Schema"
 import { createElement } from "react"
 import { afterEach, describe, expect, it, vi } from "vite-plus/test"
@@ -7,13 +8,12 @@ import { LogTimeForm, parseDurationToSeconds } from "./LogTimeForm"
 
 const mocks = vi.hoisted(() => ({ logTime: vi.fn() }))
 
-vi.mock("@effect-atom/atom-react", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@effect-atom/atom-react")>()
+vi.mock("@effect/atom-react", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@effect/atom-react")>()
   return {
     ...actual,
     useAtomSet: () => mocks.logTime,
-    useAtomValue: () => actual.Result.initial()
+    useAtomValue: () => AsyncResult.initial()
   }
 })
 

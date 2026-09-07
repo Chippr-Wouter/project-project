@@ -1,5 +1,4 @@
-import * as JSONSchema from "effect/JSONSchema"
-import type * as Schema from "effect/Schema"
+import * as Schema from "effect/Schema"
 import { z } from "zod"
 
 type JsonSchemaNode = {
@@ -45,19 +44,14 @@ const toZod = (
       if (nullIdx === 0) return variants[1]!.nullable()
       if (nullIdx === 1) return variants[0]!.nullable()
     }
-    return z.union(variants as [z.ZodType, z.ZodType, ...Array<z.ZodType>])
+    return z.union(variants)
   }
 
   if (node.enum) {
     if (node.enum.every((v) => typeof v === "string")) {
-      return z.enum(node.enum as Array<string>)
+      return z.enum(node.enum)
     }
-    const variants = node.enum.map((v) =>
-      z.literal(v as z.core.util.Literal)
-    ) as Array<z.ZodType>
-    return z.union(
-      variants as unknown as [z.ZodType, z.ZodType, ...Array<z.ZodType>]
-    )
+    return z.union(node.enum.map((value) => z.literal(value)))
   }
 
   switch (node.type) {
@@ -101,10 +95,12 @@ const toZod = (
   }
 }
 
-export const effectToZodObject = <A, I, R>(
-  schema: Schema.Schema<A, I, R>
-): z.ZodObject => {
-  const root = JSONSchema.make(schema) as JsonSchemaNode
+export const effectToZodObject = <A>(schema: Schema.Schema<A>): z.ZodObject => {
+  const document = Schema.toJsonSchemaDocument(schema)
+  const root = {
+    ...document.schema,
+    $defs: document.definitions
+  } as JsonSchemaNode
   const defs = root.$defs ?? {}
   const converted = toZod({ ...root, $defs: undefined }, defs, new Set())
   if (converted instanceof z.ZodObject) return converted

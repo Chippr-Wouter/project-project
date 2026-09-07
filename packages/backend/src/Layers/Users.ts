@@ -10,9 +10,7 @@
 
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import { eq, inArray } from "drizzle-orm"
 import type { User } from "@projectproject/shared"
-import { user } from "../db/schema"
 import { Db } from "../Services/Db"
 import { Users, type UsersShape, type UserSummary } from "../Services/Users"
 
@@ -32,7 +30,10 @@ export const UsersLive = Layer.effect(
       db.query.user
         .findFirst({
           columns: userColumns,
-          where: eq(user.email, email.toLowerCase())
+          where: {
+            RAW: (table, _operators) =>
+              _operators.eq(table.email, email.toLowerCase())!
+          }
         })
         .pipe(
           Effect.map((row) => row ?? null),
@@ -46,7 +47,9 @@ export const UsersLive = Layer.effect(
       return db.query.user
         .findMany({
           columns: userColumns,
-          where: inArray(user.id, [...ids])
+          where: {
+            RAW: (table, _operators) => _operators.inArray(table.id, [...ids])!
+          }
         })
         .pipe(Effect.orDie)
     }
@@ -65,7 +68,9 @@ export const UsersLive = Layer.effect(
             image: true,
             createdAt: true
           },
-          where: inArray(user.id, [...ids])
+          where: {
+            RAW: (table, _operators) => _operators.inArray(table.id, [...ids])!
+          }
         })
         .pipe(
           Effect.map((rows) =>

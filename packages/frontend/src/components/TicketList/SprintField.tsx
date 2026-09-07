@@ -1,4 +1,5 @@
-import { useAtomValue } from "@effect-atom/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import { useAtomValue } from "@effect/atom-react"
 import { Plus } from "lucide-react"
 import { useState } from "react"
 import { SprintStateIcon } from "@/components/sprints/SprintChip"
@@ -14,7 +15,6 @@ import {
   useRemoveTicketsFromSprint
 } from "@/atoms/sprints"
 import { type Group, type TicketId } from "@projectproject/shared"
-import { Result } from "@effect-atom/atom-react"
 
 export function SprintField({
   orgSlug,

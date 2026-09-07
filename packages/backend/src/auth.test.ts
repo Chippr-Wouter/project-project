@@ -409,7 +409,7 @@ describe("organization role assignment access control", () => {
         organizationId,
         userId: adminUser!.id,
         role: "admin",
-        createdAt: DateTime.toDate(DateTime.unsafeNow())
+        createdAt: DateTime.toDate(DateTime.nowUnsafe())
       }
     })
 
@@ -432,7 +432,7 @@ describe("organization role assignment access control", () => {
         organizationId,
         userId: targetUser!.id,
         role: "member",
-        createdAt: DateTime.toDate(DateTime.unsafeNow())
+        createdAt: DateTime.toDate(DateTime.nowUnsafe())
       }
     })
 

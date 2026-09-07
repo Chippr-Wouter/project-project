@@ -1,4 +1,5 @@
-import { Result, useAtomValue } from "@effect-atom/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import { useAtomValue } from "@effect/atom-react"
 import { Link } from "@tanstack/react-router"
 import { m } from "@/paraglide/messages"
 import { projectKey, sprintsListAtom } from "@/atoms/sprints"

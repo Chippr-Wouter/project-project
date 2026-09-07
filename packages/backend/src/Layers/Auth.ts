@@ -29,7 +29,7 @@
 // malformed cookie payload). The wire type of this middleware is
 // `Unauthorized`, so we collapse `BetterAuthError → Unauthorized` via
 // `Effect.mapError`. The cause is lost from the client's perspective; if you
-// want it preserved server-side, log it via `Effect.tapErrorCause(...)` first.
+// want it preserved server-side, log it via `Effect.tapCause(...)` first.
 //
 // `getSession` also returns `null` when the cookie is structurally valid but
 // expired/revoked. That isn't a Promise rejection, just a `null` result — we
@@ -42,9 +42,10 @@
 // way is to provide `BetterAuthLive` somewhere underneath `AuthenticationLive`
 // in the `Layer.provide` chain.
 
-import { HttpServerRequest } from "@effect/platform"
+import { HttpServerRequest } from "effect/unstable/http"
 import {
   Authentication,
+  CurrentUser,
   type EditorPreference,
   Unauthorized
 } from "@projectproject/shared"
@@ -71,7 +72,7 @@ export const AuthenticationLive = Layer.effect(
     const ba = yield* BetterAuth
 
     return Authentication.of({
-      sessionCookie: (_token) =>
+      sessionCookie: (httpEffect, _options) =>
         Effect.gen(function* () {
           const req = yield* HttpServerRequest.HttpServerRequest
           const session = yield* ba
@@ -114,7 +115,7 @@ export const AuthenticationLive = Layer.effect(
           const personalEverhour = yield* ba
             .getPersonalEverhour(id)
             .pipe(Effect.orDie)
-          return {
+          return yield* Effect.provideService(httpEffect, CurrentUser, {
             id,
             email,
             name,
@@ -125,7 +126,7 @@ export const AuthenticationLive = Layer.effect(
             personalGithub,
             editorPreference,
             personalEverhour
-          }
+          })
         })
     })
   })

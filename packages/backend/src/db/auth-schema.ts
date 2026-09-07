@@ -1,4 +1,3 @@
-import { relations } from "drizzle-orm"
 // HAND-EDITED.
 //
 // `bunx @better-auth/cli generate` will overwrite this file with its own
@@ -22,7 +21,7 @@ import {
 } from "drizzle-orm/pg-core"
 import * as DateTime from "effect/DateTime"
 
-const now = () => DateTime.toDate(DateTime.unsafeNow())
+const now = () => DateTime.toDate(DateTime.nowUnsafe())
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -417,88 +416,3 @@ export const oauthClientAssertion = pgTable("oauth_client_assertion", {
   id: text("id").primaryKey(),
   expiresAt: timestamp("expires_at").notNull()
 })
-
-export const userRelations = relations(user, ({ many }) => ({
-  sessions: many(session),
-  accounts: many(account),
-  members: many(member),
-  invitations: many(invitation),
-  oauthClients: many(oauthClient),
-  oauthAccessTokens: many(oauthAccessToken),
-  oauthConsents: many(oauthConsent)
-}))
-
-export const sessionRelations = relations(session, ({ one }) => ({
-  user: one(user, {
-    fields: [session.userId],
-    references: [user.id]
-  })
-}))
-
-export const accountRelations = relations(account, ({ one }) => ({
-  user: one(user, {
-    fields: [account.userId],
-    references: [user.id]
-  })
-}))
-
-export const organizationRelations = relations(organization, ({ many }) => ({
-  members: many(member),
-  invitations: many(invitation)
-}))
-
-export const memberRelations = relations(member, ({ one }) => ({
-  organization: one(organization, {
-    fields: [member.organizationId],
-    references: [organization.id]
-  }),
-  user: one(user, {
-    fields: [member.userId],
-    references: [user.id]
-  })
-}))
-
-export const invitationRelations = relations(invitation, ({ one }) => ({
-  organization: one(organization, {
-    fields: [invitation.organizationId],
-    references: [organization.id]
-  }),
-  user: one(user, {
-    fields: [invitation.inviterId],
-    references: [user.id]
-  })
-}))
-
-export const oauthClientRelations = relations(oauthClient, ({ one, many }) => ({
-  user: one(user, {
-    fields: [oauthClient.userId],
-    references: [user.id]
-  }),
-  oauthAccessTokens: many(oauthAccessToken),
-  oauthConsents: many(oauthConsent)
-}))
-
-export const oauthAccessTokenRelations = relations(
-  oauthAccessToken,
-  ({ one }) => ({
-    oauthClient: one(oauthClient, {
-      fields: [oauthAccessToken.clientId],
-      references: [oauthClient.clientId]
-    }),
-    user: one(user, {
-      fields: [oauthAccessToken.userId],
-      references: [user.id]
-    })
-  })
-)
-
-export const oauthConsentRelations = relations(oauthConsent, ({ one }) => ({
-  oauthClient: one(oauthClient, {
-    fields: [oauthConsent.clientId],
-    references: [oauthClient.clientId]
-  }),
-  user: one(user, {
-    fields: [oauthConsent.userId],
-    references: [user.id]
-  })
-}))

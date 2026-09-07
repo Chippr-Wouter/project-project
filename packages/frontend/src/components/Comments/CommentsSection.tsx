@@ -1,5 +1,6 @@
+import * as Result from "effect/unstable/reactivity/AsyncResult"
 import { useState } from "react"
-import { useAtomValue, Result } from "@effect-atom/atom-react"
+import { useAtomValue } from "@effect/atom-react"
 import { motion, AnimatePresence } from "motion/react"
 import { ChevronRight } from "lucide-react"
 import { commentsAtom, commentsKey } from "@/atoms/comments"

@@ -15,7 +15,7 @@ import {
 const decodeTicketId = Schema.decodeUnknownSync(TicketId)
 const decodeTagName = Schema.decodeUnknownSync(TagName)
 const s = Schema.decodeUnknownSync(StatusSlug)
-const isoDate = (s: string) => DateTime.toDate(DateTime.unsafeMake(s))
+const isoDate = (s: string) => DateTime.toDate(DateTime.makeUnsafe(s))
 
 const baseTicket = (overrides: Partial<Ticket> = {}): Ticket => ({
   id: decodeTicketId("T-1"),

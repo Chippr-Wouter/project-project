@@ -4,7 +4,7 @@ This deployment moves the MCP authorization provider from the old Better Auth MC
 
 ## What the migration does
 
-The migration `0029_better_auth_17` creates the provider tables (`oauth_client`, `oauth_client_resource`, `oauth_provider_access_token`, `oauth_provider_consent`, `oauth_refresh_token`, `oauth_resource`, and supporting JWKS/assertion tables). It copies legacy `oauth_application` records into `oauth_client` records. Existing client secrets are copied as the provider's hashed secret; a legacy application without a secret is copied with the `none` token endpoint authentication method. Redirect URLs, client metadata, timestamps, and disabled state are preserved. The new records enable authorization-code and refresh-token grants, code responses, and mandatory PKCE.
+The migration `20260907091000_better_auth_17` creates the provider tables (`oauth_client`, `oauth_client_resource`, `oauth_provider_access_token`, `oauth_provider_consent`, `oauth_refresh_token`, `oauth_resource`, and supporting JWKS/assertion tables). It copies legacy `oauth_application` records into `oauth_client` records. Existing client secrets are copied as the provider's hashed secret; a legacy application without a secret is copied with the `none` token endpoint authentication method. Redirect URLs, client metadata, timestamps, and disabled state are preserved. The new records enable authorization-code and refresh-token grants, code responses, and mandatory PKCE.
 
 After the provider seeds the configured MCP resource, auth initialization links migrated clients to it. The backfill matches both the legacy row ID and client ID and leaves existing mappings unchanged, so repeated starts are safe. Per-client resource enforcement stays enabled.
 
@@ -24,7 +24,7 @@ Because old access tokens are expired and old consents are absent, a successful 
 
 ## Operational sequence
 
-1. Back up the database and apply the Drizzle migrations, including `0029_better_auth_17`.
+1. Back up the database and apply the timestamped Drizzle history, including `20260907091000_better_auth_17`.
 2. Deploy the matching backend and frontend together so root discovery, signed-query consent, and v1.7 OAuth endpoints agree.
 3. Ask existing MCP users to authorize their clients again. Confirm one new `oauth_client` and user-scoped `oauth_provider_consent` record exists for a migrated client.
 4. Verify a newly issued token against the configured MCP resource and verify that deleting the user's application removes the user's provider consent and token rows while leaving `oauth_client` intact.

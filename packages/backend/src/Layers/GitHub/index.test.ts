@@ -36,7 +36,9 @@ const FakeBetterAuthLive = Layer.succeed(BetterAuth, fakeBetterAuth)
 const buildGitHubLayer = (config: Map<string, string>) =>
   Layer.build(GitHubLive.pipe(Layer.provide(FakeBetterAuthLive))).pipe(
     Effect.scoped,
-    Effect.withConfigProvider(ConfigProvider.fromMap(config))
+    Effect.provideService(ConfigProvider.ConfigProvider)(
+      ConfigProvider.fromUnknown(Object.fromEntries(config))
+    )
   )
 
 const validConfig = new Map([

@@ -21,6 +21,7 @@ export interface SecretCryptoShape {
   ) => Effect.Effect<string, SecretCryptoUnavailable>
 }
 
-export class SecretCrypto extends Context.Tag(
-  "@projectproject/backend/Services/SecretCrypto"
-)<SecretCrypto, SecretCryptoShape>() {}
+export class SecretCrypto extends Context.Service<
+  SecretCrypto,
+  SecretCryptoShape
+>()("@projectproject/backend/Services/SecretCrypto") {}

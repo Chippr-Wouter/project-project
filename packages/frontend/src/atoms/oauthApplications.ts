@@ -1,4 +1,5 @@
-import { Atom, Result } from "@effect-atom/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import * as Atom from "effect/unstable/reactivity/Atom"
 import * as Effect from "effect/Effect"
 import { runtime } from "@/runtime"
 import { ApiClient } from "@/services/ApiClient"
@@ -24,7 +25,7 @@ export const revokeOAuthApplicationAtom = Atom.family((id: string) =>
     fn: runtime.fn(
       Effect.fn(function* (_: void, get) {
         const client = yield* ApiClient
-        yield* client.oauthApplications.revoke({ path: { id } })
+        yield* client.oauthApplications.revoke({ params: { id } })
         get.refresh(oauthApplicationsBaseAtom)
       })
     )

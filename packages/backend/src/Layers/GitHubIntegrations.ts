@@ -2,7 +2,7 @@ import * as Config from "effect/Config"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import * as SqlClient from "@effect/sql/SqlClient"
+import * as SqlClient from "effect/unstable/sql/SqlClient"
 import { and, eq, inArray } from "drizzle-orm"
 import { randomBytes, createHash } from "node:crypto"
 import {
@@ -14,10 +14,8 @@ import {
 } from "@projectproject/shared"
 import {
   githubAppInstallSession,
-  organization,
   organizationGithubIntegration,
   organizationIntegration,
-  projectIndex,
   projectIntegrationLink
 } from "../db/schema"
 import { CurrentOrg } from "../Services/CurrentOrg"
@@ -146,10 +144,13 @@ export const GitHubIntegrationsLive = Layer.effect(
             : yield* db.query.projectIndex
                 .findFirst({
                   columns: { id: true, organizationId: true },
-                  where: and(
-                    eq(projectIndex.organizationId, org.organizationId),
-                    eq(projectIndex.slug, returnProjectSlug)
-                  )
+                  where: {
+                    RAW: (table, _operators) =>
+                      _operators.and(
+                        _operators.eq(table.organizationId, org.organizationId),
+                        _operators.eq(table.slug, returnProjectSlug)
+                      )!
+                  }
                 })
                 .pipe(Effect.orDie)
         if (returnProjectSlug != null && !returnProject) {
@@ -181,7 +182,10 @@ export const GitHubIntegrationsLive = Layer.effect(
         const now = yield* DateTime.nowAsDate
         const session = yield* db.query.githubAppInstallSession
           .findFirst({
-            where: eq(githubAppInstallSession.stateHash, hashState(state))
+            where: {
+              RAW: (table, _operators) =>
+                _operators.eq(table.stateHash, hashState(state))!
+            }
           })
           .pipe(Effect.orDie)
         if (!session || session.completedAt || session.expiresAt < now) {
@@ -354,7 +358,10 @@ export const GitHubIntegrationsLive = Layer.effect(
         const org = yield* db.query.organization
           .findFirst({
             columns: { slug: true },
-            where: eq(organization.id, session.organizationId)
+            where: {
+              RAW: (table, _operators) =>
+                _operators.eq(table.id, session.organizationId)!
+            }
           })
           .pipe(Effect.orDie)
         if (!org) return yield* new NotFound()
@@ -364,10 +371,16 @@ export const GitHubIntegrationsLive = Layer.effect(
             : yield* db.query.projectIndex
                 .findFirst({
                   columns: { slug: true },
-                  where: and(
-                    eq(projectIndex.id, session.returnProjectId),
-                    eq(projectIndex.organizationId, session.organizationId)
-                  )
+                  where: {
+                    RAW: (table, _operators) =>
+                      _operators.and(
+                        _operators.eq(table.id, session.returnProjectId!),
+                        _operators.eq(
+                          table.organizationId,
+                          session.organizationId
+                        )
+                      )!
+                  }
                 })
                 .pipe(Effect.orDie)
         const baseUrl = yield* publicBaseUrl.pipe(

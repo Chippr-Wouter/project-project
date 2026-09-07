@@ -1,5 +1,6 @@
-import { FileSystem, Path } from "@effect/platform"
-import { BunContext } from "@effect/platform-bun"
+import * as FileSystem from "effect/FileSystem"
+import * as Path from "effect/Path"
+import * as BunServices from "@effect/platform-bun/BunServices"
 import { it } from "@effect/vitest"
 import * as Config from "effect/Config"
 import * as ConfigProvider from "effect/ConfigProvider"
@@ -9,7 +10,7 @@ import { describe, expect } from "vite-plus/test"
 import { Markdown } from "../Services/Markdown"
 import { MarkdownLive } from "./Markdown"
 
-const TestLayer = Layer.unwrapScoped(
+const TestLayer = Layer.unwrap(
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
     const tmpRoot = yield* fs.makeTempDirectoryScoped({
@@ -17,13 +18,13 @@ const TestLayer = Layer.unwrapScoped(
     })
     return MarkdownLive.pipe(
       Layer.provideMerge(
-        Layer.setConfigProvider(
-          ConfigProvider.fromMap(new Map([["PROJECTS_DIR", tmpRoot]]))
+        ConfigProvider.layer(
+          ConfigProvider.fromUnknown({ PROJECTS_DIR: tmpRoot })
         )
       )
     )
   })
-).pipe(Layer.provideMerge(BunContext.layer))
+).pipe(Layer.provideMerge(BunServices.layer))
 
 const projectFrontmatter = (slug: string) => ({
   org: "acme",
@@ -52,7 +53,7 @@ const ticketFrontmatter = (id: string) => ({
 })
 
 describe("Markdown deletion (real fs)", () => {
-  it.scoped(
+  it.effect(
     "removeTicketFile removes the file and listTicketIds reflects it",
     () =>
       Effect.gen(function* () {
@@ -87,7 +88,7 @@ describe("Markdown deletion (real fs)", () => {
       }).pipe(Effect.provide(TestLayer))
   )
 
-  it.scoped(
+  it.effect(
     "removeProjectDir removes the entire project tree including tickets",
     () =>
       Effect.gen(function* () {
@@ -126,7 +127,7 @@ describe("Markdown deletion (real fs)", () => {
       }).pipe(Effect.provide(TestLayer))
   )
 
-  it.scoped(
+  it.effect(
     "project re-created under same slug after removeProjectDir is empty of old tickets",
     () =>
       Effect.gen(function* () {

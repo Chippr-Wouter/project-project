@@ -55,7 +55,7 @@ export const isActionableInvitation = (
 export const filterActionableInvitations = (
   invites: readonly RawInvitation[],
   userEmail: string,
-  now = DateTime.toDate(DateTime.unsafeNow())
+  now = DateTime.toDate(DateTime.nowUnsafe())
 ) => invites.filter((invite) => isActionableInvitation(invite, userEmail, now))
 
 export const toPendingInvite = (
@@ -89,7 +89,7 @@ export const pickActiveInvite = (
 export const acceptInvitations = async (
   invites: readonly PendingInvite[],
   accept: (invite: PendingInvite) => Promise<void>,
-  now = DateTime.toDate(DateTime.unsafeNow())
+  now = DateTime.toDate(DateTime.nowUnsafe())
 ): Promise<InviteAcceptResult> => {
   const settled = await Promise.allSettled(
     invites.map(async (invite) => {
@@ -151,4 +151,4 @@ export const hasErrorCode = (cause: unknown, code: string) =>
   cause.code === code
 
 const toDate = (value: Date | string) =>
-  value instanceof Date ? value : DateTime.toDate(DateTime.unsafeMake(value))
+  value instanceof Date ? value : DateTime.toDate(DateTime.makeUnsafe(value))

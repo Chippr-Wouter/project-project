@@ -1,4 +1,4 @@
-import { useAtomSet, useAtomValue } from "@effect-atom/atom-react"
+import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import { createFileRoute } from "@tanstack/react-router"
 import * as DateTime from "effect/DateTime"
 import { projectKey, updateProjectSetupAtom } from "@/atoms/projects"
@@ -55,7 +55,7 @@ function WorkflowSettings() {
               update({
                 workflowReviewedAt: reviewedAt
                   ? null
-                  : DateTime.toDate(DateTime.unsafeNow())
+                  : DateTime.toDate(DateTime.nowUnsafe())
               })
             }
           >

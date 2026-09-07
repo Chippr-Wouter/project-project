@@ -1,4 +1,5 @@
-import { Result, useAtomSet, useAtomValue } from "@effect-atom/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import { useRouter } from "@tanstack/react-router"
 import * as Cause from "effect/Cause"
 import * as Exit from "effect/Exit"
@@ -47,7 +48,7 @@ function DeletedBody({ orgSlug, org }: { orgSlug: string; org: OrgDetail }) {
       await router.navigate({ to: "/orgs/$orgSlug", params: { orgSlug } })
       return
     }
-    const failure = Cause.failureOption(exit.cause)
+    const failure = Cause.findErrorOption(exit.cause)
     const graceExpired =
       Option.isSome(failure) &&
       failure.value._tag === "Conflict" &&

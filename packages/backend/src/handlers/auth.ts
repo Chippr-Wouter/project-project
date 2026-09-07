@@ -23,7 +23,7 @@
 // If a handler ever feels like it's accumulating logic, that's the signal to
 // push it into a service.
 
-import { HttpApiBuilder } from "@effect/platform"
+import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { AppApi, CurrentUser } from "@projectproject/shared"
 import * as Effect from "effect/Effect"
 

@@ -244,9 +244,10 @@ export interface AttachmentsShape {
   }>
 }
 
-export class Attachments extends Context.Tag(
-  "@projectproject/backend/Services/Attachments"
-)<Attachments, AttachmentsShape>() {}
+export class Attachments extends Context.Service<
+  Attachments,
+  AttachmentsShape
+>()("@projectproject/backend/Services/Attachments") {}
 
 export const DEDUPE_HASH_BATCH = 200
 

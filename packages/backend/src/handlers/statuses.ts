@@ -1,4 +1,4 @@
-import { HttpApiBuilder } from "@effect/platform"
+import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { AppApi, CurrentUser } from "@projectproject/shared"
 import * as Effect from "effect/Effect"
 import { CurrentOrg } from "../Services/CurrentOrg"
@@ -11,66 +11,80 @@ export const StatusesHandlerLive = HttpApiBuilder.group(
   "statuses",
   (handlers) =>
     handlers
-      .handle("list", ({ path }) =>
+      .handle("list", ({ params }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const svc = yield* ProjectStatuses
-          return yield* svc.list(org.orgSlug, user.id, path.slug)
+          return yield* svc.list(org.orgSlug, user.id, params.slug)
         })
       )
-      .handle("create", ({ path, payload }) =>
+      .handle("create", ({ params, payload }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const svc = yield* ProjectStatuses
-          return yield* svc.create(org.orgSlug, user.id, path.slug, payload)
+          return yield* svc.create(org.orgSlug, user.id, params.slug, payload)
         })
       )
-      .handle("update", ({ path, payload }) =>
+      .handle("update", ({ params, payload }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const svc = yield* ProjectStatuses
           const result = yield* svc
-            .update(org.orgSlug, user.id, path.slug, path.statusSlug, payload)
+            .update(
+              org.orgSlug,
+              user.id,
+              params.slug,
+              params.statusSlug,
+              payload
+            )
             .pipe(dieOnMarkdown)
           const everhour = yield* EverhourIntegrations
-          yield* everhour.bestEffortProjectSync(org.orgSlug, user.id, path.slug)
+          yield* everhour.bestEffortProjectSync(
+            org.orgSlug,
+            user.id,
+            params.slug
+          )
           return result
         })
       )
-      .handle("reorder", ({ path, payload }) =>
+      .handle("reorder", ({ params, payload }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const svc = yield* ProjectStatuses
           return yield* svc.reorder(
             org.orgSlug,
             user.id,
-            path.slug,
-            path.statusSlug,
+            params.slug,
+            params.statusSlug,
             payload
           )
         })
       )
-      .handle("remove", ({ path, urlParams }) =>
+      .handle("remove", ({ params, query }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const svc = yield* ProjectStatuses
           const result = yield* svc
-            .remove(org.orgSlug, user.id, path.slug, path.statusSlug, {
-              reassignTo: urlParams.reassignTo
+            .remove(org.orgSlug, user.id, params.slug, params.statusSlug, {
+              reassignTo: query.reassignTo
             })
             .pipe(dieOnMarkdown)
           const everhour = yield* EverhourIntegrations
-          yield* everhour.bestEffortProjectSync(org.orgSlug, user.id, path.slug)
+          yield* everhour.bestEffortProjectSync(
+            org.orgSlug,
+            user.id,
+            params.slug
+          )
           return result
         })
       )

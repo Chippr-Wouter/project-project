@@ -15,7 +15,7 @@ import type { TicketIndexProject } from "../Services/TicketIndex"
 
 const ticketId = Schema.decodeUnknownSync(TicketId)
 const ticketStatus = Schema.decodeUnknownSync(TicketStatus)
-const at = (iso: string) => DateTime.toDate(DateTime.unsafeMake(iso))
+const at = (iso: string) => DateTime.toDate(DateTime.makeUnsafe(iso))
 
 const project: TicketIndexProject = {
   orgSlug: "acme",

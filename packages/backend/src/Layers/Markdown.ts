@@ -6,7 +6,8 @@
 // org" lookup at this layer; callers (handlers via the Projects service)
 // thread it through.
 
-import { FileSystem, Path } from "@effect/platform"
+import * as FileSystem from "effect/FileSystem"
+import * as Path from "effect/Path"
 import * as Config from "effect/Config"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -33,22 +34,6 @@ function ensureSafeSlug(slug: string): Effect.Effect<void, MarkdownError> {
   }
   return Effect.void
 }
-
-const isSystemNotFound = (cause: unknown): boolean =>
-  typeof cause === "object" &&
-  cause !== null &&
-  "_tag" in cause &&
-  cause._tag === "SystemError" &&
-  "reason" in cause &&
-  cause.reason === "NotFound"
-
-const isSystemAlreadyExists = (cause: unknown): boolean =>
-  typeof cause === "object" &&
-  cause !== null &&
-  "_tag" in cause &&
-  cause._tag === "SystemError" &&
-  "reason" in cause &&
-  cause.reason === "AlreadyExists"
 
 export const MarkdownLive = Layer.effect(
   Markdown,
@@ -96,7 +81,7 @@ export const MarkdownLive = Layer.effect(
           .readFileString(file, "utf8")
           .pipe(
             Effect.mapError((cause): NotFound | MarkdownError =>
-              isSystemNotFound(cause)
+              cause.reason._tag === "NotFound"
                 ? new NotFound()
                 : new MarkdownError({ cause, message: `read failed: ${file}` })
             )
@@ -122,7 +107,7 @@ export const MarkdownLive = Layer.effect(
           .readFileString(file, "utf8")
           .pipe(
             Effect.mapError((cause): NotFound | MarkdownError =>
-              isSystemNotFound(cause)
+              cause.reason._tag === "NotFound"
                 ? new NotFound()
                 : new MarkdownError({ cause, message: `read failed: ${file}` })
             )
@@ -209,7 +194,7 @@ export const MarkdownLive = Layer.effect(
           .readFileString(file, "utf8")
           .pipe(
             Effect.mapError((cause): NotFound | MarkdownError =>
-              isSystemNotFound(cause)
+              cause.reason._tag === "NotFound"
                 ? new NotFound()
                 : new MarkdownError({ cause, message: `read failed: ${file}` })
             )
@@ -253,7 +238,7 @@ export const MarkdownLive = Layer.effect(
           .readFileString(file, "utf8")
           .pipe(
             Effect.mapError((cause): NotFound | MarkdownError =>
-              isSystemNotFound(cause)
+              cause.reason._tag === "NotFound"
                 ? new NotFound()
                 : new MarkdownError({ cause, message: `read failed: ${file}` })
             )
@@ -287,7 +272,7 @@ export const MarkdownLive = Layer.effect(
           )
         yield* fs.writeFileString(file, content, { flag: "wx" }).pipe(
           Effect.mapError((cause): MarkdownError | TicketIdTaken =>
-            isSystemAlreadyExists(cause)
+            cause.reason._tag === "AlreadyExists"
               ? new TicketIdTaken()
               : new MarkdownError({
                   cause,
@@ -346,7 +331,7 @@ export const MarkdownLive = Layer.effect(
         const file = ticketFilePath(orgSlug, slug, id)
         yield* fs.remove(file).pipe(
           Effect.mapError((cause): NotFound | MarkdownError =>
-            isSystemNotFound(cause)
+            cause.reason._tag === "NotFound"
               ? new NotFound()
               : new MarkdownError({
                   cause,
@@ -364,8 +349,8 @@ export const MarkdownLive = Layer.effect(
         yield* ensureSafeOrgAndProject(orgSlug, slug)
         const dir = ticketsDir(orgSlug, slug)
         const entries = yield* fs.readDirectory(dir).pipe(
-          Effect.catchAll((cause) =>
-            isSystemNotFound(cause)
+          Effect.catch((cause) =>
+            cause.reason._tag === "NotFound"
               ? Effect.succeed([] as ReadonlyArray<string>)
               : Effect.fail(
                   new MarkdownError({
@@ -413,7 +398,7 @@ export const MarkdownLive = Layer.effect(
           .readFileString(file, "utf8")
           .pipe(
             Effect.mapError((cause): NotFound | MarkdownError =>
-              isSystemNotFound(cause)
+              cause.reason._tag === "NotFound"
                 ? new NotFound()
                 : new MarkdownError({ cause, message: `read failed: ${file}` })
             )
@@ -441,7 +426,7 @@ export const MarkdownLive = Layer.effect(
           .readFileString(file, "utf8")
           .pipe(
             Effect.mapError((cause): NotFound | MarkdownError =>
-              isSystemNotFound(cause)
+              cause.reason._tag === "NotFound"
                 ? new NotFound()
                 : new MarkdownError({ cause, message: `read failed: ${file}` })
             )
@@ -475,7 +460,7 @@ export const MarkdownLive = Layer.effect(
           )
         yield* fs.writeFileString(file, content, { flag: "wx" }).pipe(
           Effect.mapError((cause): MarkdownError | GroupIdTaken =>
-            isSystemAlreadyExists(cause)
+            cause.reason._tag === "AlreadyExists"
               ? new GroupIdTaken()
               : new MarkdownError({
                   cause,
@@ -549,7 +534,7 @@ export const MarkdownLive = Layer.effect(
         const file = groupFilePath(orgSlug, slug, id)
         yield* fs.remove(file).pipe(
           Effect.mapError((cause): NotFound | MarkdownError =>
-            isSystemNotFound(cause)
+            cause.reason._tag === "NotFound"
               ? new NotFound()
               : new MarkdownError({
                   cause,
@@ -567,8 +552,8 @@ export const MarkdownLive = Layer.effect(
         yield* ensureSafeOrgAndProject(orgSlug, slug)
         const dir = groupsDir(orgSlug, slug)
         const entries = yield* fs.readDirectory(dir).pipe(
-          Effect.catchAll((cause) =>
-            isSystemNotFound(cause)
+          Effect.catch((cause) =>
+            cause.reason._tag === "NotFound"
               ? Effect.succeed([] as ReadonlyArray<string>)
               : Effect.fail(
                   new MarkdownError({

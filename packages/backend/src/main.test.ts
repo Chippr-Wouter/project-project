@@ -37,26 +37,23 @@
 // the frontend uses; same types; full contract enforcement.
 
 import { it } from "@effect/vitest"
-import {
-  FetchHttpClient,
-  HttpApi,
-  HttpApp,
-  HttpApiBuilder,
-  HttpApiClient,
-  HttpServer
-} from "@effect/platform"
-import { AppApi } from "@projectproject/shared"
+import { FetchHttpClient, HttpRouter, HttpServer } from "effect/unstable/http"
+import { HttpApi, HttpApiBuilder, HttpApiClient } from "effect/unstable/httpapi"
+import { AppApi, Authentication, Unauthorized } from "@projectproject/shared"
 import * as ConfigProvider from "effect/ConfigProvider"
+import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
 import { afterAll, expect, vi } from "vite-plus/test"
+import { createHmac } from "node:crypto"
+
 vi.mock("./auth", () => ({
   auth: {},
   mcpResource: "http://localhost:3000/mcp"
 }))
-import { createHmac } from "node:crypto"
 import {
+  ApiRouterLive,
   GITHUB_WEBHOOK_MAX_BODY_BYTES,
   HealthHandlerLive,
   githubWebhookRoute,
@@ -67,22 +64,42 @@ import {
   GitHubWebhooks,
   type GitHubWebhooksShape
 } from "./Services/GitHubWebhooks"
+import { AuthHandlerLive } from "./handlers/auth"
 
 const healthGroup = Object.values(AppApi.groups).find(
   (group) => group.identifier === "health"
 )
 if (!healthGroup) throw new Error("Health API group not found")
 
-const ApiUnderTestLive = HttpApiBuilder.api(
-  HttpApi.make(AppApi.identifier).add(healthGroup)
-).pipe(Layer.provide(HealthHandlerLive))
+const authGroup = AppApi.groups.auth
+
+const ApiUnderTestLive = HttpApiBuilder.layer(
+  HttpApi.make(AppApi.identifier).add(healthGroup).add(authGroup)
+).pipe(
+  Layer.provide(HealthHandlerLive),
+  Layer.provide(AuthHandlerLive),
+  Layer.provide(
+    Layer.succeed(Authentication, {
+      sessionCookie: () => Effect.fail(new Unauthorized())
+    })
+  ),
+  Layer.provide(ApiRouterLive)
+)
 
 // One shared web handler for the whole suite.
-const { handler, dispose } = HttpApiBuilder.toWebHandler(
-  ApiUnderTestLive.pipe(Layer.provideMerge(HttpServer.layerContext))
+const { handler, dispose } = HttpRouter.toWebHandler(
+  ApiUnderTestLive.pipe(Layer.provideMerge(HttpServer.layerServices))
 )
 
 afterAll(() => dispose())
+
+it.effect("GET /api/me reaches authentication instead of returning 404", () =>
+  Effect.promise(async () => {
+    const response = await handler(new Request("http://localhost/api/me"))
+    expect(response.status).toBe(401)
+    expect(await response.json()).toEqual({ _tag: "Unauthorized" })
+  })
+)
 
 // Layer that lets `HttpApiClient.make(AppApi)` reach our in-process handler
 // instead of the network. We override the `FetchHttpClient.Fetch` service —
@@ -99,10 +116,10 @@ const TestHttpClientLayer = FetchHttpClient.layer.pipe(
 // 1. The test you wrote: happy path through the raw web handler.
 // ----------------------------------------------------------------------------
 
-it.effect("GET /health responds with { status: 'ok' } and a 200", () =>
+it.effect("GET /api/health responds with { status: 'ok' } and a 200", () =>
   Effect.gen(function* () {
     const response = yield* Effect.promise(() =>
-      handler(new Request("http://localhost/health"))
+      handler(new Request("http://localhost/api/health"))
     )
 
     expect(response.status).toBe(200)
@@ -118,10 +135,10 @@ it.effect("GET /health responds with { status: 'ok' } and a 200", () =>
 //    pass the body check but fail this one.
 // ----------------------------------------------------------------------------
 
-it.effect("GET /health sets Content-Type to JSON", () =>
+it.effect("GET /api/health sets Content-Type to JSON", () =>
   Effect.gen(function* () {
     const response = yield* Effect.promise(() =>
-      handler(new Request("http://localhost/health"))
+      handler(new Request("http://localhost/api/health"))
     )
 
     // The platform sets `application/json` with charset/profile suffixes
@@ -139,7 +156,7 @@ it.effect("GET /health sets Content-Type to JSON", () =>
 it.effect("GET /unknown returns 404", () =>
   Effect.gen(function* () {
     const response = yield* Effect.promise(() =>
-      handler(new Request("http://localhost/unknown"))
+      handler(new Request("http://localhost/api/unknown"))
     )
 
     expect(response.status).toBe(404)
@@ -163,7 +180,7 @@ it.effect("GET /unknown returns 404", () =>
 it.effect("HttpApiClient.health.get() returns { status: 'ok' }", () =>
   Effect.gen(function* () {
     const client = yield* HttpApiClient.make(AppApi, {
-      baseUrl: "http://localhost"
+      baseUrl: "http://localhost/api"
     })
     const result = yield* client.health.get()
 
@@ -173,22 +190,43 @@ it.effect("HttpApiClient.health.get() returns { status: 'ok' }", () =>
 
 const webhookSecret = "test-webhook-secret"
 const jsonBody = (value: unknown) =>
-  Schema.encodeSync(Schema.parseJson())(value)
+  Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(value)
 
 const signWebhookBody = (body: string) =>
   `sha256=${createHmac("sha256", webhookSecret).update(body).digest("hex")}`
 
 const makeWebhookHandler = (service: GitHubWebhooksShape) =>
-  HttpApp.toWebHandlerLayer(
-    githubWebhookRoute.pipe(
-      Effect.withConfigProvider(
-        ConfigProvider.fromMap(
-          new Map([["GITHUB_APP_WEBHOOK_SECRET", webhookSecret]])
+  (() => {
+    const web = HttpRouter.toWebHandler(
+      HttpRouter.add(
+        "POST",
+        "/api/integrations/github/webhook",
+        githubWebhookRoute
+      ).pipe(
+        Layer.provide(Layer.succeed(GitHubWebhooks, service)),
+        Layer.provide(
+          ConfigProvider.layer(
+            ConfigProvider.fromUnknown({
+              GITHUB_APP_WEBHOOK_SECRET: webhookSecret
+            })
+          )
         )
       )
-    ),
-    Layer.succeed(GitHubWebhooks, service)
-  )
+    )
+    const context = Context.merge(
+      Context.make(GitHubWebhooks, service),
+      Context.make(
+        ConfigProvider.ConfigProvider,
+        ConfigProvider.fromUnknown({
+          GITHUB_APP_WEBHOOK_SECRET: webhookSecret
+        })
+      )
+    )
+    return {
+      handler: (request: Request) => web.handler(request, context),
+      dispose: web.dispose
+    }
+  })()
 
 it("verifyGithubWebhook accepts the matching sha256 signature", () => {
   const body = jsonBody({ action: "ping" })
@@ -208,9 +246,9 @@ it.effect(
           body: "abcd"
         }),
         3
-      ).pipe(Effect.either)
+      ).pipe(Effect.result)
 
-      expect(result._tag).toBe("Left")
+      expect(result._tag).toBe("Failure")
     })
 )
 

@@ -26,7 +26,7 @@
 //
 // DATE HANDLING
 // ----------------------------------------------------------------------------
-// `Schema.Date` decodes from an ISO string into a `Date` object on the
+// `Schema.DateFromString` decodes from an ISO string into a `Date` object on the
 // frontend, encodes a `Date` to an ISO string on the backend. This matches
 // Better Auth's wire format (Drizzle returns `Date` objects, JSON.stringify
 // turns those into ISO strings).
@@ -43,12 +43,12 @@ export const PersonalGithub = Schema.Struct({
 })
 export type PersonalGithub = typeof PersonalGithub.Type
 
-export const EditorPreference = Schema.Literal(
+export const EditorPreference = Schema.Literals([
   "github",
   "github_dev",
   "vscode",
   "cursor"
-)
+])
 export type EditorPreference = typeof EditorPreference.Type
 
 export const User = Schema.Struct({
@@ -57,7 +57,7 @@ export const User = Schema.Struct({
   name: Schema.String,
   username: Schema.NullOr(Schema.String),
   image: Schema.NullOr(Schema.String),
-  createdAt: Schema.Date,
+  createdAt: Schema.DateFromString,
   // The slug of the org this user is currently acting in (mirrors
   // session.activeOrganizationId, joined to organization.slug). Null when
   // the user has no active org (fresh signup, pre-onboarding). Frontend

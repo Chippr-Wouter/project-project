@@ -66,6 +66,6 @@ export interface BetterAuthShape {
   ) => Effect.Effect<{ redirectURI: string }, BetterAuthError>
 }
 
-export class BetterAuth extends Context.Tag(
+export class BetterAuth extends Context.Service<BetterAuth, BetterAuthShape>()(
   "@projectproject/backend/Services/BetterAuth"
-)<BetterAuth, BetterAuthShape>() {}
+) {}

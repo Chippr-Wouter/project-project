@@ -154,7 +154,7 @@ const branchEntryFromParts = (
           url: pr.url,
           title: pr.title,
           mergedAt: pr.mergedAt
-            ? DateTime.toDate(DateTime.unsafeMake(pr.mergedAt))
+            ? DateTime.toDate(DateTime.makeUnsafe(pr.mergedAt))
             : null,
           checks: mapChecks(
             pr.commits.nodes[0]?.commit.statusCheckRollup?.state

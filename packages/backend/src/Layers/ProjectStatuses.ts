@@ -1,7 +1,7 @@
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import { and, asc, eq } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { generateKeyBetween } from "fractional-indexing"
 import {
   Conflict,
@@ -15,8 +15,8 @@ import {
   isReservedStatusSlug,
   pickStatusColor
 } from "@projectproject/shared"
-import { projectIndex, projectStatus } from "../db/schema"
 import { Db } from "../Services/Db"
+import { projectStatus } from "../db/schema"
 import { Projects } from "../Services/Projects"
 import {
   ProjectStatuses,
@@ -51,7 +51,9 @@ export const ProjectStatusesLive = Layer.effect(
       db.query.projectIndex
         .findFirst({
           columns: { id: true },
-          where: eq(projectIndex.slug, slug)
+          where: {
+            RAW: (table, _operators) => _operators.eq(table.slug, slug)!
+          }
         })
         .pipe(
           Effect.orDie,
@@ -66,8 +68,11 @@ export const ProjectStatusesLive = Layer.effect(
         const projectId = yield* projectIdFromSlug(slug)
         const rows = yield* db.query.projectStatus
           .findMany({
-            where: eq(projectStatus.projectId, projectId),
-            orderBy: [asc(projectStatus.orderKey)]
+            where: {
+              RAW: (table, _operators) =>
+                _operators.eq(table.projectId, projectId)!
+            },
+            orderBy: (table, operators) => operators.asc(table.orderKey)
           })
           .pipe(Effect.orDie)
         return rows.map(rowToStatus)
@@ -111,8 +116,11 @@ export const ProjectStatusesLive = Layer.effect(
 
         const existing = yield* db.query.projectStatus
           .findMany({
-            where: eq(projectStatus.projectId, projectId),
-            orderBy: [asc(projectStatus.orderKey)]
+            where: {
+              RAW: (table, _operators) =>
+                _operators.eq(table.projectId, projectId)!
+            },
+            orderBy: (table, operators) => operators.asc(table.orderKey)
           })
           .pipe(Effect.orDie)
 
@@ -156,10 +164,13 @@ export const ProjectStatusesLive = Layer.effect(
 
         const current = yield* db.query.projectStatus
           .findFirst({
-            where: and(
-              eq(projectStatus.projectId, projectId),
-              eq(projectStatus.slug, statusSlug)
-            )
+            where: {
+              RAW: (table, _operators) =>
+                _operators.and(
+                  _operators.eq(table.projectId, projectId),
+                  _operators.eq(table.slug, statusSlug)
+                )!
+            }
           })
           .pipe(Effect.orDie)
         if (!current) return yield* new NotFound()
@@ -179,10 +190,13 @@ export const ProjectStatusesLive = Layer.effect(
             return yield* new Conflict({ reason: "reserved_slug" })
           const collision = yield* db.query.projectStatus
             .findFirst({
-              where: and(
-                eq(projectStatus.projectId, projectId),
-                eq(projectStatus.slug, newSlug)
-              )
+              where: {
+                RAW: (table, _operators) =>
+                  _operators.and(
+                    _operators.eq(table.projectId, projectId),
+                    _operators.eq(table.slug, newSlug)
+                  )!
+              }
             })
             .pipe(Effect.orDie)
           if (collision) return yield* new Conflict({ reason: "slug_exists" })
@@ -273,10 +287,13 @@ export const ProjectStatusesLive = Layer.effect(
 
         const current = yield* db.query.projectStatus
           .findFirst({
-            where: and(
-              eq(projectStatus.projectId, projectId),
-              eq(projectStatus.slug, statusSlug)
-            )
+            where: {
+              RAW: (table, _operators) =>
+                _operators.and(
+                  _operators.eq(table.projectId, projectId),
+                  _operators.eq(table.slug, statusSlug)
+                )!
+            }
           })
           .pipe(Effect.orDie)
         if (!current) return yield* new NotFound()
@@ -291,12 +308,16 @@ export const ProjectStatusesLive = Layer.effect(
             return yield* new Conflict({ reason: "reassign_required" })
           if (input.reassignTo === statusSlug)
             return yield* new Conflict({ reason: "reassign_target_invalid" })
+          const reassignTo = input.reassignTo
           const target = yield* db.query.projectStatus
             .findFirst({
-              where: and(
-                eq(projectStatus.projectId, projectId),
-                eq(projectStatus.slug, input.reassignTo)
-              )
+              where: {
+                RAW: (table, _operators) =>
+                  _operators.and(
+                    _operators.eq(table.projectId, projectId),
+                    _operators.eq(table.slug, reassignTo)
+                  )!
+              }
             })
             .pipe(Effect.orDie)
           if (!target)

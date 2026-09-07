@@ -1,11 +1,21 @@
 import { describe, expect, it } from "vite-plus/test"
 import * as Schema from "effect/Schema"
 import { StatusSlug } from "../schemas/Status"
+import { DEFAULT_TICKET_SORT, TicketListQuery } from "./Ticket"
 import { ticketListQueryFromSearch, ticketListQueryToSearch } from "./url"
 
 const s = Schema.decodeUnknownSync(StatusSlug)
 
 describe("ticketListQueryFromSearch", () => {
+  it("applies the default sort when the key is absent or undefined", () => {
+    expect(Schema.decodeUnknownSync(TicketListQuery)({}).sort).toEqual(
+      DEFAULT_TICKET_SORT
+    )
+    expect(
+      Schema.decodeUnknownSync(TicketListQuery)({ sort: undefined }).sort
+    ).toEqual(DEFAULT_TICKET_SORT)
+  })
+
   it("decodes a flat search record into the composite query", () => {
     const result = ticketListQueryFromSearch({
       status: ["todo", "in_progress"],

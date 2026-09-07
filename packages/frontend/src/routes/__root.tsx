@@ -4,14 +4,14 @@ import {
   useRouterState
 } from "@tanstack/react-router"
 import { useEffect } from "react"
-import type { Registry } from "@effect-atom/atom-react"
+import type { AtomRegistry } from "effect/unstable/reactivity/AtomRegistry"
 import { ErrorPage } from "@/components/ErrorPage"
 import { LoaderOverlay } from "@/components/Loader/LoaderOverlay"
 import { NotFoundPage } from "@/components/NotFoundPage"
 import { ShapeProvider } from "@/lib/shape-context"
 
 export interface RouterContext {
-  registry: Registry.Registry
+  registry: AtomRegistry
 }
 
 export const Route = createRootRouteWithContext<RouterContext>()({

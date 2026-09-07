@@ -1,12 +1,11 @@
-import * as Either from "effect/Either"
+import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import { useCallback, useEffect, useRef, useState } from "react"
 
-function readFromStorage<A, I>(
-  key: string,
-  schema: Schema.Schema<A, I>,
-  initial: A
-): A {
+function readFromStorage<
+  S extends Schema.ConstraintDecoder<unknown> &
+    Schema.ConstraintEncoder<unknown>
+>(key: string, schema: S, initial: S["Type"]): S["Type"] {
   if (typeof window === "undefined") return initial
   let raw: string | null
   try {
@@ -21,21 +20,24 @@ function readFromStorage<A, I>(
   } catch {
     return initial
   }
-  const decoded = Schema.decodeUnknownEither(schema)(parsed)
-  return Either.isRight(decoded) ? decoded.right : initial
+  const decoded = Schema.decodeUnknownResult(schema)(parsed)
+  return Result.isSuccess(decoded) ? decoded.success : initial
 }
 
-export function useLocalStorageState<A, I>(
+export function useLocalStorageState<
+  S extends Schema.ConstraintDecoder<unknown> &
+    Schema.ConstraintEncoder<unknown>
+>(
   key: string,
-  schema: Schema.Schema<A, I>,
-  initial: A
-): readonly [A, (next: A) => void] {
+  schema: S,
+  initial: S["Type"]
+): readonly [S["Type"], (next: S["Type"]) => void] {
   const schemaRef = useRef(schema)
   schemaRef.current = schema
   const initialRef = useRef(initial)
   initialRef.current = initial
 
-  const [value, setValue] = useState<A>(() =>
+  const [value, setValue] = useState<S["Type"]>(() =>
     readFromStorage(key, schema, initial)
   )
 
@@ -44,7 +46,7 @@ export function useLocalStorageState<A, I>(
   }, [key])
 
   const write = useCallback(
-    (next: A) => {
+    (next: S["Type"]) => {
       setValue(next)
       if (typeof window === "undefined") return
       try {

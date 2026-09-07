@@ -1,4 +1,5 @@
-import { Result, useAtomValue } from "@effect-atom/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import { useAtomValue } from "@effect/atom-react"
 import { Navigate, createFileRoute } from "@tanstack/react-router"
 import { SprintDetailSkeleton } from "@/components/sprints/SprintDetailSkeleton"
 import { SprintsEmpty } from "@/components/sprints/SprintsEmpty"

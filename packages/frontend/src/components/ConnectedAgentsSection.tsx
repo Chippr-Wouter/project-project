@@ -1,3 +1,4 @@
+import * as Result from "effect/unstable/reactivity/AsyncResult"
 // Connected agents card on the profile page.
 //
 // Lists OAuth clients (typically MCP agents) that have completed an
@@ -9,7 +10,7 @@
 // from the current window origin — single-origin homelab deploys work without
 // edits; dev/split-origin setups can swap the host before pasting.
 
-import { Result, useAtomSet, useAtomValue } from "@effect-atom/atom-react"
+import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import { ChevronRight, KeyRound } from "lucide-react"
 import { useMemo, useState } from "react"

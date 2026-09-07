@@ -3,7 +3,7 @@ import { PgDialect } from "drizzle-orm/pg-core"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import * as TestClock from "effect/TestClock"
+import * as TestClock from "effect/testing/TestClock"
 import { expect } from "vite-plus/test"
 import { member } from "../db/schema"
 import { CurrentOrg, type CurrentOrgShape } from "../Services/CurrentOrg"
@@ -13,18 +13,18 @@ import { OrgLive } from "./Org"
 
 const NOW = "2026-05-19T00:00:00.000Z"
 const setNow = TestClock.setTime(
-  DateTime.toEpochMillis(DateTime.unsafeMake(NOW))
+  DateTime.toEpochMillis(DateTime.makeUnsafe(NOW))
 )
 
 const dialect = new PgDialect()
 const sqlOf = (cond: unknown) => dialect.sqlToQuery(cond as never).sql
 
-const isoDate = (s: string) => DateTime.toDate(DateTime.unsafeMake(s))
+const isoDate = (s: string) => DateTime.toDate(DateTime.makeUnsafe(s))
 const nowDate = isoDate(NOW)
 const daysBefore = (n: number) =>
-  DateTime.toDate(DateTime.subtract(DateTime.unsafeMake(NOW), { days: n }))
+  DateTime.toDate(DateTime.subtract(DateTime.makeUnsafe(NOW), { days: n }))
 const plusGrace = (d: Date) =>
-  DateTime.toDate(DateTime.add(DateTime.unsafeFromDate(d), { days: 14 }))
+  DateTime.toDate(DateTime.add(DateTime.fromDateUnsafe(d), { days: 14 }))
 
 interface OrgRowLike {
   readonly organizationId: string
@@ -188,10 +188,10 @@ it.effect("get returns null deletedAt/purgeAt for a live org", () =>
 it.effect("get requires membership", () =>
   Effect.gen(function* () {
     const org = yield* Org
-    const result = yield* Effect.either(org.get("acme", "user-1"))
-    expect(result._tag).toBe("Left")
-    if (result._tag === "Left") {
-      expect(result.left._tag).toBe("NotFound")
+    const result = yield* Effect.result(org.get("acme", "user-1"))
+    expect(result._tag).toBe("Failure")
+    if (result._tag === "Failure") {
+      expect(result.failure._tag).toBe("NotFound")
     }
   }).pipe(Effect.provide(makeOrgLayer(makeState({ orgRow: null }))))
 )
@@ -222,10 +222,10 @@ it.effect("softDelete sets deletedAt for an owner", () =>
 it.effect("softDelete is owner-only", () =>
   Effect.gen(function* () {
     const org = yield* Org
-    const result = yield* Effect.either(org.softDelete("acme", "user-1"))
-    expect(result._tag).toBe("Left")
-    if (result._tag === "Left") {
-      expect(result.left._tag).toBe("Forbidden")
+    const result = yield* Effect.result(org.softDelete("acme", "user-1"))
+    expect(result._tag).toBe("Failure")
+    if (result._tag === "Failure") {
+      expect(result.failure._tag).toBe("Forbidden")
     }
   }).pipe(Effect.provide(makeOrgLayer(makeState(), memberResolve)))
 )
@@ -255,10 +255,10 @@ it.effect("restore rejects a past-grace org with Conflict", () =>
   Effect.gen(function* () {
     yield* setNow
     const org = yield* Org
-    const result = yield* Effect.either(org.restore("acme", "user-1"))
-    expect(result._tag).toBe("Left")
-    if (result._tag === "Left") {
-      expect(result.left._tag).toBe("Conflict")
+    const result = yield* Effect.result(org.restore("acme", "user-1"))
+    expect(result._tag).toBe("Failure")
+    if (result._tag === "Failure") {
+      expect(result.failure._tag).toBe("Conflict")
     }
   }).pipe(
     Effect.provide(
@@ -282,10 +282,10 @@ it.effect("restore rejects a live org with Conflict", () =>
   Effect.gen(function* () {
     yield* setNow
     const org = yield* Org
-    const result = yield* Effect.either(org.restore("acme", "user-1"))
-    expect(result._tag).toBe("Left")
-    if (result._tag === "Left") {
-      expect(result.left._tag).toBe("Conflict")
+    const result = yield* Effect.result(org.restore("acme", "user-1"))
+    expect(result._tag).toBe("Failure")
+    if (result._tag === "Failure") {
+      expect(result.failure._tag).toBe("Conflict")
     }
   }).pipe(
     Effect.provide(
@@ -309,10 +309,10 @@ it.effect("restore is owner-only", () =>
   Effect.gen(function* () {
     yield* setNow
     const org = yield* Org
-    const result = yield* Effect.either(org.restore("acme", "user-1"))
-    expect(result._tag).toBe("Left")
-    if (result._tag === "Left") {
-      expect(result.left._tag).toBe("Forbidden")
+    const result = yield* Effect.result(org.restore("acme", "user-1"))
+    expect(result._tag).toBe("Failure")
+    if (result._tag === "Failure") {
+      expect(result.failure._tag).toBe("Forbidden")
     }
   }).pipe(
     Effect.provide(
@@ -335,10 +335,10 @@ it.effect("restore is owner-only", () =>
 it.effect("restore requires membership", () =>
   Effect.gen(function* () {
     const org = yield* Org
-    const result = yield* Effect.either(org.restore("acme", "user-1"))
-    expect(result._tag).toBe("Left")
-    if (result._tag === "Left") {
-      expect(result.left._tag).toBe("NotFound")
+    const result = yield* Effect.result(org.restore("acme", "user-1"))
+    expect(result._tag).toBe("Failure")
+    if (result._tag === "Failure") {
+      expect(result.failure._tag).toBe("NotFound")
     }
   }).pipe(Effect.provide(makeOrgLayer(makeState({ orgRow: null }))))
 )

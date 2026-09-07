@@ -1,5 +1,6 @@
+import * as Result from "effect/unstable/reactivity/AsyncResult"
 import { useState } from "react"
-import { useAtomValue, useAtomSet, Result } from "@effect-atom/atom-react"
+import { useAtomValue, useAtomSet } from "@effect/atom-react"
 import * as DateTime from "effect/DateTime"
 import { Markdown } from "@/components/Markdown"
 import { MemberAvatar } from "@/components/MemberAvatar"
@@ -52,7 +53,7 @@ export function CommentRow({
             </span>
             <time className="text-muted-foreground">
               {DateTime.toDate(
-                DateTime.unsafeMake(comment.createdAt)
+                DateTime.makeUnsafe(comment.createdAt)
               ).toLocaleString(getLocale())}
             </time>
             {comment.editedAt && (

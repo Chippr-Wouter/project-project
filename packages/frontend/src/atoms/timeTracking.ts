@@ -1,4 +1,5 @@
-import { Atom, Result } from "@effect-atom/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import * as Atom from "effect/unstable/reactivity/Atom"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import {
@@ -58,8 +59,8 @@ export const ticketTimeKeysForTimers = (
   )
 
 export const optimisticStopTimer = <E>(
-  current: Result.Result<ActiveTimer | null, E>
-): Result.Result<ActiveTimer | null, E> =>
+  current: Result.AsyncResult<ActiveTimer | null, E>
+): Result.AsyncResult<ActiveTimer | null, E> =>
   Result.isSuccess(current)
     ? Result.success(current.value, { waiting: true })
     : current
@@ -72,7 +73,7 @@ export const activeTimerBaseAtom = Atom.family((orgSlug: string) =>
     .atom(
       Effect.gen(function* () {
         const client = yield* ApiClient
-        return yield* client.everhour.currentTimer({ path: { orgSlug } })
+        return yield* client.everhour.currentTimer({ params: { orgSlug } })
       })
     )
     .pipe(Atom.setIdleTTL("15 seconds"))
@@ -89,7 +90,7 @@ export const workTypesForTicketAtom = Atom.family((key: string) => {
       Effect.gen(function* () {
         const client = yield* ApiClient
         return yield* client.everhour.ticketWorkTypes({
-          path: { orgSlug, slug, id }
+          params: { orgSlug, slug, id }
         })
       })
     )
@@ -103,7 +104,7 @@ export const ticketTimeBaseAtom = Atom.family((key: string) => {
       Effect.gen(function* () {
         const client = yield* ApiClient
         return yield* client.everhour.ticketTime({
-          path: { orgSlug, slug, id }
+          params: { orgSlug, slug, id }
         })
       })
     )
@@ -126,7 +127,7 @@ export const startTicketTimerAtom = Atom.family((key: string) => {
       return Effect.gen(function* () {
         const client = yield* ApiClient
         const timer = yield* client.everhour.startTicketTimer({
-          path: { orgSlug, slug, id },
+          params: { orgSlug, slug, id },
           payload: input
         })
         get.refresh(activeTimerBaseAtom(orgSlug))
@@ -154,7 +155,7 @@ export const startSprintTimerAtom = Atom.family((key: string) => {
       return Effect.gen(function* () {
         const client = yield* ApiClient
         const timer = yield* client.everhour.startSprintTimer({
-          path: { orgSlug, slug, id },
+          params: { orgSlug, slug, id },
           payload: input
         })
         get.refresh(activeTimerBaseAtom(orgSlug))
@@ -176,7 +177,7 @@ export const stopTimerAtom = Atom.family((orgSlug: string) =>
       Effect.fn(function* (_input: void, get) {
         const client = yield* ApiClient
         const stopped = yield* client.everhour.stopTimer({
-          path: { orgSlug }
+          params: { orgSlug }
         })
         get.refresh(activeTimerBaseAtom(orgSlug))
         for (const stoppedKey of ticketTimeKeysForTimers(orgSlug, [stopped])) {
@@ -194,7 +195,7 @@ export const logTimeAtom = Atom.family((key: string) => {
     Effect.fn(function* (input: LogTimeInput, get) {
       const client = yield* ApiClient
       const summary = yield* client.everhour.logTime({
-        path: { orgSlug, slug },
+        params: { orgSlug, slug },
         payload: input
       })
       get.refresh(activeTimerBaseAtom(orgSlug))

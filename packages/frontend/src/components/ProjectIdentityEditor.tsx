@@ -1,4 +1,5 @@
-import { Result, useAtomSet, useAtomValue } from "@effect-atom/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as Schema from "effect/Schema"
 import { ProjectColor, ProjectIcon } from "@projectproject/shared"
 import { projectKey, updateProjectAtom } from "@/atoms/projects"

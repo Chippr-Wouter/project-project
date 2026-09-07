@@ -154,6 +154,7 @@ export interface TicketIndexShape {
   >
 }
 
-export class TicketIndex extends Context.Tag(
-  "@projectproject/backend/Services/TicketIndex"
-)<TicketIndex, TicketIndexShape>() {}
+export class TicketIndex extends Context.Service<
+  TicketIndex,
+  TicketIndexShape
+>()("@projectproject/backend/Services/TicketIndex") {}

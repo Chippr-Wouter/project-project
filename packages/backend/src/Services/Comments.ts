@@ -54,6 +54,6 @@ export interface CommentsShape {
   ) => Effect.Effect<void, NotFound | Forbidden | MarkdownError>
 }
 
-export class Comments extends Context.Tag(
+export class Comments extends Context.Service<Comments, CommentsShape>()(
   "@projectproject/backend/Services/Comments"
-)<Comments, CommentsShape>() {}
+) {}

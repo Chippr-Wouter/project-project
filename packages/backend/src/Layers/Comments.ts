@@ -2,7 +2,7 @@ import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import { and, eq } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import { ulid } from "ulid"
 import {
   Comment,
@@ -100,10 +100,13 @@ export const CommentsLive = Layer.effect(
         yield* ensureMember(orgSlug, userId, slug)
         const rows = yield* db.query.commentIndex
           .findMany({
-            where: and(
-              eq(commentIndex.projectSlug, slug),
-              eq(commentIndex.ticketId, ticketId)
-            ),
+            where: {
+              RAW: (table, _operators) =>
+                _operators.and(
+                  _operators.eq(table.projectSlug, slug),
+                  _operators.eq(table.ticketId, ticketId)
+                )!
+            },
             orderBy: (c, { asc }) => [asc(c.createdAt)]
           })
           .pipe(Effect.orDie)
@@ -211,11 +214,14 @@ export const CommentsLive = Layer.effect(
       Effect.gen(function* () {
         const row = yield* db.query.commentIndex
           .findFirst({
-            where: and(
-              eq(commentIndex.id, commentId),
-              eq(commentIndex.projectSlug, slug),
-              eq(commentIndex.ticketId, ticketId)
-            )
+            where: {
+              RAW: (table, _operators) =>
+                _operators.and(
+                  _operators.eq(table.id, commentId),
+                  _operators.eq(table.projectSlug, slug),
+                  _operators.eq(table.ticketId, ticketId)
+                )!
+            }
           })
           .pipe(Effect.orDie)
         if (!row) return yield* new NotFound()

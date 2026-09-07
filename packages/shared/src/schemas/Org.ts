@@ -3,7 +3,7 @@ import { Slug } from "./Project"
 
 export const ORG_DELETE_GRACE_DAYS = 14
 
-export const OrgRole = Schema.Literal("owner", "admin", "member")
+export const OrgRole = Schema.Literals(["owner", "admin", "member"])
 export type OrgRole = typeof OrgRole.Type
 
 export const Org = Schema.Struct({
@@ -18,8 +18,8 @@ export const OrgDetail = Schema.Struct({
   slug: Slug,
   name: Schema.String,
   role: OrgRole,
-  createdAt: Schema.Date,
-  deletedAt: Schema.NullOr(Schema.Date),
-  purgeAt: Schema.NullOr(Schema.Date)
+  createdAt: Schema.DateFromString,
+  deletedAt: Schema.NullOr(Schema.DateFromString),
+  purgeAt: Schema.NullOr(Schema.DateFromString)
 })
 export type OrgDetail = typeof OrgDetail.Type

@@ -103,6 +103,7 @@ export interface GitHubWebhooksShape {
   ) => Effect.Effect<void, GitHubWebhookHandleError>
 }
 
-export class GitHubWebhooks extends Context.Tag(
-  "@projectproject/backend/Services/GitHubWebhooks"
-)<GitHubWebhooks, GitHubWebhooksShape>() {}
+export class GitHubWebhooks extends Context.Service<
+  GitHubWebhooks,
+  GitHubWebhooksShape
+>()("@projectproject/backend/Services/GitHubWebhooks") {}

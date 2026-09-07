@@ -54,7 +54,7 @@ export const orgActionErrorFromExit = <A>(
   exit: Exit.Exit<A, unknown>
 ): OrgActionError | null => {
   if (!Exit.isFailure(exit)) return null
-  const failure = Cause.failureOption(exit.cause)
+  const failure = Cause.findErrorOption(exit.cause)
   const raw = Option.isSome(failure) ? failure.value : exit.cause
   const unwrapped =
     typeof raw === "object" && raw !== null && "error" in raw

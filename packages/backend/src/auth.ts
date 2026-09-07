@@ -1,89 +1,25 @@
-// packages/backend/src/auth.ts
-//
-// THE BETTER AUTH INSTANCE.
-// ============================================================================
-// This file is the single place where the Better Auth library is configured.
-// It exports the configured `auth` instance (a plain object with `.handler`
-// and `.api` namespaces) plus the inferred `User` and `Session` types.
-//
-// Everything else in the codebase touches Better Auth through the
-// `BetterAuth` Effect service in `services/BetterAuth.ts` — *not* by
-// importing `auth` directly. The exception is the Better Auth CLI, which
-// reads this file at the command line to generate the Drizzle schema.
-//
-// WHY A SEPARATE DRIZZLE CLIENT FOR BETTER AUTH?
-// ----------------------------------------------------------------------------
-// The Effect `Db` service in `services/Db.ts` produces a Drizzle client
-// inside Effect's Layer/Scope system. That client only exists while the
-// surrounding scope is alive — it's resource-managed.
-//
-// Better Auth, being Promise-based and constructed at module load, can't
-// participate in that scope. It needs a Drizzle client *now*, synchronously,
-// at file evaluation time.
-//
-// Two choices:
-//
-//   (A) Stand up a second, simple Drizzle client here just for Better Auth.
-//       Two pools share the same `DATABASE_URL`. Trivially cheap; clean.
-//
-//   (B) Hoist the Drizzle client out of `Db` into a top-level singleton and
-//       have both this file and `Db` use it. This couples `Db`'s lifecycle to
-//       module-load and undermines the resource management we set up in
-//       Chapter 1.
-//
-// We're going with (A) — keep this file simple, pay one extra connection.
-//
-// CONFIG TO FILL IN
-// ----------------------------------------------------------------------------
-//   - database:        drizzleAdapter(db, { provider: "pg", schema: { user, session, account, verification } })
-//   - secret:          process.env.BETTER_AUTH_SECRET
-//   - baseURL:         process.env.BETTER_AUTH_URL
-//   - trustedOrigins:  ["http://localhost:5173", "http://localhost:3000"]   (dev)
-//   - socialProviders.github:
-//       clientId, clientSecret from env, scope: ["repo", "read:org"]
-//   - session.cookieCache: { enabled: true, maxAge: 5 * 60 }
-//
-// EXPORTED TYPES
-// ----------------------------------------------------------------------------
-// After the instance is built:
-//
-//   export type User = typeof auth.$Infer.Session["user"]
-//   export type Session = typeof auth.$Infer.Session["session"]
-//
-// These flow into `services/BetterAuth.ts` so the wrapper's signatures stay
-// in sync with whatever Better Auth config we have here.
-//
-// USING `process.env` HERE IS FINE
-// ----------------------------------------------------------------------------
-// In Effect code we'd reach for `Config.redacted("FOO")` so missing env vars
-// fail with a typed `ConfigError`. Here, we're outside any Effect runtime —
-// `auth` is a top-level constant evaluated at import time. Plain `process.env`
-// reads are appropriate. If a required var is missing, throwing at boot is
-// the right behavior.
-
 import { betterAuth } from "better-auth"
 import { admin, jwt, magicLink, organization } from "better-auth/plugins"
 import { mcp } from "@better-auth/mcp"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { APIError } from "better-auth/api"
 import { drizzle } from "drizzle-orm/node-postgres"
-import { and, eq, inArray, ne, sql } from "drizzle-orm"
-import { FileSystem, Path } from "@effect/platform"
-import { BunContext } from "@effect/platform-bun"
+import { and, eq, inArray, sql } from "drizzle-orm"
+import { FileSystem, Path } from "effect"
+import * as BunServices from "@effect/platform-bun/BunServices"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import matter from "gray-matter"
 import * as schema from "./db/schema"
 import * as authSchema from "./db/auth-schema"
 import {
-  member,
   projectIndex,
   projectInviteGrant,
   projectMember,
   user
 } from "./db/schema"
 
-const db = drizzle(process.env.DATABASE_URL!, { schema })
+const db = drizzle(process.env.DATABASE_URL!, { relations: schema.relations })
 
 const SAFE_SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/
 const TICKET_FILE = /^T-[1-9][0-9]*\.md$/
@@ -128,19 +64,16 @@ async function assertNotLastOrgOwner(
   if (nextRole !== null && roleList(nextRole).includes("owner")) return
   const target = await db.query.member.findFirst({
     columns: { role: true },
-    where: and(
-      eq(member.organizationId, organizationId),
-      eq(member.userId, targetUserId)
-    )
+    where: { organizationId, userId: targetUserId }
   })
   if (!target || !roleList(target.role).includes("owner")) return
   const others = await db.query.member.findMany({
     columns: { id: true },
-    where: and(
-      eq(member.organizationId, organizationId),
-      eq(member.role, "owner"),
-      ne(member.userId, targetUserId)
-    )
+    where: {
+      organizationId,
+      role: "owner",
+      userId: { ne: targetUserId }
+    }
   })
   if (
     lastOrgOwnerBlocked({
@@ -227,7 +160,7 @@ async function unassignUserFromActiveTicketsOnDisk(
             }
             parsed.data.assignees = assignees.filter((id) => id !== userId)
             parsed.data.updatedAt = DateTime.toDate(
-              DateTime.unsafeNow()
+              DateTime.nowUnsafe()
             ).toISOString()
             yield* fs.writeFileString(
               filePath,
@@ -236,7 +169,7 @@ async function unassignUserFromActiveTicketsOnDisk(
           }),
         { concurrency: 8 }
       )
-    }).pipe(Effect.provide(BunContext.layer))
+    }).pipe(Effect.provide(BunServices.layer))
   )
 }
 
@@ -344,23 +277,20 @@ export const auth = betterAuth({
         before: async (sessionData) => {
           const currentUser = await db.query.user.findFirst({
             columns: { lastActiveOrganizationId: true },
-            where: eq(user.id, sessionData.userId)
+            where: { id: sessionData.userId }
           })
           let orgId = currentUser?.lastActiveOrganizationId ?? null
           if (orgId) {
             const stillMember = await db.query.member.findFirst({
               columns: { organizationId: true },
-              where: and(
-                eq(member.userId, sessionData.userId),
-                eq(member.organizationId, orgId)
-              )
+              where: { userId: sessionData.userId, organizationId: orgId }
             })
             if (!stillMember) orgId = null
           }
           if (!orgId) {
             const firstMembership = await db.query.member.findFirst({
               columns: { organizationId: true },
-              where: eq(member.userId, sessionData.userId)
+              where: { userId: sessionData.userId }
             })
             orgId = firstMembership?.organizationId ?? null
           }
@@ -546,6 +476,5 @@ export const auth = betterAuth({
   ]
 })
 
-// TODO: export inferred types.
 export type User = (typeof auth.$Infer.Session)["user"]
 export type Session = (typeof auth.$Infer.Session)["session"]

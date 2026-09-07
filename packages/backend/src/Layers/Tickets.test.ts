@@ -1,5 +1,6 @@
-import { FileSystem, Path } from "@effect/platform"
-import { BunContext } from "@effect/platform-bun"
+import * as FileSystem from "effect/FileSystem"
+import * as Path from "effect/Path"
+import * as BunServices from "@effect/platform-bun/BunServices"
 import { it } from "@effect/vitest"
 import * as Config from "effect/Config"
 import * as ConfigProvider from "effect/ConfigProvider"
@@ -156,7 +157,7 @@ const FakeDb = Layer.succeed(Db, {
   }
 } as never)
 
-const TestLayer = Layer.unwrapScoped(
+const TestLayer = Layer.unwrap(
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
     const tmpRoot = yield* fs.makeTempDirectoryScoped({
@@ -173,15 +174,15 @@ const TestLayer = Layer.unwrapScoped(
       Layer.provide(FakeDb),
       Layer.provide(MarkdownLive),
       Layer.provideMerge(
-        Layer.setConfigProvider(
-          ConfigProvider.fromMap(new Map([["PROJECTS_DIR", tmpRoot]]))
+        ConfigProvider.layer(
+          ConfigProvider.fromUnknown({ PROJECTS_DIR: tmpRoot })
         )
       )
     )
   })
-).pipe(Layer.provideMerge(BunContext.layer))
+).pipe(Layer.provideMerge(BunServices.layer))
 
-it.scoped("deleting a ticket removes its markdown file from disk", () =>
+it.effect("deleting a ticket removes its markdown file from disk", () =>
   Effect.gen(function* () {
     const tickets = yield* Tickets
     const fs = yield* FileSystem.FileSystem
@@ -213,7 +214,7 @@ it.scoped("deleting a ticket removes its markdown file from disk", () =>
   }).pipe(Effect.provide(TestLayer))
 )
 
-it.scoped("honors a custom status on quickCreate", () =>
+it.effect("honors a custom status on quickCreate", () =>
   Effect.gen(function* () {
     const tickets = yield* Tickets
     const created = yield* tickets.quickCreate("org", "user-1", "p", {
@@ -224,7 +225,7 @@ it.scoped("honors a custom status on quickCreate", () =>
   }).pipe(Effect.provide(TestLayer))
 )
 
-it.scoped("falls back to 'todo' when status is omitted on quickCreate", () =>
+it.effect("falls back to 'todo' when status is omitted on quickCreate", () =>
   Effect.gen(function* () {
     const tickets = yield* Tickets
     const created = yield* tickets.quickCreate("org", "user-1", "p", {
@@ -234,23 +235,23 @@ it.scoped("falls back to 'todo' when status is omitted on quickCreate", () =>
   }).pipe(Effect.provide(TestLayer))
 )
 
-it.scoped("rejects an unknown status on quickCreate", () =>
+it.effect("rejects an unknown status on quickCreate", () =>
   Effect.gen(function* () {
     const tickets = yield* Tickets
-    const result = yield* Effect.either(
+    const result = yield* Effect.result(
       tickets.quickCreate("org", "user-1", "p", {
         title: "bogus",
         status: "not_a_real_status" as never
       })
     )
-    expect(result._tag).toBe("Left")
-    if (result._tag === "Left") {
-      expect(result.left._tag).toBe("Validation")
+    expect(result._tag).toBe("Failure")
+    if (result._tag === "Failure") {
+      expect(result.failure._tag).toBe("Validation")
     }
   }).pipe(Effect.provide(TestLayer))
 )
 
-it.scoped("archiving sets archivedAt and records the reason as a comment", () =>
+it.effect("archiving sets archivedAt and records the reason as a comment", () =>
   Effect.gen(function* () {
     recordedCommentBodies.length = 0
     const tickets = yield* Tickets
@@ -279,7 +280,7 @@ it.scoped("archiving sets archivedAt and records the reason as a comment", () =>
   }).pipe(Effect.provide(TestLayer))
 )
 
-it.scoped("archiving without a reason posts no comment", () =>
+it.effect("archiving without a reason posts no comment", () =>
   Effect.gen(function* () {
     recordedCommentBodies.length = 0
     const tickets = yield* Tickets
@@ -291,7 +292,7 @@ it.scoped("archiving without a reason posts no comment", () =>
   }).pipe(Effect.provide(TestLayer))
 )
 
-it.scoped(
+it.effect(
   "creating a ticket after deleting one with the same name does not inherit the old description",
   () =>
     Effect.gen(function* () {

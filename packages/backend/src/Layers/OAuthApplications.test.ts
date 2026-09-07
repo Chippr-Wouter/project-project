@@ -8,10 +8,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test"
 import { OAuthApplicationsLive } from "./OAuthApplications"
 import { DbLive } from "./Db"
 import { OAuthApplications } from "../Services/OAuthApplications"
-import * as authSchema from "../db/auth-schema"
 
 const databaseUrl = process.env.PROJECTPROJECT_TEST_DATABASE_URL
-const date = (value: string) => DateTime.toDate(DateTime.unsafeMake(value))
+const date = (value: string) => DateTime.toDate(DateTime.makeUnsafe(value))
 
 describe.skipIf(!databaseUrl)("OAuth application service", () => {
   const userA = randomUUID()
@@ -28,9 +27,7 @@ describe.skipIf(!databaseUrl)("OAuth application service", () => {
         OAuthApplicationsLive.pipe(
           Layer.provide(
             DbLive.pipe(
-              Layer.provideMerge(
-                PgClient.layer({ url: Redacted.make(databaseUrl) })
-              )
+              Layer.provide(PgClient.layer({ url: Redacted.make(databaseUrl) }))
             )
           )
         )
@@ -51,7 +48,7 @@ describe.skipIf(!databaseUrl)("OAuth application service", () => {
       )
     }
     pool = new Pool({ connectionString: databaseUrl })
-    await migrate(drizzle({ client: pool, schema: authSchema }), {
+    await migrate(drizzle({ client: pool }), {
       migrationsFolder: `${import.meta.dirname}/../db/migrations`
     })
 

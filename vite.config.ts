@@ -66,7 +66,7 @@ export default defineConfig({
       "**/dist",
       "**/build",
       "**/.next",
-      "**/db/migrations/meta/**",
+      "**/db/migrations/**/snapshot.json",
       "docs/everhour-api-schema.yml",
       "bun.lock",
       "**/routeTree.gen.ts",

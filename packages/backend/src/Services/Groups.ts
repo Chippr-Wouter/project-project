@@ -123,6 +123,6 @@ export interface GroupsShape {
   ) => Effect.Effect<void, MarkdownError>
 }
 
-export class Groups extends Context.Tag(
+export class Groups extends Context.Service<Groups, GroupsShape>()(
   "@projectproject/backend/Services/Groups"
-)<Groups, GroupsShape>() {}
+) {}

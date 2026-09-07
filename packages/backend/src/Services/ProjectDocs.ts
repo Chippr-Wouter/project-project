@@ -68,6 +68,7 @@ export interface ProjectDocsShape {
   >
 }
 
-export class ProjectDocs extends Context.Tag(
-  "@projectproject/backend/Services/ProjectDocs"
-)<ProjectDocs, ProjectDocsShape>() {}
+export class ProjectDocs extends Context.Service<
+  ProjectDocs,
+  ProjectDocsShape
+>()("@projectproject/backend/Services/ProjectDocs") {}

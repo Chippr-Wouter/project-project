@@ -18,7 +18,7 @@ const withKey =
 
 const run = <A, E>(effect: Effect.Effect<A, E, SecretCrypto>) =>
   Effect.runPromise(
-    Effect.provide(effect, SecretCryptoLive) as Effect.Effect<A, E, never>
+    effect.pipe(Effect.provide(SecretCryptoLive)) as Effect.Effect<A, E, never>
   )
 
 describe("SecretCrypto", () => {
@@ -57,7 +57,7 @@ describe("SecretCrypto", () => {
         Effect.gen(function* () {
           const crypto = yield* SecretCrypto
           const sealed = yield* crypto.seal("r2-secret-key")
-          return yield* Effect.either(
+          return yield* Effect.result(
             crypto.open({
               ...sealed,
               ciphertext: Buffer.from("tampered").toString("base64")
@@ -65,7 +65,7 @@ describe("SecretCrypto", () => {
           )
         })
       )
-      expect(result._tag).toBe("Left")
+      expect(result._tag).toBe("Failure")
     })
   )
 
@@ -76,10 +76,10 @@ describe("SecretCrypto", () => {
       const result = await run(
         Effect.gen(function* () {
           const crypto = yield* SecretCrypto
-          return yield* Effect.either(crypto.seal("x"))
+          return yield* Effect.result(crypto.seal("x"))
         })
       )
-      expect(result._tag).toBe("Left")
+      expect(result._tag).toBe("Failure")
     } finally {
       process.env.USER_SECRET_ENCRYPTION_KEY = previous
     }
@@ -93,10 +93,10 @@ describe("SecretCrypto", () => {
       const result = await run(
         Effect.gen(function* () {
           const crypto = yield* SecretCrypto
-          return yield* Effect.either(crypto.seal("x"))
+          return yield* Effect.result(crypto.seal("x"))
         })
       )
-      expect(result._tag).toBe("Left")
+      expect(result._tag).toBe("Failure")
     } finally {
       process.env.USER_SECRET_ENCRYPTION_KEY = previous
     }
