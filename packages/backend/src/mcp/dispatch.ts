@@ -24,6 +24,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import * as Effect from "effect/Effect"
 import type * as ManagedRuntime from "effect/ManagedRuntime"
+import * as Record from "effect/Record"
 import * as Schema from "effect/Schema"
 import {
   CurrentUser,
@@ -34,6 +35,10 @@ import {
 import { mapToolError, type McpToolErrorResult } from "./errorMap"
 import { currentUserStorage } from "./currentUserStorage"
 import { effectToZodObject } from "./inputSchemas"
+
+const inputSchemas = Record.map(McpTools, (spec) =>
+  effectToZodObject(spec.input)
+)
 
 type SpecOf<K extends McpToolName> = (typeof McpTools)[K]
 
@@ -85,13 +90,11 @@ function registerOne<R, K extends McpToolName>(
     input: InputOf<K>
   ) => Effect.Effect<OutputOf<K>, SpecErrors<K>, R | CurrentUser>
 
-  const inputZod = effectToZodObject(spec.input)
-
   server.registerTool(
     name,
     {
       description: spec.description,
-      inputSchema: inputZod.shape
+      inputSchema: inputSchemas[name].shape
     },
     (async (input: unknown) => {
       const user = currentUserStorage.getStore()
