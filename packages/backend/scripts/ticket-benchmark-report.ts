@@ -1,35 +1,5 @@
 import * as Schema from "effect/Schema"
 
-export interface BenchmarkResult {
-  readonly operation: string
-  readonly concurrency: number
-  readonly samples: number
-  readonly failures: number
-  readonly p50Ms: number
-  readonly p95Ms: number
-  readonly p99Ms: number
-  readonly throughputPerSecond: number
-  readonly wallTimeMs: number
-  readonly firstFailure: string | null
-}
-
-export interface BenchmarkReport {
-  readonly generatedAt: string
-  readonly environment: {
-    readonly platform: string
-    readonly architecture: string
-    readonly cpuCount: number
-    readonly bunVersion: string
-  }
-  readonly variant: string
-  readonly round: number
-  readonly ticketCount: number
-  readonly sampleCount: number
-  readonly concurrencies: ReadonlyArray<number>
-  readonly seedTimeMs: number
-  readonly results: ReadonlyArray<BenchmarkResult>
-}
-
 export interface BenchmarkComparison {
   readonly operation: string
   readonly concurrency: number
@@ -73,6 +43,9 @@ const BenchmarkReportSchema = Schema.Struct({
   results: Schema.Array(BenchmarkResultSchema)
 })
 
+export type BenchmarkResult = typeof BenchmarkResultSchema.Type
+export type BenchmarkReport = typeof BenchmarkReportSchema.Type
+
 const decodeBenchmarkReports = Schema.decodeUnknownSync(
   Schema.Array(BenchmarkReportSchema)
 )
@@ -84,7 +57,7 @@ export const parseBenchmarkReports = (
   if (trimmed === "") return []
   let parsed: unknown
   try {
-    parsed = JSON.parse(trimmed) as unknown
+    parsed = JSON.parse(trimmed)
   } catch {
     parsed = trimmed
       .split("\n")
