@@ -86,6 +86,7 @@ const ticketSortExpression = (sort: TicketSort): SQL => {
     case "priority":
       return ticketPrioritySortExpression
   }
+  throw new Error("unsupported ticket sort key")
 }
 
 const cursorSortValue = (
@@ -171,9 +172,7 @@ const ticketWhereConditions = (
     const assignees = filter.assignee.map((assignee) =>
       assignee === "mine" ? options.viewerId : assignee
     )
-    const requestedIds = assignees.filter(
-      (assignee) => assignee !== null
-    )
+    const requestedIds = assignees.filter((assignee) => assignee !== null)
     const assigneeConditions: Array<SQL> = []
     if (assignees.includes(null)) {
       assigneeConditions.push(
