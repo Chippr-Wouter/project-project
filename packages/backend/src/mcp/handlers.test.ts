@@ -190,8 +190,8 @@ describe("MCP dispatcher → list_tickets", () => {
 
     registerAllTools(
       fakeServer as Parameters<typeof registerAllTools>[0],
-      runtime as any,
-      handlers as any
+      runtime,
+      handlers
     )
 
     const cb = registered.get("list_tickets")
@@ -226,8 +226,8 @@ describe("MCP dispatcher → doc tools", () => {
 
     registerAllTools(
       fakeServer as Parameters<typeof registerAllTools>[0],
-      runtime as any,
-      handlers as any
+      runtime,
+      handlers
     )
 
     const cb = registered.get("get_project_doc")
@@ -252,8 +252,8 @@ describe("MCP dispatcher → doc tools", () => {
     const fakeServer = captureToolCalls(registered)
     registerAllTools(
       fakeServer as Parameters<typeof registerAllTools>[0],
-      runtime as any,
-      handlers as any
+      runtime,
+      handlers
     )
 
     const cb = registered.get("get_group_doc")
@@ -276,8 +276,8 @@ describe("MCP dispatcher → doc tools", () => {
     const fakeServer = captureToolCalls(registered)
     registerAllTools(
       fakeServer as Parameters<typeof registerAllTools>[0],
-      runtime as any,
-      handlers as any
+      runtime,
+      handlers
     )
 
     const cb = registered.get("get_ticket_doc")
@@ -393,8 +393,8 @@ describe("MCP dispatcher → write tools", () => {
     const fakeServer = captureToolCalls(registered)
     registerAllTools(
       fakeServer as Parameters<typeof registerAllTools>[0],
-      runtime as any,
-      handlers as any
+      runtime,
+      handlers
     )
     return { runtime, registered }
   }
@@ -640,8 +640,8 @@ describe("MCP dispatcher → add_tickets_to_group", () => {
     const fakeServer = captureToolCalls(registered)
     registerAllTools(
       fakeServer as Parameters<typeof registerAllTools>[0],
-      runtime as any,
-      handlers as any
+      runtime,
+      handlers
     )
     return {
       runtime,
@@ -783,8 +783,8 @@ describe("MCP dispatcher → sprint writes", () => {
     const fakeServer = captureToolCalls(registered)
     registerAllTools(
       fakeServer as Parameters<typeof registerAllTools>[0],
-      runtime as any,
-      handlers as any
+      runtime,
+      handlers
     )
     return {
       runtime,
@@ -947,8 +947,8 @@ describe("MCP dispatcher → NotFound retained", () => {
     const fakeServer = captureToolCalls(registered)
     registerAllTools(
       fakeServer as Parameters<typeof registerAllTools>[0],
-      runtime as any,
-      handlers as any
+      runtime,
+      handlers
     )
 
     const cb = registered.get("get_ticket_doc")

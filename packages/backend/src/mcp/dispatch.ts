@@ -16,7 +16,7 @@ import {
   Unauthorized,
   type McpToolName
 } from "@projectproject/shared"
-import { mapToolError, type McpToolErrorResult } from "./errorMap"
+import { mapToolError } from "./errorMap"
 import { currentUserStorage } from "./currentUserStorage"
 
 const isToolName = Schema.is(Schema.Literals(Record.keys(McpTools)))
@@ -39,9 +39,6 @@ type SpecOf<K extends McpToolName> = (typeof McpTools)[K]
 type InputOf<K extends McpToolName> = Schema.Schema.Type<SpecOf<K>["input"]>
 type OutputOf<K extends McpToolName> = Schema.Schema.Type<SpecOf<K>["output"]>
 
-// Union of Schema-decoded error types declared in `spec.errors`. Drives the
-// handler's E channel so a handler raising an error not in the catalog
-// fails to typecheck.
 type SpecErrors<K extends McpToolName> = Schema.Schema.Type<
   SpecOf<K>["errors"][number]
 >
@@ -85,39 +82,19 @@ async function callTool<R, K extends McpToolName>(
   input: unknown
 ) {
   const spec = McpTools[name] as SpecOf<K>
-  const handler = handlers[name] as (
-    input: InputOf<K>
-  ) => Effect.Effect<OutputOf<K>, SpecErrors<K>, R | CurrentUser>
+  const handler = handlers[name]
 
   const user = currentUserStorage.getStore()
   if (!user) {
     return mapToolError(new Unauthorized())
   }
 
-  const decodeInput = (
-    value: unknown
-  ): Effect.Effect<InputOf<K>, Schema.SchemaError, never> =>
-    Schema.decodeUnknownEffect(spec.input)(value) as Effect.Effect<
-      InputOf<K>,
-      Schema.SchemaError,
-      never
-    >
-  const encodeOutput = (
-    value: OutputOf<K>
-  ): Effect.Effect<unknown, Schema.SchemaError, never> =>
-    Schema.encodeEffect(spec.output)(value) as Effect.Effect<
-      unknown,
-      Schema.SchemaError,
-      never
-    >
-
-  const program: Effect.Effect<
-    JsonContentResult | McpToolErrorResult,
-    never,
-    R
-  > = decodeInput(input).pipe(
+  const decoded = Schema.decodeUnknownEffect(spec.input)(
+    input
+  ) as Effect.Effect<InputOf<K>, Schema.SchemaError>
+  const program = decoded.pipe(
     Effect.flatMap(handler),
-    Effect.flatMap(encodeOutput),
+    Effect.flatMap(Schema.encodeEffect(spec.output)),
     Effect.map(asJsonContent),
     Effect.catch((e) => Effect.succeed(mapToolError(e))),
     Effect.tapDefect((cause) =>
