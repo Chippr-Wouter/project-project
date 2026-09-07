@@ -66,7 +66,7 @@ export const Route = createFileRoute("/_authed/orgs/$orgSlug/projects/$slug/")({
                     )
                   )
                 ),
-              { concurrency: "unbounded" }
+              { concurrency: 4 }
             )
           })
         ],
