@@ -11,6 +11,19 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: mcp-test
+          POSTGRES_DB: projectproject_mcp_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -26,6 +39,12 @@ jobs:
 
       - name: Typecheck
         run: bun run typecheck
+
+      - name: MCP transport integration
+        working-directory: packages/backend
+        run: bun run test src/Layers/McpHttp.test.ts
+        env:
+          PROJECTPROJECT_MCP_TEST_DATABASE_URL: postgres://postgres:mcp-test@127.0.0.1:5432/projectproject_mcp_test
 
       - name: Build
         run: bun run build
