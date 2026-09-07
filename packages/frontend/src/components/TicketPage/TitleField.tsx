@@ -54,7 +54,7 @@ export function TitleField({
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="-mx-1.5 block w-full rounded px-1.5 text-left text-2xl font-semibold tracking-tight transition-all duration-100 hover:bg-accent/40 active:scale-[0.97]"
+        className="-mx-2 block w-full rounded-md px-2 text-left text-2xl font-semibold tracking-tight transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
       >
         <span className={saving || failed ? "animate-pulse" : undefined}>
           {ticket.title}
@@ -70,7 +70,7 @@ export function TitleField({
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => void commit()}
       onKeyDown={handleKey}
-      className="-mx-1.5 block w-full rounded bg-transparent px-1.5 text-2xl font-semibold tracking-tight outline-none ring-2 ring-ring/50"
+      className="-mx-2 block w-full rounded-md bg-transparent px-2 text-2xl font-semibold tracking-tight outline-none ring-2 ring-ring/50"
       maxLength={200}
       aria-label={m.tickets_title_aria_label()}
     />
