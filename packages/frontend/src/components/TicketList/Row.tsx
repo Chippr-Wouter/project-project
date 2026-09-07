@@ -133,6 +133,8 @@ function RowImpl({
               openOnHover
               delay={TICKET_PREVIEW_DELAY_MS}
               nativeButton={false}
+              onPointerEnter={handleTitlePointerEnter}
+              onPointerLeave={handleTitlePointerLeave}
               render={(triggerProps) => (
                 <div
                   {...triggerProps}
@@ -145,8 +147,6 @@ function RowImpl({
                   onKeyDown={undefined}
                   onKeyUp={undefined}
                   onPointerDown={undefined}
-                  onPointerEnter={handleTitlePointerEnter}
-                  onPointerLeave={handleTitlePointerLeave}
                   className="flex min-w-0 flex-1 self-stretch items-center"
                 />
               )}
