@@ -1,13 +1,57 @@
 import * as React from "react"
+import { flushSync } from "react-dom"
+import { mergeProps } from "@base-ui/react/merge-props"
 import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react"
 import { Menu as MenuPrimitive } from "@base-ui/react/menu"
 
 import { cn } from "@/lib/utils"
 
-function DropdownMenu({
-  ...props
-}: React.ComponentProps<typeof MenuPrimitive.Root>) {
-  return <MenuPrimitive.Root {...props} />
+const DeferMenusContext = React.createContext(false)
+const DeferredMenuContext = React.createContext<{
+  handle: ReturnType<typeof MenuPrimitive.createHandle>
+  mounted: boolean
+  activate: () => void
+  rootProps: React.ComponentProps<typeof MenuPrimitive.Root>
+} | null>(null)
+
+function DeferredDropdownMenus({ children }: { children: React.ReactNode }) {
+  return <DeferMenusContext value>{children}</DeferMenusContext>
+}
+
+function DropdownMenu(props: React.ComponentProps<typeof MenuPrimitive.Root>) {
+  const defer = React.useContext(DeferMenusContext)
+  return defer && !props.handle && typeof props.children !== "function" ? (
+    <DeferredDropdownMenu {...props} children={props.children} />
+  ) : (
+    <MenuPrimitive.Root {...props} />
+  )
+}
+
+function DeferredDropdownMenu({
+  children,
+  ...rootProps
+}: Omit<React.ComponentProps<typeof MenuPrimitive.Root>, "children"> & {
+  children: React.ReactNode
+}) {
+  const [handle] = React.useState(() => MenuPrimitive.createHandle())
+  const [mounted, setMounted] = React.useState(
+    Boolean(rootProps.open ?? rootProps.defaultOpen)
+  )
+  const activate = React.useCallback(() => {
+    if (!mounted) flushSync(() => setMounted(true))
+  }, [mounted])
+  return (
+    <DeferredMenuContext
+      value={{
+        handle,
+        mounted: mounted || rootProps.open === true,
+        activate,
+        rootProps
+      }}
+    >
+      {children}
+    </DeferredMenuContext>
+  )
 }
 
 function DropdownMenuPortal({
@@ -16,10 +60,28 @@ function DropdownMenuPortal({
   return <MenuPrimitive.Portal {...props} />
 }
 
-function DropdownMenuTrigger({
-  ...props
-}: React.ComponentProps<typeof MenuPrimitive.Trigger>) {
-  return <MenuPrimitive.Trigger data-slot="dropdown-menu-trigger" {...props} />
+function DropdownMenuTrigger(
+  props: React.ComponentProps<typeof MenuPrimitive.Trigger>
+) {
+  const deferred = React.useContext(DeferredMenuContext)
+  return (
+    <MenuPrimitive.Trigger
+      {...mergeProps(
+        props,
+        deferred
+          ? {
+              handle: deferred.handle,
+              onPointerEnter: deferred.activate,
+              onFocus: deferred.activate,
+              onPointerDownCapture: deferred.activate,
+              onKeyDownCapture: deferred.activate,
+              onClickCapture: deferred.activate
+            }
+          : {}
+      )}
+      data-slot="dropdown-menu-trigger"
+    />
+  )
 }
 
 type DropdownMenuContentProps = React.ComponentProps<
@@ -30,7 +92,20 @@ type DropdownMenuContentProps = React.ComponentProps<
     "align" | "alignOffset" | "side" | "sideOffset" | "anchor"
   >
 
-function DropdownMenuContent({
+function DropdownMenuContent(props: DropdownMenuContentProps) {
+  const deferred = React.useContext(DeferredMenuContext)
+  if (!deferred) return <DropdownMenuPopup {...props} />
+  if (!deferred.mounted) return null
+  return (
+    <DeferredMenuContext value={null}>
+      <MenuPrimitive.Root {...deferred.rootProps} handle={deferred.handle}>
+        <DropdownMenuPopup {...props} />
+      </MenuPrimitive.Root>
+    </DeferredMenuContext>
+  )
+}
+
+function DropdownMenuPopup({
   className,
   align,
   alignOffset,
@@ -296,6 +371,7 @@ function DropdownMenuSubContent({
 }
 
 export {
+  DeferredDropdownMenus,
   DropdownMenu,
   DropdownMenuPortal,
   DropdownMenuTrigger,
