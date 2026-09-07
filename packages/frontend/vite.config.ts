@@ -46,6 +46,10 @@ export default defineConfig(({ mode }) => ({
         target: "http://localhost:3000",
         changeOrigin: true
       },
+      "/mcp": {
+        target: "http://localhost:3000",
+        changeOrigin: true
+      },
       "/.well-known/": {
         target: "http://localhost:3000",
         changeOrigin: true
