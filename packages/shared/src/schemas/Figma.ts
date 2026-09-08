@@ -14,7 +14,7 @@ export const FigmaProjectIntegrationStatus = Schema.Struct({
   connected: Schema.Boolean,
   handle: Schema.NullOr(Schema.String),
   connectedAt: Schema.NullOr(Schema.DateTimeUtc),
-  lastCheckStatus: Schema.NullOr(Schema.Literal("ok", "error")),
+  lastCheckStatus: Schema.NullOr(Schema.Literals(["ok", "error"])),
   lastCheckError: Schema.NullOr(Schema.String),
   storageConnected: Schema.Boolean
 })
@@ -23,7 +23,7 @@ export type FigmaProjectIntegrationStatus = Schema.Schema.Type<
 >
 
 export const ConnectFigmaProjectInput = Schema.Struct({
-  accessToken: Schema.String.pipe(Schema.minLength(1))
+  accessToken: Schema.String.pipe(Schema.check(Schema.isMinLength(1)))
 })
 export type ConnectFigmaProjectInput = Schema.Schema.Type<
   typeof ConnectFigmaProjectInput

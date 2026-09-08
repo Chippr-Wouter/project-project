@@ -685,63 +685,74 @@ const EverhourGroup = HttpApiGroup.make("everhour")
 
 const FigmaGroup = HttpApiGroup.make("figma")
   .add(
-    HttpApiEndpoint.get("profile", "/integrations/figma/profile")
-      .addSuccess(PersonalFigma)
-      .addError(Unauthorized)
+    HttpApiEndpoint.get("profile", "/integrations/figma/profile", {
+      success: PersonalFigma,
+      error: [Unauthorized]
+    })
   )
   .add(
-    HttpApiEndpoint.del("disconnectProfile", "/integrations/figma/profile")
-      .addSuccess(PersonalFigma)
-      .addError(Unauthorized)
+    HttpApiEndpoint.delete(
+      "disconnectProfile",
+      "/integrations/figma/profile",
+      {
+        success: PersonalFigma,
+        error: [Unauthorized]
+      }
+    )
   )
   .add(
     HttpApiEndpoint.get(
       "projectStatus",
-      "/orgs/:orgSlug/projects/:slug/integrations/figma"
+      "/orgs/:orgSlug/projects/:slug/integrations/figma",
+      {
+        params: ProjectPath,
+        success: FigmaProjectIntegrationStatus,
+        error: [Unauthorized, NotFound]
+      }
     )
-      .setPath(ProjectPath)
-      .addSuccess(FigmaProjectIntegrationStatus)
-      .addError(Unauthorized)
-      .addError(NotFound)
   )
   .add(
     HttpApiEndpoint.post(
       "connectProject",
-      "/orgs/:orgSlug/projects/:slug/integrations/figma/connect"
+      "/orgs/:orgSlug/projects/:slug/integrations/figma/connect",
+      {
+        params: ProjectPath,
+        payload: ConnectFigmaProjectInput,
+        success: FigmaProjectIntegrationStatus,
+        error: [
+          Unauthorized,
+          NotFound,
+          Forbidden,
+          StorageNotConnected,
+          FigmaNotConnected,
+          FigmaAuthInvalid,
+          FigmaRateLimited,
+          FigmaError
+        ]
+      }
     )
-      .setPath(ProjectPath)
-      .setPayload(ConnectFigmaProjectInput)
-      .addSuccess(FigmaProjectIntegrationStatus)
-      .addError(Unauthorized)
-      .addError(NotFound)
-      .addError(Forbidden)
-      .addError(StorageNotConnected)
-      .addError(FigmaNotConnected)
-      .addError(FigmaAuthInvalid)
-      .addError(FigmaRateLimited)
-      .addError(FigmaError)
   )
   .add(
-    HttpApiEndpoint.del(
+    HttpApiEndpoint.delete(
       "disconnectProject",
-      "/orgs/:orgSlug/projects/:slug/integrations/figma"
+      "/orgs/:orgSlug/projects/:slug/integrations/figma",
+      {
+        params: ProjectPath,
+        success: FigmaProjectIntegrationStatus,
+        error: [Unauthorized, NotFound, Forbidden]
+      }
     )
-      .setPath(ProjectPath)
-      .addSuccess(FigmaProjectIntegrationStatus)
-      .addError(Unauthorized)
-      .addError(NotFound)
-      .addError(Forbidden)
   )
   .add(
     HttpApiEndpoint.get(
       "ticketLinks",
-      "/orgs/:orgSlug/projects/:slug/tickets/:id/figma/links"
+      "/orgs/:orgSlug/projects/:slug/tickets/:id/figma/links",
+      {
+        params: TicketPath,
+        success: Schema.Array(FigmaLinkMetadata),
+        error: [Unauthorized, NotFound, Forbidden]
+      }
     )
-      .setPath(TicketPath)
-      .addSuccess(Schema.Array(FigmaLinkMetadata))
-      .addError(Unauthorized)
-      .addError(NotFound)
-      .addError(Forbidden)
   )
   .middleware(Authentication)
 
