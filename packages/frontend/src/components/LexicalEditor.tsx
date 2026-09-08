@@ -53,6 +53,7 @@ import {
 } from "./Lexical/horizontalRuleTransformer"
 import { ChecklistClickExtension } from "./Lexical/checklistClickExtension"
 import { ListTabExtension } from "./Lexical/listTabExtension"
+import { registerMarkdownPaste } from "./Lexical/markdownPaste"
 import "@/lib/prism-langs"
 import { cn } from "@/lib/utils"
 import { m } from "@/paraglide/messages"
@@ -259,6 +260,8 @@ export function LexicalEditor({
       name: "@projectproject/body-editor",
       namespace: "ProjectBody",
       theme: lexicalTheme,
+      register: (editor: LexicalEditorType) =>
+        registerMarkdownPaste(editor, transformers),
       onError: (error) => {
         Effect.runFork(Effect.logError("[Lexical]", error))
       },

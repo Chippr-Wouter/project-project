@@ -20,6 +20,7 @@
     "@hugeicons/core-free-icons": "^4.1.1",
     "@hugeicons/react": "^1.1.6",
     "@inlang/paraglide-js": "2.25.0",
+    "@lexical/clipboard": "^0.44.0",
     "@lexical/code": "^0.44.0",
     "@lexical/extension": "^0.44.0",
     "@lexical/history": "^0.44.0",
