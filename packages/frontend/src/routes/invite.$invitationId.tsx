@@ -205,7 +205,7 @@ function InviteAccept({ invite }: { invite: PendingInvite }) {
 }
 
 function InviteUnavailable() {
-  const logout = useAtomSet(logoutAtom)
+  const logout = useAtomSet(logoutAtom("me"))
 
   return (
     <div className="space-y-5">

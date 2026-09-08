@@ -3,7 +3,7 @@ import * as Schema from "effect/Schema"
 import { Ticket, TicketId } from "@projectproject/shared"
 import { applyTicketDeltaPrototype } from "./ticketSyncPrototype"
 
-const ticket = Schema.decodeUnknownSync(Ticket)({
+const ticket = Schema.decodeSync(Ticket)({
   id: "T-1",
   title: "Original",
   status: "todo",
@@ -30,7 +30,7 @@ describe("ticket sync prototype delta application", () => {
       items: [
         {
           ...ticket,
-          id: Schema.decodeUnknownSync(TicketId)("T-2"),
+          id: Schema.decodeSync(TicketId)("T-2"),
           title: "Created"
         }
       ],

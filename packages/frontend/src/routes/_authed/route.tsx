@@ -69,7 +69,12 @@ function AuthedLayout() {
 
   return Result.matchWithError(me, {
     onInitial: () => <LoaderOverlay active />,
-    onError: () => <Navigate to="/login" replace />,
+    onError: (error) =>
+      error._tag === "Unauthorized" ? (
+        <Navigate to="/login" replace />
+      ) : (
+        <ErrorPage error={error} />
+      ),
     onDefect: (defect) => <ErrorPage error={defect} />,
     onSuccess: ({ value }) => {
       const redirect = authedRouteRedirect(pathname, value.activeOrgSlug)
@@ -450,7 +455,7 @@ function MobileNav({ user }: { user: User }) {
 }
 
 function UserMenu({ user }: { user: User }) {
-  const logout = useAtomSet(logoutAtom)
+  const logout = useAtomSet(logoutAtom("me"))
   const initial = (user.name?.charAt(0) ?? user.email.charAt(0)).toUpperCase()
 
   return (

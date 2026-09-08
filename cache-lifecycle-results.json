@@ -1,0 +1,105 @@
+{
+  "fixture": {
+    "origin": "http://localhost:4193",
+    "backendPort": 3110,
+    "tickets": 10000,
+    "productionBuild": true
+  },
+  "warm": {
+    "delta": 6,
+    "ready": {
+      "loaded": [3334, 3333, 3333],
+      "mounted": [15, 7, 7],
+      "ms": 510.09999999403954
+    },
+    "rows": [3334, 3333, 3333],
+    "snapshots": 0
+  },
+  "transportFailure": {
+    "failures": 21,
+    "rows": [3334, 3333, 3333],
+    "text": true
+  },
+  "accountSwitch": {
+    "from": "measure-user",
+    "to": "prototype-lifecycle-user",
+    "tabs": 2,
+    "delayedBootstrap": true,
+    "visibleOldTickets": 0,
+    "persistedSnapshots": 0,
+    "generation": 2
+  },
+  "projectDenied": [
+    {
+      "tabId": "tab_h",
+      "denied": true,
+      "oldTickets": false,
+      "rows": 0
+    },
+    {
+      "tabId": "tab_i",
+      "denied": true,
+      "oldTickets": false,
+      "rows": 0
+    },
+    {
+      "tabId": "tab_j",
+      "denied": true,
+      "oldTickets": false,
+      "rows": 0
+    }
+  ],
+  "delayedDeltaAndAuth": [
+    {
+      "tabId": "tab_j",
+      "oldTickets": false,
+      "path": "/login",
+      "pending": [],
+      "text": "Markdown-first project management.\n\nContinue with email\nor\nContinue with Google\n\nBy signin"
+    },
+    {
+      "tabId": "tab_k",
+      "oldTickets": false,
+      "path": "/login",
+      "pending": [],
+      "text": "Markdown-first project management.\n\nContinue with email\nor\nContinue with Google\n\nBy signin"
+    }
+  ],
+  "delayedBootstrapFinal": {
+    "rows": 0,
+    "text": "Markdown-first project management.\n\nContinue with email\nor\nContinue with Google\n\nBy signing in you authorize this instance to create a session and connect provider accounts you choose.",
+    "url": "http://localhost:4193/login"
+  },
+  "finalInventory": {
+    "databases": [
+      {
+        "name": "PROTOTYPE-ticket-sync-v2",
+        "stores": [
+          {
+            "count": 1,
+            "name": "auth",
+            "samples": [
+              {
+                "generation": 16,
+                "id": "global",
+                "keys": ["id", "generation", "userId"]
+              }
+            ]
+          },
+          {
+            "count": 0,
+            "name": "project",
+            "samples": []
+          },
+          {
+            "count": 0,
+            "name": "snapshot",
+            "samples": []
+          }
+        ],
+        "version": 1
+      }
+    ],
+    "supported": true
+  }
+}

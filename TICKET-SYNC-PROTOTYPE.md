@@ -75,16 +75,15 @@ Frontend checks:
 bunx vp test run --project frontend packages/frontend/src/atoms/ticketSyncPrototype.test.ts packages/frontend/src/components/TicketList/SectionList.test.tsx
 ```
 
-Local database: PROTOTYPE-ticket-sync-v1. It is separate from previous snapshot experiments.
+Local database: PROTOTYPE-ticket-sync-v2. It is separate from previous snapshot experiments. The [cache lifecycle slice](CACHE-LIFECYCLE-PROTOTYPE.md) adds account ownership, revocation, and cross-tab cleanup; it does not import unowned v1 snapshots.
 
 ## Limits before promotion
 
 - No log retention/compaction or automatic epoch rotation. An operator replacing the log must change the epoch and bootstrap clients again.
 - The prototype serializes writes per project on one head row. Throughput and contention are unmeasured.
 - A single snapshot record is rewritten for each nonempty delta. Per-ticket object stores would reduce large-project persistence work.
-- Scope and identity are hardcoded to the fixture. Account partitioning, logout cleanup, permission revocation in already cached views, and offline authenticated startup remain unresolved.
+- Project scope remains restricted to the fixture. Account partitioning, logout cleanup, and confirmed project-access revocation are implemented; offline authenticated startup remains unresolved.
 - Only changes published to ticket_index are tracked. Project configuration that affects derived metadata, memberships, related entities, and live GitHub data require their own invalidation/sync treatment.
 - No offline mutation queue or complete optimistic-mutation reconciliation. This tests server mutations followed by local convergence.
 - Transient sync failures preserve the current local state and retry on the next trigger; dedicated sync-status UI and backoff are not implemented.
 - No payload compression or progressive bootstrap display.
-

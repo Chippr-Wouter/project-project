@@ -7,7 +7,9 @@ import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import { runtime } from "@/runtime"
 import { ApiClient } from "@/services/ApiClient"
-import { pollTicketSyncPrototype } from "./ticketSyncPrototype"
+import { meAtom } from "./auth"
+import { authenticateTicketSyncPrototype } from "./ticketSyncAuthPrototype"
+import * as TicketSync from "@/services/TicketSync"
 import {
   usesTicketReplicaPrototype,
   replicaListPrototype,
@@ -29,15 +31,25 @@ class MalformedQuery extends Data.TaggedError("MalformedQuery")<{
   readonly cause: unknown
 }> {}
 
-export const pollTicketSyncPrototypeAtom = Atom.family((_key: string) =>
-  runtime.fn(
-    Effect.fn(function* () {
-      const changed = yield* pollTicketSyncPrototype
-      if (changed)
-        yield* Reactivity.invalidate(["tickets", "measure", "ten-thousand"])
-    })
+export const pollTicketSyncPrototypeAtom = Atom.family((key: string) => {
+  const [orgSlug, slug] = key.split("/")
+  return runtime.fn(
+    Effect.fn("pollTicketSyncPrototypeAtom")(
+      function* () {
+        if (!usesTicketReplicaPrototype(orgSlug, slug)) return
+        const { owner } = yield* authenticateTicketSyncPrototype()
+        const sync = yield* TicketSync.TicketSync
+        const changed = yield* sync.poll(owner, { orgSlug, slug })
+        if (changed) yield* Reactivity.invalidate(["tickets", orgSlug, slug])
+      },
+      Effect.tapError((error) =>
+        error._tag === "Unauthorized" || error._tag === "NotFound"
+          ? Reactivity.invalidate(["tickets", orgSlug, slug])
+          : Effect.void
+      )
+    )
   )
-)
+})
 
 const encodeQueryForKey = Schema.encodeSync(TicketListQuery)
 
@@ -123,10 +135,16 @@ const ticketsListBaseAtom = Atom.family((key: string) => {
   const { orgSlug, slug, queryJson } = splitFamilyKey(key)
   return runtime
     .atom(
-      Effect.gen(function* () {
+      Effect.fn(function* (get) {
         const query = yield* decodeListQuery(queryJson)
-        if (usesTicketReplicaPrototype(orgSlug, slug))
-          return yield* replicaListPrototype(query)
+        if (usesTicketReplicaPrototype(orgSlug, slug)) {
+          const user = yield* get.result(meAtom)
+          return yield* replicaListPrototype(
+            query,
+            user.id,
+            user.ticketSyncOwner
+          )
+        }
         const client = yield* ApiClient
         const page = yield* client.tickets.list({
           params: { orgSlug, slug },
@@ -268,10 +286,16 @@ const ticketsCountBaseAtom = Atom.family((key: string) => {
   const { orgSlug, slug, queryJson } = splitFamilyKey(key)
   return runtime
     .atom(
-      Effect.gen(function* () {
+      Effect.fn(function* (get) {
         const query = yield* decodeCountQuery(queryJson)
-        if (usesTicketReplicaPrototype(orgSlug, slug))
-          return yield* replicaCountPrototype(query)
+        if (usesTicketReplicaPrototype(orgSlug, slug)) {
+          const user = yield* get.result(meAtom)
+          return yield* replicaCountPrototype(
+            query,
+            user.id,
+            user.ticketSyncOwner
+          )
+        }
         const client = yield* ApiClient
         return yield* client.tickets.count({
           params: { orgSlug, slug },

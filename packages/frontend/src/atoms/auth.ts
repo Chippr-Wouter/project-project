@@ -111,20 +111,48 @@ import { runtime } from "@/runtime"
 import { ApiClient } from "@/services/ApiClient"
 import { authClient } from "@/services/AuthClient"
 import { githubAuthEpochAtom } from "./github"
+import { runLogout } from "@/services/logout"
+import * as TicketSync from "@/services/TicketSync"
+import { authenticateTicketSyncPrototype } from "./ticketSyncAuthPrototype"
+import { ticketSyncPrototypeEnabled } from "./ticketSyncPrototype"
 
 export const meAtom = runtime.atom(
   Effect.gen(function* () {
+    if (ticketSyncPrototypeEnabled) {
+      const { user, owner } = yield* authenticateTicketSyncPrototype()
+      return { ...user, ticketSyncOwner: owner }
+    }
     const client = yield* ApiClient
-    return yield* client.auth.me()
+    return { ...(yield* client.auth.me()), ticketSyncOwner: null }
   })
 )
 
 // Sign out, then refresh meAtom so the gate flips to redirect on the next render.
-export const logoutAtom = runtime.fn(
-  Effect.fn(function* (_: void, get) {
-    yield* Effect.tryPromise(() => authClient.signOut())
-    get.refresh(meAtom)
-  })
+export const logoutAtom = Atom.family((_key: "me") =>
+  runtime.fn(
+    Effect.fn("logout")(function* (_: void, get) {
+      const sync = yield* TicketSync.TicketSync
+      yield* runLogout({
+        captureCacheToken: () =>
+          ticketSyncPrototypeEnabled ? sync.capture : Effect.succeed(null),
+        serverSignOut: () =>
+          Effect.tryPromise(() => authData(authClient.signOut())).pipe(
+            Effect.asVoid
+          ),
+        clearCache: (token) => (token ? sync.clear(token) : Effect.void),
+        resetLocalAuth: () =>
+          Effect.gen(function* () {
+            yield* sync.reset
+            get.refresh(meAtom)
+            if (ticketSyncPrototypeEnabled) {
+              const root = document.getElementById("root")
+              if (root) root.style.visibility = "hidden"
+              window.location.replace("/login")
+            }
+          })
+      })
+    })
+  )
 )
 
 export const connectPersonalGithubAtom = runtime.fn(

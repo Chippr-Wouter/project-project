@@ -79,7 +79,7 @@ function WelcomeContent() {
 }
 
 function WelcomeNoAccess() {
-  const logout = useAtomSet(logoutAtom)
+  const logout = useAtomSet(logoutAtom("me"))
 
   return (
     <>
@@ -125,7 +125,7 @@ function WelcomeInviteList({
   const activateOrg = useAtomSet(setActiveOrganizationAtom("me"), {
     mode: "promiseExit"
   })
-  const logout = useAtomSet(logoutAtom)
+  const logout = useAtomSet(logoutAtom("me"))
   const [failedAccepts, setFailedAccepts] = useState<InviteAcceptFailure[]>([])
   const [acceptingAll, setAcceptingAll] = useState(false)
   const [pageError, setPageError] = useState<string | null>(null)

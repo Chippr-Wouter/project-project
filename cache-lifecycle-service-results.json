@@ -1,0 +1,53 @@
+{
+  "browserTests": [
+    {
+      "name": "delayed bootstrap cannot revive a revoked account",
+      "passed": true
+    },
+    {
+      "name": "delayed delta cannot revive a revoked account",
+      "passed": true
+    },
+    {
+      "name": "stale authentication cannot reactivate after revocation",
+      "passed": true
+    },
+    {
+      "name": "service scopes isolate memory, persist hydration, and close connections",
+      "passed": true
+    },
+    {
+      "name": "transport failure preserves local tickets",
+      "passed": true
+    }
+  ],
+  "productionWarmReload": {
+    "delta": 6,
+    "lists": [
+      {
+        "loaded": 3334,
+        "mounted": 15
+      },
+      {
+        "loaded": 3333,
+        "mounted": 7
+      },
+      {
+        "loaded": 3333,
+        "mounted": 7
+      }
+    ],
+    "snapshots": 0
+  },
+  "productionStorageFailureLogout": {
+    "path": "/login",
+    "rows": 0,
+    "serverSignOut": "simulated by fixture proxy; real session unchanged"
+  },
+  "build": "production, both prototype flags enabled",
+  "checks": {
+    "workspaceTypecheck": "passed",
+    "browserHarnessTypecheck": "passed",
+    "focusedTests": 8
+  }
+}

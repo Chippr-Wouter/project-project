@@ -1,3 +1,4 @@
+import type { TicketSyncStorageError } from "@/services/TicketSyncStorage"
 import * as Match from "effect/Match"
 import type {
   AttachmentNotUploaded,
@@ -31,6 +32,7 @@ import type { InviteAcceptError } from "@/lib/invitations"
 import { m } from "@/paraglide/messages"
 
 export type AppError =
+  | TicketSyncStorageError
   | Unauthorized
   | NotFound
   | Forbidden
@@ -62,6 +64,9 @@ export type AppError =
 export const errorMessage = (error: AppError): string =>
   Match.value(error)
     .pipe(
+      Match.tag("TicketSyncStorageError", () =>
+        m.error_ticket_cache_unavailable()
+      ),
       Match.tag("InviteExpired", () => m.auth_invites_accept_error_expired()),
       Match.tag("InviteNotFound", () =>
         m.auth_invites_accept_error_not_found()

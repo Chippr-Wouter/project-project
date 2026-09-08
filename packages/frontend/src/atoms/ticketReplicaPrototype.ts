@@ -12,10 +12,11 @@ import {
   type TicketCounts,
   type TicketListQuery
 } from "@projectproject/shared"
+import * as TicketSync from "@/services/TicketSync"
 import { ApiClient } from "@/services/ApiClient"
 import {
   ticketSyncPrototypeEnabled,
-  readTicketSyncPrototype
+  type TicketSyncOwnerPrototype
 } from "./ticketSyncPrototype"
 
 export const usesTicketReplicaPrototype = (orgSlug: string, slug: string) =>
@@ -79,44 +80,60 @@ const hydrate = Effect.gen(function* () {
 
 const snapshot = Effect.runSync(Effect.cached(hydrate))
 
-export const replicaListPrototype = Effect.fn(function* (
-  query: TicketListQuery
-) {
-  if (
-    query.sort.key !== "created" ||
-    query.sort.dir !== "desc" ||
-    query.filter?.groupId
-  )
-    return yield* Effect.die(
-      "Prototype supports default sort and no sprint filter"
+export const replicaListPrototype = Effect.fn("replicaListPrototype")(
+  function* (
+    query: TicketListQuery,
+    userId: string,
+    owner: TicketSyncOwnerPrototype | null
+  ) {
+    if (
+      query.sort.key !== "created" ||
+      query.sort.dir !== "desc" ||
+      query.filter?.groupId
     )
-  const all = yield* ticketSyncPrototypeEnabled
-    ? readTicketSyncPrototype
-    : snapshot
-  return {
-    items: all.filter((ticket) =>
-      matchesTicketQuery(ticket, query, "measure-user")
-    ),
-    nextCursor: null
+      return yield* Effect.die(
+        "Prototype supports default sort and no sprint filter"
+      )
+    if (ticketSyncPrototypeEnabled && !owner)
+      return yield* Effect.die("Missing authenticated replica owner")
+    const all = yield* owner
+      ? (yield* TicketSync.TicketSync).read(owner, {
+          orgSlug: "measure",
+          slug: "ten-thousand"
+        })
+      : snapshot
+    return {
+      items: all.filter((ticket) => matchesTicketQuery(ticket, query, userId)),
+      nextCursor: null
+    }
   }
-})
+)
 
-export const replicaCountPrototype = Effect.fn(function* (
-  query: TicketCountQuery
-) {
-  if (query.filter?.groupId)
-    return yield* Effect.die("Prototype does not support sprint filters")
-  const all = yield* ticketSyncPrototypeEnabled
-    ? readTicketSyncPrototype
-    : snapshot
-  const counts: { total: number; byStatus: Record<string, number> } = {
-    total: 0,
-    byStatus: {}
+export const replicaCountPrototype = Effect.fn("replicaCountPrototype")(
+  function* (
+    query: TicketCountQuery,
+    userId: string,
+    owner: TicketSyncOwnerPrototype | null
+  ) {
+    if (query.filter?.groupId)
+      return yield* Effect.die("Prototype does not support sprint filters")
+    if (ticketSyncPrototypeEnabled && !owner)
+      return yield* Effect.die("Missing authenticated replica owner")
+    const all = yield* owner
+      ? (yield* TicketSync.TicketSync).read(owner, {
+          orgSlug: "measure",
+          slug: "ten-thousand"
+        })
+      : snapshot
+    const counts: { total: number; byStatus: Record<string, number> } = {
+      total: 0,
+      byStatus: {}
+    }
+    for (const ticket of all) {
+      if (!matchesTicketQuery(ticket, query, userId)) continue
+      counts.total++
+      counts.byStatus[ticket.status] = (counts.byStatus[ticket.status] ?? 0) + 1
+    }
+    return counts satisfies TicketCounts
   }
-  for (const ticket of all) {
-    if (!matchesTicketQuery(ticket, query, "measure-user")) continue
-    counts.total++
-    counts.byStatus[ticket.status] = (counts.byStatus[ticket.status] ?? 0) + 1
-  }
-  return counts satisfies TicketCounts
-})
+)

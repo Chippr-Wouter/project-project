@@ -20,6 +20,7 @@
   "error_page_home_link": "Go to dashboard",
   "error_page_retry_button": "Try again",
   "error_page_title": "Something broke",
+  "error_ticket_cache_unavailable": "Local ticket storage is unavailable. Reload the page to try again.",
   "error_unknown": "Something went wrong.",
   "validation_required": "Required"
 }
