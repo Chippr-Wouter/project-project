@@ -15,7 +15,12 @@ import * as schema from "../db/schema"
 import { Db } from "../Services/Db"
 import { Figma } from "../Services/Figma"
 import { FigmaIntegrations } from "../Services/FigmaIntegrations"
-import { FigmaLinks, planFigmaReferences } from "../Services/FigmaLinks"
+import {
+  devResourceName,
+  FigmaLinks,
+  planFigmaReferences,
+  shouldBacklink
+} from "../Services/FigmaLinks"
 import { OrgStorage } from "../Services/OrgStorage"
 import { Projects } from "../Services/Projects"
 import { S3Storage } from "../Services/S3Storage"
@@ -26,6 +31,30 @@ import {
   figmaThumbnailKey,
   FigmaLinksLive
 } from "./FigmaLinks"
+
+describe("devResourceName", () => {
+  it("names the resource after the ticket", () => {
+    expect(devResourceName("T-51", "Figma integration")).toBe(
+      "T-51 · Figma integration"
+    )
+  })
+
+  it("truncates a very long title", () => {
+    const name = devResourceName("T-51", "x".repeat(200))
+    expect(name.length).toBeLessThanOrEqual(100)
+    expect(name.startsWith("T-51 · ")).toBe(true)
+  })
+})
+
+describe("shouldBacklink", () => {
+  it("backlinks a node-level reference", () => {
+    expect(shouldBacklink({ nodeId: "1:2" })).toBe(true)
+  })
+
+  it("skips a file-level reference", () => {
+    expect(shouldBacklink({ nodeId: null })).toBe(false)
+  })
+})
 
 describe("planFigmaReferences", () => {
   it("adds a reference that appears in the body", () => {
@@ -234,8 +263,16 @@ const JOINED = 'inner join "figma_link_index"'
 const referencedLink = (input: {
   readonly fetchedAt: string | null
   readonly lastCheckStatus: string | null
+  readonly devResourceId?: string | null
 }) => [
-  ["link-1", "FILEKEY123", "12:34", input.fetchedAt, input.lastCheckStatus]
+  [
+    "link-1",
+    "FILEKEY123",
+    "12:34",
+    input.fetchedAt,
+    input.lastCheckStatus,
+    input.devResourceId ?? null
+  ]
 ]
 
 const failingDb = () => {
@@ -512,5 +549,130 @@ describe("reconcileTicket metadata resolution", () => {
       expect(params).not.toContain("secret-pat")
       expect(params).toContain("figma_auth_invalid")
     })
+  )
+})
+
+describe("reconcileTicket dev mode backlink", () => {
+  it.live(
+    "creates a figma dev resource for a newly added node-level reference and persists the id",
+    () =>
+      Effect.gen(function* () {
+        const createDevResource = vi.fn(() => Effect.succeed("dev-99"))
+        const { params, db } = recordingDb((sql) => {
+          if (sql.startsWith("select") && sql.includes("project_index")) {
+            return [["org-1"]]
+          }
+          if (sql.startsWith('insert into "figma_link_index"')) {
+            return [["link-1"]]
+          }
+          if (sql.startsWith("select") && sql.includes("ticket_index")) {
+            return [["Fix login bug"]]
+          }
+          return []
+        })
+        const exit = yield* reconcile(
+          harness({ db, figma: { createDevResource } }),
+          BODY
+        )
+        yield* Effect.sleep("100 millis")
+
+        expect(exit._tag).toBe("Success")
+        expect(createDevResource).toHaveBeenCalledTimes(1)
+        const [, input] = createDevResource.mock.calls[0] as [
+          unknown,
+          { fileKey: string; nodeId: string; name: string; url: string }
+        ]
+        expect(input.fileKey).toBe("FILEKEY123")
+        expect(input.nodeId).toBe("12:34")
+        expect(input.name.startsWith("WEB-1 · ")).toBe(true)
+        expect(params).toContain("dev-99")
+      })
+  )
+
+  it.live(
+    "does not create a dev resource for a file-level reference",
+    () =>
+      Effect.gen(function* () {
+        const createDevResource = vi.fn(() => Effect.succeed("dev-1"))
+        const { db } = recordingDb((sql) => {
+          if (sql.startsWith("select") && sql.includes("project_index")) {
+            return [["org-1"]]
+          }
+          if (sql.startsWith('insert into "figma_link_index"')) {
+            return [["link-1"]]
+          }
+          return []
+        })
+        const exit = yield* reconcile(
+          harness({ db, figma: { createDevResource } }),
+          "https://www.figma.com/design/FILEKEY123/Spec"
+        )
+        yield* Effect.sleep("100 millis")
+
+        expect(exit._tag).toBe("Success")
+        expect(createDevResource).not.toHaveBeenCalled()
+      })
+  )
+
+  it.effect(
+    "does not fail the ticket save when creating a dev resource fails",
+    () =>
+      Effect.gen(function* () {
+        const { db } = proxyDb((sql) =>
+          sql.startsWith("select") && sql.includes("project_index")
+            ? [["org-1"]]
+            : sql.startsWith('insert into "figma_link_index"')
+              ? [["link-1"]]
+              : []
+        )
+        const exit = yield* reconcile(
+          harness({
+            db,
+            figma: {
+              createDevResource: () => Effect.fail(new FigmaAuthInvalid())
+            }
+          }),
+          BODY
+        )
+        expect(exit._tag).toBe("Success")
+      })
+  )
+
+  it.live(
+    "deletes the figma dev resource before removing the reference row",
+    () =>
+      Effect.gen(function* () {
+        const order: Array<string> = []
+        const deleteDevResource = vi.fn(() => {
+          order.push("figma-delete")
+          return Effect.void
+        })
+        const { db } = recordingDb((sql) => {
+          if (sql.includes(JOINED)) {
+            return referencedLink({
+              fetchedAt: null,
+              lastCheckStatus: null,
+              devResourceId: "dev-1"
+            })
+          }
+          if (sql.startsWith('delete from "figma_reference"')) {
+            order.push("db-delete")
+          }
+          return []
+        })
+        const exit = yield* reconcile(
+          harness({ db, figma: { deleteDevResource } }),
+          ""
+        )
+        yield* Effect.sleep("100 millis")
+
+        expect(exit._tag).toBe("Success")
+        expect(deleteDevResource).toHaveBeenCalledWith(
+          expect.anything(),
+          "FILEKEY123",
+          "dev-1"
+        )
+        expect(order).toEqual(["figma-delete", "db-delete"])
+      })
   )
 })

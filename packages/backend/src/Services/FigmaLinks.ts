@@ -19,6 +19,18 @@ export const planFigmaReferences = (input: {
   removed: [...input.existing].filter((key) => !input.referenced.has(key))
 })
 
+export const DEV_RESOURCE_NAME_MAX = 100
+
+export const devResourceName = (ticketId: string, title: string): string => {
+  const prefix = `${ticketId} · `
+  const room = DEV_RESOURCE_NAME_MAX - prefix.length
+  return `${prefix}${title.slice(0, room)}`
+}
+
+export const shouldBacklink = (ref: {
+  readonly nodeId: string | null
+}): boolean => ref.nodeId !== null
+
 export interface FigmaLinksShape {
   readonly reconcileTicket: (
     orgSlug: string,

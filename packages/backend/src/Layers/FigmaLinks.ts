@@ -6,12 +6,18 @@ import {
   type FigmaRef
 } from "@projectproject/shared"
 import { and, asc, eq, inArray, isNull } from "drizzle-orm"
+import * as Config from "effect/Config"
 import * as Data from "effect/Data"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import { ulid } from "ulid"
-import { figmaLinkIndex, figmaReference, projectIndex } from "../db/schema"
+import {
+  figmaLinkIndex,
+  figmaReference,
+  projectIndex,
+  ticketIndex
+} from "../db/schema"
 import { Db } from "../Services/Db"
 import {
   Figma,
@@ -20,8 +26,10 @@ import {
 } from "../Services/Figma"
 import { FigmaIntegrations } from "../Services/FigmaIntegrations"
 import {
+  devResourceName,
   FigmaLinks,
   planFigmaReferences,
+  shouldBacklink,
   type FigmaLinksShape
 } from "../Services/FigmaLinks"
 import { OrgStorage } from "../Services/OrgStorage"
@@ -41,6 +49,20 @@ const THUMBNAIL_VIEW_TTL_SECONDS = 3600
 const RESOLVE_CONCURRENCY = 2
 
 const METADATA_TTL_MS = 24 * 60 * 60 * 1000
+
+const publicBaseUrl = Config.string("BETTER_AUTH_URL").pipe(
+  Config.withDefault("http://localhost:5173")
+)
+
+const ticketUrl = (orgSlug: string, slug: string, ticketId: string) =>
+  Effect.map(
+    publicBaseUrl,
+    (base) =>
+      new URL(
+        `/orgs/${orgSlug}/projects/${slug}/tickets/${ticketId}`,
+        base
+      ).toString()
+  )
 
 export const needsFigmaMetadata = (
   row: {
@@ -264,6 +286,162 @@ export const FigmaLinksLive = Layer.effect(
         discard: true
       })
 
+    const createBacklinks = (
+      orgSlug: string,
+      slug: string,
+      ticketId: string,
+      entries: ReadonlyArray<{
+        readonly linkId: string
+        readonly ref: FigmaRef
+      }>
+    ) =>
+      Effect.gen(function* () {
+        if (entries.length === 0) return
+        const ticket = yield* db
+          .select({ title: ticketIndex.title })
+          .from(ticketIndex)
+          .where(
+            and(
+              eq(ticketIndex.orgSlug, orgSlug),
+              eq(ticketIndex.projectSlug, slug),
+              eq(ticketIndex.ticketId, ticketId)
+            )
+          )
+          .limit(1)
+        const title = ticket[0]?.title
+        if (title === undefined) {
+          yield* Effect.logDebug(
+            "figma backlink skipped: ticket not indexed yet"
+          ).pipe(Effect.annotateLogs({ orgSlug, projectSlug: slug, ticketId }))
+          return
+        }
+
+        const credential = yield* integrations.credentialFor(
+          orgSlug,
+          slug,
+          null
+        )
+        const url = yield* ticketUrl(orgSlug, slug, ticketId)
+        const name = devResourceName(ticketId, title)
+
+        yield* Effect.forEach(
+          entries,
+          (entry) =>
+            Effect.gen(function* () {
+              if (entry.ref.nodeId === null) return
+              const devResourceId = yield* figma.createDevResource(
+                credential,
+                {
+                  fileKey: entry.ref.fileKey,
+                  nodeId: entry.ref.nodeId,
+                  name,
+                  url
+                }
+              )
+              if (devResourceId === null) return
+              yield* db
+                .update(figmaReference)
+                .set({ devResourceId })
+                .where(
+                  and(
+                    eq(figmaReference.linkId, entry.linkId),
+                    eq(figmaReference.orgSlug, orgSlug),
+                    eq(figmaReference.projectSlug, slug),
+                    eq(figmaReference.ticketId, ticketId)
+                  )
+                )
+            }),
+          { concurrency: RESOLVE_CONCURRENCY, discard: true }
+        )
+      }).pipe(
+        Effect.catchTag("FigmaNotConnected", () =>
+          Effect.logDebug(
+            "figma backlink skipped: project not connected"
+          ).pipe(Effect.annotateLogs({ orgSlug, projectSlug: slug, ticketId }))
+        ),
+        Effect.catchAllCause((cause) =>
+          Effect.logWarning("figma backlink failed").pipe(
+            Effect.annotateLogs({
+              orgSlug,
+              projectSlug: slug,
+              ticketId,
+              cause: String(cause)
+            })
+          )
+        )
+      )
+
+    const retractBacklinks = (
+      orgSlug: string,
+      slug: string,
+      ticketId: string,
+      entries: ReadonlyArray<{
+        readonly linkId: string
+        readonly fileKey: string
+        readonly devResourceId: string
+      }>
+    ) =>
+      Effect.gen(function* () {
+        if (entries.length === 0) return
+        const credential = yield* integrations.credentialFor(
+          orgSlug,
+          slug,
+          null
+        )
+        yield* Effect.forEach(
+          entries,
+          (entry) =>
+            Effect.gen(function* () {
+              yield* figma.deleteDevResource(
+                credential,
+                entry.fileKey,
+                entry.devResourceId
+              )
+              yield* db
+                .delete(figmaReference)
+                .where(
+                  and(
+                    eq(figmaReference.linkId, entry.linkId),
+                    eq(figmaReference.orgSlug, orgSlug),
+                    eq(figmaReference.projectSlug, slug),
+                    eq(figmaReference.ticketId, ticketId)
+                  )
+                )
+            }).pipe(
+              Effect.catchAllCause((cause) =>
+                Effect.logWarning(
+                  "figma backlink retraction failed; reference retained for retry"
+                ).pipe(
+                  Effect.annotateLogs({
+                    orgSlug,
+                    projectSlug: slug,
+                    ticketId,
+                    fileKey: entry.fileKey,
+                    cause: String(cause)
+                  })
+                )
+              )
+            ),
+          { concurrency: RESOLVE_CONCURRENCY, discard: true }
+        )
+      }).pipe(
+        Effect.catchTag("FigmaNotConnected", () =>
+          Effect.logDebug(
+            "figma backlink retraction skipped: project not connected"
+          ).pipe(Effect.annotateLogs({ orgSlug, projectSlug: slug, ticketId }))
+        ),
+        Effect.catchAllCause((cause) =>
+          Effect.logWarning("figma backlink retraction failed").pipe(
+            Effect.annotateLogs({
+              orgSlug,
+              projectSlug: slug,
+              ticketId,
+              cause: String(cause)
+            })
+          )
+        )
+      )
+
     const upsertLink = (
       organizationId: string,
       orgSlug: string,
@@ -332,7 +510,8 @@ export const FigmaLinksLive = Layer.effect(
             fileKey: figmaLinkIndex.fileKey,
             nodeId: figmaLinkIndex.nodeId,
             fetchedAt: figmaLinkIndex.fetchedAt,
-            lastCheckStatus: figmaLinkIndex.lastCheckStatus
+            lastCheckStatus: figmaLinkIndex.lastCheckStatus,
+            devResourceId: figmaReference.devResourceId
           })
           .from(figmaReference)
           .innerJoin(
@@ -356,27 +535,44 @@ export const FigmaLinksLive = Layer.effect(
           referenced: new Set(byKey.keys())
         })
 
-        if (plan.removed.length > 0) {
-          const linkIds = plan.removed.flatMap((key) => {
-            const row = existingByKey.get(key)
-            return row === undefined ? [] : [row.linkId]
-          })
-          if (linkIds.length > 0) {
-            yield* db
-              .delete(figmaReference)
-              .where(
-                and(
-                  eq(figmaReference.orgSlug, orgSlug),
-                  eq(figmaReference.projectSlug, slug),
-                  eq(figmaReference.ticketId, ticketId),
-                  inArray(figmaReference.linkId, linkIds)
-                )
-              )
+        const removalsToRetract: Array<{
+          readonly linkId: string
+          readonly fileKey: string
+          readonly devResourceId: string
+        }> = []
+        const removalsToDeleteNow: Array<string> = []
+        for (const key of plan.removed) {
+          const row = existingByKey.get(key)
+          if (row === undefined) continue
+          if (row.devResourceId !== null) {
+            removalsToRetract.push({
+              linkId: row.linkId,
+              fileKey: row.fileKey,
+              devResourceId: row.devResourceId
+            })
+          } else {
+            removalsToDeleteNow.push(row.linkId)
           }
+        }
+        if (removalsToDeleteNow.length > 0) {
+          yield* db
+            .delete(figmaReference)
+            .where(
+              and(
+                eq(figmaReference.orgSlug, orgSlug),
+                eq(figmaReference.projectSlug, slug),
+                eq(figmaReference.ticketId, ticketId),
+                inArray(figmaReference.linkId, removalsToDeleteNow)
+              )
+            )
         }
 
         const now = yield* DateTime.nowAsDate
         const toResolve: Array<{
+          readonly linkId: string
+          readonly ref: FigmaRef
+        }> = []
+        const toBacklink: Array<{
           readonly linkId: string
           readonly ref: FigmaRef
         }> = []
@@ -385,6 +581,9 @@ export const FigmaLinksLive = Layer.effect(
           if (row === undefined) continue
           if (needsFigmaMetadata(row, now)) {
             toResolve.push({ linkId: row.linkId, ref })
+          }
+          if (shouldBacklink(ref) && row.devResourceId === null) {
+            toBacklink.push({ linkId: row.linkId, ref })
           }
         }
 
@@ -406,6 +605,7 @@ export const FigmaLinksLive = Layer.effect(
             if (link === null) continue
             added.push({ linkId: link.id, ref })
             if (link.resolve) toResolve.push({ linkId: link.id, ref })
+            if (shouldBacklink(ref)) toBacklink.push({ linkId: link.id, ref })
           }
 
           if (added.length > 0) {
@@ -423,9 +623,27 @@ export const FigmaLinksLive = Layer.effect(
           }
         }
 
-        if (toResolve.length === 0) return
+        if (
+          toResolve.length === 0 &&
+          toBacklink.length === 0 &&
+          removalsToRetract.length === 0
+        ) {
+          return
+        }
 
-        yield* Effect.forkDaemon(resolveLinks(orgSlug, slug, toResolve))
+        yield* Effect.forkDaemon(
+          Effect.gen(function* () {
+            if (toResolve.length > 0) {
+              yield* resolveLinks(orgSlug, slug, toResolve)
+            }
+            if (toBacklink.length > 0) {
+              yield* createBacklinks(orgSlug, slug, ticketId, toBacklink)
+            }
+            if (removalsToRetract.length > 0) {
+              yield* retractBacklinks(orgSlug, slug, ticketId, removalsToRetract)
+            }
+          })
+        )
       })
 
     const reconcileTicket: FigmaLinksShape["reconcileTicket"] = (
