@@ -2,16 +2,18 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
 import * as ManagedRuntime from "effect/ManagedRuntime"
+import * as Predicate from "effect/Predicate"
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient"
 import * as HttpApiClient from "effect/unstable/httpapi/HttpApiClient"
 import { AppApi } from "@projectproject/shared"
 import * as ApiClient from "../src/services/ApiClient"
 import * as TicketSync from "../src/services/TicketSync"
 
+const databaseName = "PROTOTYPE-ticket-sync-v2"
 const params = { orgSlug: "measure", slug: "ten-thousand" }
-const ticket = {
-  id: "T-1",
-  title: "Original",
+const makeTicket = (id: string, title: string) => ({
+  id,
+  title,
   status: "todo",
   type: "chore",
   priority: "med",
@@ -26,12 +28,35 @@ const ticket = {
   createdBy: "a",
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z"
-}
+})
+const ticket = makeTicket("T-1", "Original")
+const secondTicket = makeTicket("T-2", "Second")
 const snapshot = { checkpoint: { epoch: "test", revision: 1 }, items: [ticket] }
+const twoTicketSnapshot = {
+  checkpoint: { epoch: "test", revision: 1 },
+  items: [ticket, secondTicket]
+}
 const delta = {
   checkpoint: { epoch: "test", revision: 2 },
   items: [{ ...ticket, title: "Updated" }],
   deleted: [],
+  reset: false,
+  hasMore: false
+}
+const twoTicketDelta = {
+  checkpoint: { epoch: "test", revision: 2 },
+  items: [
+    { ...ticket, title: "Atomic first" },
+    { ...secondTicket, title: "Atomic second" }
+  ],
+  deleted: [],
+  reset: false,
+  hasMore: false
+}
+const tombstoneDelta = {
+  checkpoint: { epoch: "test", revision: 2 },
+  items: [],
+  deleted: [secondTicket.id],
   reset: false,
   hasMore: false
 }
@@ -50,13 +75,278 @@ const check: (condition: unknown, message: string) => asserts condition = (
 }
 const removeDatabase = () =>
   new Promise<void>((resolve, reject) => {
-    const request = indexedDB.deleteDatabase("PROTOTYPE-ticket-sync-v2")
+    const request = indexedDB.deleteDatabase(databaseName)
     request.addEventListener("success", () => resolve())
     request.addEventListener("error", () => reject(request.error))
     request.addEventListener("blocked", () =>
       reject(new Error("A service leaked its IndexedDB connection"))
     )
   })
+
+const requestResult = <A>(request: IDBRequest<A>) =>
+  new Promise<A>((resolve, reject) => {
+    request.addEventListener("success", () => resolve(request.result))
+    request.addEventListener("error", () =>
+      reject(request.error ?? new Error("IndexedDB request failed"))
+    )
+  })
+
+const transactionDone = (transaction: IDBTransaction) =>
+  new Promise<void>((resolve, reject) => {
+    let settled = false
+    const finish = (effect: () => void) => {
+      if (settled) return
+      settled = true
+      effect()
+    }
+    transaction.addEventListener("complete", () => finish(resolve))
+    transaction.addEventListener("abort", () =>
+      finish(() =>
+        reject(transaction.error ?? new Error("IndexedDB transaction aborted"))
+      )
+    )
+    transaction.addEventListener("error", () =>
+      finish(() =>
+        reject(transaction.error ?? new Error("IndexedDB transaction failed"))
+      )
+    )
+  })
+
+type Upgrade = (database: IDBDatabase, transaction: IDBTransaction) => void
+
+const openDatabase = (version?: number, upgrade?: Upgrade) =>
+  new Promise<IDBDatabase>((resolve, reject) => {
+    const request =
+      version === undefined
+        ? indexedDB.open(databaseName)
+        : indexedDB.open(databaseName, version)
+    let settled = false
+    const fail = (error: unknown) => {
+      if (settled) return
+      settled = true
+      reject(error)
+    }
+    request.addEventListener("upgradeneeded", () => {
+      if (!upgrade) return
+      const transaction = request.transaction
+      if (transaction === null) {
+        fail(new Error("IndexedDB upgrade had no transaction"))
+        return
+      }
+      upgrade(request.result, transaction)
+    })
+    request.addEventListener("success", () => {
+      if (settled) {
+        request.result.close()
+        return
+      }
+      settled = true
+      resolve(request.result)
+    })
+    request.addEventListener("error", () =>
+      fail(request.error ?? new Error("IndexedDB open failed"))
+    )
+    request.addEventListener("blocked", () =>
+      fail(new Error("IndexedDB open was blocked"))
+    )
+  })
+
+const readStore = async (name: string): Promise<ReadonlyArray<unknown>> => {
+  const database = await openDatabase()
+  try {
+    const transaction = database.transaction(name, "readonly")
+    const done = transactionDone(transaction)
+    const values = await requestResult(transaction.objectStore(name).getAll())
+    await done
+    return values
+  } finally {
+    database.close()
+  }
+}
+
+const ticketRecordId = (projectId: string, ticketId: string) =>
+  JSON.stringify([projectId, ticketId])
+
+const accountRecordId = (owner: { server: string; userId: string }) =>
+  JSON.stringify([owner.server, owner.userId])
+
+const projectRecordId = (
+  owner: { server: string; userId: string },
+  projectParams: typeof params
+) =>
+  JSON.stringify([
+    owner.server,
+    owner.userId,
+    projectParams.orgSlug,
+    projectParams.slug
+  ])
+
+const ticketTitle = (rows: ReadonlyArray<unknown>, id: string) => {
+  const row = rows.find((value) => Predicate.isObject(value) && value.id === id)
+  if (!Predicate.isObject(row) || !Predicate.isObject(row.ticket))
+    return undefined
+  return typeof row.ticket.title === "string" ? row.ticket.title : undefined
+}
+
+const snapshotRevision = (rows: ReadonlyArray<unknown>) => {
+  const row = rows[0]
+  if (!Predicate.isObject(row) || !Predicate.isObject(row.checkpoint))
+    return undefined
+  return typeof row.checkpoint.revision === "number"
+    ? row.checkpoint.revision
+    : undefined
+}
+
+const createLegacySchema1 = async (owner: {
+  server: string
+  userId: string
+  generation: number
+}) => {
+  const database = await openDatabase(1, (database) => {
+    const auth = database.createObjectStore("auth", { keyPath: "id" })
+    const project = database.createObjectStore("project", { keyPath: "id" })
+    const snapshotStore = database.createObjectStore("snapshot", {
+      keyPath: "id"
+    })
+    project.createIndex("byAccount", "accountId")
+    snapshotStore.createIndex("byAccount", "accountId")
+    auth.put({
+      id: "global",
+      generation: owner.generation,
+      userId: owner.userId
+    })
+  })
+  try {
+    const transaction = database.transaction(
+      ["auth", "project", "snapshot"],
+      "readwrite"
+    )
+    const done = transactionDone(transaction)
+    const id = projectRecordId(owner, params)
+    const accountId = accountRecordId(owner)
+    transaction.objectStore("project").put({ id, accountId, generation: 0 })
+    transaction.objectStore("snapshot").put({
+      id,
+      accountId,
+      generation: 0,
+      checkpoint: { epoch: "legacy", revision: 8 },
+      items: [ticket]
+    })
+    await done
+  } finally {
+    database.close()
+  }
+}
+
+type IdManager = {
+  readonly onPut?: (store: IDBObjectStore, value: object) => void
+  readonly onGet?: (store: IDBObjectStore) => void
+  readonly onGetAll?: (store: IDBObjectStore) => void
+  readonly onIndexGetAll?: (index: IDBIndex) => void
+}
+
+const idbMethods = () => ({
+  put: Object.getOwnPropertyDescriptor(IDBObjectStore.prototype, "put")?.value,
+  get: Object.getOwnPropertyDescriptor(IDBObjectStore.prototype, "get")?.value,
+  getAll: Object.getOwnPropertyDescriptor(IDBObjectStore.prototype, "getAll")
+    ?.value,
+  indexGetAll: Object.getOwnPropertyDescriptor(IDBIndex.prototype, "getAll")
+    ?.value
+})
+
+const checkIdbMethodsRestored = (original: ReturnType<typeof idbMethods>) => {
+  const current = idbMethods()
+  check(
+    current.put === original.put &&
+      current.get === original.get &&
+      current.getAll === original.getAll &&
+      current.indexGetAll === original.indexGetAll,
+    "IndexedDB instrumentation was not restored"
+  )
+}
+
+const instrumentIndexedDb = (manager: IdManager) => {
+  const stores = IDBObjectStore.prototype
+  const indexes = IDBIndex.prototype
+  const putDescriptor = Object.getOwnPropertyDescriptor(stores, "put")
+  const getDescriptor = Object.getOwnPropertyDescriptor(stores, "get")
+  const getAllDescriptor = Object.getOwnPropertyDescriptor(stores, "getAll")
+  const indexGetAllDescriptor = Object.getOwnPropertyDescriptor(
+    indexes,
+    "getAll"
+  )
+  if (
+    !putDescriptor ||
+    !getDescriptor ||
+    !getAllDescriptor ||
+    !indexGetAllDescriptor
+  )
+    throw new Error("IndexedDB methods cannot be instrumented")
+  const put = putDescriptor.value
+  const get = getDescriptor.value
+  const getAll = getAllDescriptor.value
+  const indexGetAll = indexGetAllDescriptor.value
+
+  stores.put = function (
+    this: IDBObjectStore,
+    value: object,
+    key?: IDBValidKey
+  ) {
+    const request = put.call(this, value, key)
+    manager.onPut?.(this, value)
+    return request
+  }
+  stores.get = function (
+    this: IDBObjectStore,
+    query: IDBValidKey | IDBKeyRange
+  ) {
+    const request = get.call(this, query)
+    manager.onGet?.(this)
+    return request
+  }
+  stores.getAll = function (
+    this: IDBObjectStore,
+    query?: IDBValidKey | IDBKeyRange | null,
+    count?: number
+  ) {
+    const request =
+      query === undefined
+        ? count === undefined
+          ? getAll.call(this)
+          : getAll.call(this, undefined, count)
+        : count === undefined
+          ? getAll.call(this, query)
+          : getAll.call(this, query, count)
+    manager.onGetAll?.(this)
+    return request
+  }
+  indexes.getAll = function (
+    this: IDBIndex,
+    query?: IDBValidKey | IDBKeyRange | null,
+    count?: number
+  ) {
+    const request =
+      query === undefined
+        ? count === undefined
+          ? indexGetAll.call(this)
+          : indexGetAll.call(this, undefined, count)
+        : count === undefined
+          ? indexGetAll.call(this, query)
+          : indexGetAll.call(this, query, count)
+    manager.onIndexGetAll?.(this)
+    return request
+  }
+
+  let restored = false
+  return () => {
+    if (restored) return
+    restored = true
+    Object.defineProperty(stores, "put", putDescriptor)
+    Object.defineProperty(stores, "get", getDescriptor)
+    Object.defineProperty(stores, "getAll", getAllDescriptor)
+    Object.defineProperty(indexes, "getAll", indexGetAllDescriptor)
+  }
+}
 
 function clients() {
   const runtimes: Array<{ dispose: () => Promise<void> }> = []
@@ -159,19 +449,10 @@ export async function runTicketSyncLifecycleTests() {
         (await runtime.runPromise(sync.capture)).owner === null,
         "Revoked auth was restored"
       )
-      const db = await new Promise<IDBDatabase>((resolve) => {
-        const request = indexedDB.open("PROTOTYPE-ticket-sync-v2")
-        request.addEventListener("success", () => resolve(request.result))
-      })
-      const count = await new Promise<number>((resolve) => {
-        const request = db
-          .transaction("snapshot")
-          .objectStore("snapshot")
-          .count()
-        request.addEventListener("success", () => resolve(request.result))
-      })
-      db.close()
-      check(count === 0, "Late response repersisted tickets")
+      check(
+        (await readStore("snapshot")).length === 0,
+        "Late response repersisted tickets"
+      )
     })
   }
   await test("stale authentication cannot reactivate after revocation", async ({
@@ -218,6 +499,354 @@ export async function runTicketSyncLifecycleTests() {
     check(
       Exit.isFailure(await Effect.runPromiseExit(a.capture)),
       "Disposed service remained usable"
+    )
+  })
+  await test("checkpoint-only polling skips bootstrap and writes one ticket row", async ({
+    create
+  }) => {
+    let snapshotRequests: number = 0
+    let deltaRequests: number = 0
+    const fetcher: typeof fetch = async (input) => {
+      const url = input instanceof Request ? input.url : input.toString()
+      if (url.includes("sync-delta")) {
+        deltaRequests++
+        return Response.json(delta)
+      }
+      snapshotRequests++
+      return Response.json(twoTicketSnapshot)
+    }
+
+    const emptyRuntime = create(fetcher)
+    const emptySync = await emptyRuntime.runPromise(TicketSync.TicketSync)
+    const emptyOwner = await owner(emptyRuntime)
+    let emptyTicketGets = 0
+    let emptyTicketGetAlls = 0
+    let emptyTicketIndexGetAlls = 0
+    const emptyMethods = idbMethods()
+    const restoreEmpty = instrumentIndexedDb({
+      onGet: (store) => {
+        if (store.name === "ticket") emptyTicketGets++
+      },
+      onGetAll: (store) => {
+        if (store.name === "ticket") emptyTicketGetAlls++
+      },
+      onIndexGetAll: (index) => {
+        if (index.objectStore.name === "ticket") emptyTicketIndexGetAlls++
+      }
+    })
+    try {
+      check(
+        !(await emptyRuntime.runPromise(
+          emptySync.poll(emptyOwner, params, { bootstrap: false })
+        )),
+        "Empty checkpoint poll should skip bootstrap"
+      )
+    } finally {
+      restoreEmpty()
+    }
+    checkIdbMethodsRestored(emptyMethods)
+    check(snapshotRequests === 0, "Empty checkpoint poll bootstrapped")
+    check(deltaRequests === 0, "Empty checkpoint poll requested a delta")
+    check(
+      emptyTicketGets + emptyTicketGetAlls + emptyTicketIndexGetAlls === 0,
+      "Empty checkpoint poll read ticket rows"
+    )
+    await emptyRuntime.dispose()
+
+    const firstRuntime = create(fetcher)
+    const firstSync = await firstRuntime.runPromise(TicketSync.TicketSync)
+    const firstOwner = await owner(firstRuntime)
+    check(
+      (await firstRuntime.runPromise(firstSync.read(firstOwner, params)))
+        .length === 2,
+      "Initial snapshot did not persist both tickets"
+    )
+    await firstRuntime.dispose()
+
+    const runtime = create(fetcher)
+    const sync = await runtime.runPromise(TicketSync.TicketSync)
+    const account = await owner(runtime)
+    const projectId = projectRecordId(account, params)
+    const ticketPuts: Array<string> = []
+    let ticketGets = 0
+    let ticketGetAlls = 0
+    let ticketIndexGetAlls = 0
+    let snapshotGets = 0
+    const originalMethods = idbMethods()
+    const restore = instrumentIndexedDb({
+      onPut: (store, value) => {
+        if (store.name !== "ticket" || !Predicate.isObject(value)) return
+        if (typeof value.id === "string") ticketPuts.push(value.id)
+      },
+      onGet: (store) => {
+        if (store.name === "ticket") ticketGets++
+        if (store.name === "snapshot") snapshotGets++
+      },
+      onGetAll: (store) => {
+        if (store.name === "ticket") ticketGetAlls++
+      },
+      onIndexGetAll: (index) => {
+        if (index.objectStore.name === "ticket") ticketIndexGetAlls++
+      }
+    })
+    let changed = false
+    try {
+      changed = await runtime.runPromise(
+        sync.poll(account, params, { bootstrap: false })
+      )
+    } finally {
+      restore()
+    }
+    checkIdbMethodsRestored(originalMethods)
+    check(changed, "Persisted checkpoint delta was not reported")
+    check(snapshotRequests === 1, "Fresh poll fetched a bootstrap snapshot")
+    check(deltaRequests === 1, "Fresh poll did not request one delta")
+    check(
+      ticketPuts.length === 1 &&
+        ticketPuts[0] === ticketRecordId(projectId, ticket.id),
+      "Single-ticket delta rewrote more than its changed row"
+    )
+    check(
+      ticketGets + ticketGetAlls + ticketIndexGetAlls === 0,
+      "Checkpoint-only poll hydrated ticket rows"
+    )
+    check(
+      snapshotGets > 0,
+      "Checkpoint-only poll did not read checkpoint metadata"
+    )
+    check(
+      snapshotRevision(await readStore("snapshot")) === 2,
+      "Delta checkpoint was not persisted"
+    )
+    const persistedTickets = await readStore("ticket")
+    check(
+      persistedTickets.length === 2 &&
+        ticketTitle(persistedTickets, ticketRecordId(projectId, ticket.id)) ===
+          "Updated" &&
+        ticketTitle(
+          persistedTickets,
+          ticketRecordId(projectId, secondTicket.id)
+        ) === "Second",
+      "Single-ticket delta changed the wrong ticket rows"
+    )
+    const hydrated = await runtime.runPromise(sync.read(account, params))
+    check(
+      hydrated.length === 2 &&
+        hydrated.some(
+          (value) => value.id === ticket.id && value.title === "Updated"
+        ) &&
+        hydrated.some(
+          (value) => value.id === secondTicket.id && value.title === "Second"
+        ),
+      "Subsequent read did not hydrate all persisted tickets"
+    )
+  })
+  await test("ticket delta commits are atomic with its checkpoint", async ({
+    create
+  }) => {
+    const fetcher: typeof fetch = async (input) => {
+      const url = input instanceof Request ? input.url : input.toString()
+      return Response.json(
+        url.includes("sync-delta") ? twoTicketDelta : twoTicketSnapshot
+      )
+    }
+    const runtime = create(fetcher)
+    const sync = await runtime.runPromise(TicketSync.TicketSync)
+    const account = await owner(runtime)
+    await runtime.runPromise(sync.read(account, params))
+    const projectId = projectRecordId(account, params)
+    const beforeTickets = await readStore("ticket")
+    const beforeSnapshot = await readStore("snapshot")
+    let ticketPuts = 0
+    const restore = instrumentIndexedDb({
+      onPut: (store) => {
+        if (store.name !== "ticket") return
+        ticketPuts++
+        if (ticketPuts === 2) store.transaction.abort()
+      }
+    })
+    let failure: Exit.Exit<unknown, unknown>
+    try {
+      failure = await runtime.runPromiseExit(sync.poll(account, params))
+    } finally {
+      restore()
+    }
+    check(Exit.isFailure(failure), "Injected ticket write failure was ignored")
+    check(
+      ticketPuts === 2,
+      "Atomicity probe did not fail between ticket writes"
+    )
+    const afterTickets = await readStore("ticket")
+    const afterSnapshot = await readStore("snapshot")
+    check(
+      ticketTitle(afterTickets, ticketRecordId(projectId, ticket.id)) ===
+        ticketTitle(beforeTickets, ticketRecordId(projectId, ticket.id)) &&
+        ticketTitle(
+          afterTickets,
+          ticketRecordId(projectId, secondTicket.id)
+        ) ===
+          ticketTitle(
+            beforeTickets,
+            ticketRecordId(projectId, secondTicket.id)
+          ),
+      "Atomic failure left a partially updated ticket set"
+    )
+    check(
+      snapshotRevision(afterSnapshot) === snapshotRevision(beforeSnapshot),
+      "Atomic failure advanced the checkpoint"
+    )
+  })
+  await test("independent runtimes adopt a persisted newer checkpoint", async ({
+    create
+  }) => {
+    let snapshots: number = 0
+    const revisions: Array<number> = []
+    const fetcher: typeof fetch = async (input) => {
+      const url = input instanceof Request ? input.url : input.toString()
+      if (!url.includes("sync-delta")) {
+        snapshots++
+        return Response.json(twoTicketSnapshot)
+      }
+      const revision = Number(
+        new URL(url, location.origin).searchParams.get("revision")
+      )
+      revisions.push(revision)
+      return Response.json(delta)
+    }
+    const first = create(fetcher)
+    const second = create(fetcher)
+    const firstSync = await first.runPromise(TicketSync.TicketSync)
+    const secondSync = await second.runPromise(TicketSync.TicketSync)
+    const firstOwner = await owner(first)
+    const secondOwner = await owner(second)
+    await first.runPromise(firstSync.read(firstOwner, params))
+    await second.runPromise(secondSync.read(secondOwner, params))
+    await first.runPromise(firstSync.poll(firstOwner, params))
+    const adopted = await second.runPromise(
+      secondSync.read(secondOwner, params)
+    )
+    check(
+      adopted.some(
+        (value) => value.id === ticket.id && value.title === "Updated"
+      ),
+      "Stale runtime did not adopt the persisted ticket update"
+    )
+    check(
+      adopted.some(
+        (value) => value.id === secondTicket.id && value.title === "Second"
+      ),
+      "Stale runtime lost an unchanged persisted ticket"
+    )
+    check(snapshots === 1, "Stale runtime fetched a new snapshot")
+    check(
+      revisions.length === 1 && revisions[0] === 1,
+      "Unexpected stale checkpoint request"
+    )
+  })
+  await test("tombstones survive hydration in a fresh runtime", async ({
+    create
+  }) => {
+    const firstFetcher: typeof fetch = async (input) => {
+      const url = input instanceof Request ? input.url : input.toString()
+      return Response.json(
+        url.includes("sync-delta") ? tombstoneDelta : twoTicketSnapshot
+      )
+    }
+    const first = create(firstFetcher)
+    const firstSync = await first.runPromise(TicketSync.TicketSync)
+    const firstOwner = await owner(first)
+    await first.runPromise(firstSync.read(firstOwner, params))
+    await first.runPromise(firstSync.poll(firstOwner, params))
+    const projectId = projectRecordId(firstOwner, params)
+    const rows = await readStore("ticket")
+    check(
+      rows.length === 1 &&
+        ticketTitle(rows, ticketRecordId(projectId, ticket.id)) ===
+          "Original" &&
+        ticketTitle(rows, ticketRecordId(projectId, secondTicket.id)) ===
+          undefined,
+      "Tombstone did not remove its ticket row"
+    )
+    await first.dispose()
+    let fetches = 0
+    const second = create(async () => {
+      fetches++
+      throw new Error("Hydration fetched from the API")
+    })
+    const secondSync = await second.runPromise(TicketSync.TicketSync)
+    const secondOwner = await owner(second)
+    const hydrated = await second.runPromise(
+      secondSync.read(secondOwner, params)
+    )
+    check(
+      hydrated.length === 1 && hydrated[0]?.id === ticket.id,
+      "Tombstone hydration restored a deleted ticket"
+    )
+    check(fetches === 0, "Tombstone hydration fetched from the API")
+  })
+  await test("schema v1 migration reboots snapshots and preserves auth", async ({
+    create
+  }) => {
+    const legacyOwner = {
+      server: location.origin,
+      userId: "a",
+      generation: 7
+    }
+    await createLegacySchema1(legacyOwner)
+    let snapshots = 0
+    const runtime = create(async (input) => {
+      const url = input instanceof Request ? input.url : input.toString()
+      if (url.includes("sync-delta"))
+        throw new Error("Legacy cache should rebootstrap")
+      snapshots++
+      return Response.json(snapshot)
+    })
+    const sync = await runtime.runPromise(TicketSync.TicketSync)
+    const account = await owner(runtime)
+    check(
+      account.generation === legacyOwner.generation,
+      "Schema migration changed auth generation"
+    )
+    check(
+      account.userId === legacyOwner.userId,
+      "Schema migration changed authenticated user"
+    )
+    check(
+      (await runtime.runPromise(sync.read(account, params)))[0]?.title ===
+        "Original",
+      "Schema migration did not rebootstrap the snapshot"
+    )
+    check(
+      snapshots === 1,
+      "Schema migration did not force one snapshot request"
+    )
+    const database = await openDatabase()
+    try {
+      check(database.version === 2, "Schema migration did not reach version 2")
+      check(
+        database.objectStoreNames.contains("ticket"),
+        "Schema migration did not create ticket store"
+      )
+      const names = Array.from(database.objectStoreNames)
+      check(
+        names.length === 4 &&
+          ["auth", "project", "snapshot", "ticket"].every((name) =>
+            names.includes(name)
+          ),
+        "Schema migration left an unexpected store"
+      )
+    } finally {
+      database.close()
+    }
+    const migratedSnapshot = await readStore("snapshot")
+    check(
+      snapshotRevision(migratedSnapshot) === 1,
+      "Rebootstrap checkpoint was not persisted"
+    )
+    const migratedTickets = await readStore("ticket")
+    check(
+      migratedTickets.length === 1,
+      "Rebootstrap ticket row was not persisted"
     )
   })
   await test("transport failure preserves local tickets", async ({
