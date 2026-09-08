@@ -811,6 +811,7 @@ export const figmaReference = pgTable(
       t.ticketId
     )
   ]
+)
 
 export const relations = defineRelations(
   {
