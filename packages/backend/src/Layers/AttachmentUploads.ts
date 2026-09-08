@@ -92,6 +92,14 @@ export const AttachmentUploadsLive = Layer.effect(
           try: () => new URL("/api/attachment-uploads", baseUrl),
           catch: () => new StorageConfigMissing()
         })
+        if (
+          url.protocol !== "https:" &&
+          !(
+            url.protocol === "http:" &&
+            ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)
+          )
+        )
+          return yield* new StorageConfigMissing()
         const prepared = yield* attachments.prepare(
           ticket.orgSlug,
           ticket.projectSlug,

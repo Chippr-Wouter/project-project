@@ -9,8 +9,10 @@ import {
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import * as Schema from "effect/Schema"
 import {
   normalizeEtag,
+  S3Endpoint,
   S3Storage,
   S3Unavailable,
   type S3Connection
@@ -61,15 +63,26 @@ const attempt = <A>(run: () => Promise<A>) =>
       })
   })
 
-const withClient = <A>(
+const withClient = Effect.fn("S3Storage.withClient")(function* <A>(
   connection: S3Connection,
   use: (client: S3Client) => Promise<A>
-) =>
-  Effect.acquireUseRelease(
+) {
+  yield* Schema.decodeEffect(S3Endpoint)(connection.endpoint).pipe(
+    Effect.mapError(
+      () =>
+        new S3Unavailable({
+          reason:
+            "Storage endpoint must use HTTPS, or HTTP on localhost for local development.",
+          retryable: false
+        })
+    )
+  )
+  return yield* Effect.acquireUseRelease(
     Effect.sync(() => clientFor(connection)),
     (client) => attempt(() => use(client)),
     (client) => Effect.sync(() => client.destroy())
   )
+})
 
 export const S3StorageLive = Layer.succeed(
   S3Storage,

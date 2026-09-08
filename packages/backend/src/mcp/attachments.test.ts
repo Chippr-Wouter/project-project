@@ -14,6 +14,9 @@ import { migrate } from "drizzle-orm/node-postgres/migrator"
 import { PgClient } from "@effect/sql-pg"
 import { eq } from "drizzle-orm"
 import * as Effect from "effect/Effect"
+import * as ConfigProvider from "effect/ConfigProvider"
+import * as OrgStorageLayer from "../Layers/OrgStorage"
+import * as SecretCrypto from "../Services/SecretCrypto"
 import * as Fiber from "effect/Fiber"
 import * as Layer from "effect/Layer"
 import * as Redacted from "effect/Redacted"
@@ -55,7 +58,13 @@ import * as BetterAuth from "../Services/BetterAuth"
 import * as ProjectDocs from "../Services/ProjectDocs"
 import * as GroupDocs from "../Services/GroupDocs"
 import * as TicketIndex from "../Services/TicketIndex"
-import { attachmentIndex, organization, projectIndex } from "../db/schema"
+import {
+  attachmentIndex,
+  organization,
+  projectIndex,
+  organizationIntegration,
+  organizationS3Integration
+} from "../db/schema"
 import { attachmentUploadRoute } from "../http/attachmentUploadRoutes"
 import { handlers } from "./handlers"
 import { mapToolError } from "./errorMap"
@@ -266,7 +275,17 @@ const fixture = Effect.fn("attachmentFixture")(function* (
     .select()
     .from(attachmentIndex)
     .where(eq(attachmentIndex.orgSlug, slug))
-  return { prepare, post, receive, rows, objects, writes, options, scope }
+  return {
+    prepare,
+    post,
+    receive,
+    rows,
+    objects,
+    writes,
+    options,
+    scope,
+    context
+  }
 })
 
 describe.skipIf(!databaseUrl)("MCP attachment upload with Postgres", () => {
@@ -295,6 +314,108 @@ describe.skipIf(!databaseUrl)("MCP attachment upload with Postgres", () => {
     Layer.provideMerge(
       PgClient.layer({ url: Redacted.make(databaseUrl ?? "") })
     )
+  )
+
+  it.effect.each([
+    "http://app.example.test",
+    "http://localhost.example.test",
+    "ftp://localhost",
+    "not a URL"
+  ])("rejects insecure upload origin %s before preparing storage", (baseUrl) =>
+    Effect.gen(function* () {
+      const f = yield* fixture()
+      expect(
+        (yield* Effect.flip(
+          f
+            .prepare()
+            .pipe(
+              Effect.provideService(
+                ConfigProvider.ConfigProvider,
+                ConfigProvider.fromUnknown({ BETTER_AUTH_URL: baseUrl })
+              )
+            )
+        ))._tag
+      ).toBe("StorageConfigMissing")
+      expect(yield* f.rows).toEqual([])
+    }).pipe(Effect.scoped, Effect.provide(dbLayer))
+  )
+
+  it.effect.each([
+    "https://app.example.test",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://[::1]:5173"
+  ])("allows upload origin %s", (baseUrl) =>
+    Effect.gen(function* () {
+      const f = yield* fixture()
+      const prepared = yield* f.prepare().pipe(
+        Effect.provideService(
+          ConfigProvider.ConfigProvider,
+          ConfigProvider.fromUnknown({
+            BETTER_AUTH_URL: baseUrl,
+            USER_SECRET_ENCRYPTION_KEY: process.env.USER_SECRET_ENCRYPTION_KEY
+          })
+        )
+      )
+      expect(new URL(prepared.uploadUrl).origin).toBe(baseUrl)
+    }).pipe(Effect.scoped, Effect.provide(dbLayer))
+  )
+
+  it.effect(
+    "rejects persisted insecure S3 endpoints before decrypting credentials",
+    () =>
+      Effect.gen(function* () {
+        const f = yield* fixture()
+        const db = yield* Db.Db
+        const [integration] = yield* db
+          .insert(organizationIntegration)
+          .values({
+            organizationId: f.scope.orgSlug,
+            provider: "s3",
+            status: "active"
+          })
+          .returning()
+        yield* db.insert(organizationS3Integration).values({
+          organizationIntegrationId: integration.id,
+          endpoint: "http://storage.example.test",
+          bucket: "test",
+          region: "auto",
+          accessKeyId: "test",
+          encryptedSecretKey: "test",
+          secretKeyNonce: "test",
+          secretKeyTag: "test"
+        })
+        const open = vi.fn(() => Effect.succeed("secret"))
+        const requireConnection = Effect.gen(function* () {
+          const storage = yield* OrgStorage.OrgStorage
+          return yield* storage.requireConnection(f.scope.orgSlug)
+        }).pipe(
+          Effect.provide(
+            OrgStorageLayer.OrgStorageLive.pipe(
+              Layer.provide(Layer.mock(SecretCrypto.SecretCrypto, { open }))
+            )
+          ),
+          Effect.provide(f.context)
+        )
+        expect((yield* Effect.flip(requireConnection))._tag).toBe(
+          "StorageConfigMissing"
+        )
+        expect(open).not.toHaveBeenCalled()
+        yield* db
+          .update(organizationS3Integration)
+          .set({ endpoint: "https://storage.example.test" })
+          .where(
+            eq(
+              organizationS3Integration.organizationIntegrationId,
+              integration.id
+            )
+          )
+        expect(yield* requireConnection).toMatchObject({
+          endpoint: "https://storage.example.test",
+          secretAccessKey: "secret"
+        })
+        expect(open).toHaveBeenCalledOnce()
+      }).pipe(Effect.scoped, Effect.provide(dbLayer))
   )
 
   it.effect(
