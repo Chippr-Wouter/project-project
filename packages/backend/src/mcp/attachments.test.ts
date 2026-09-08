@@ -7,7 +7,6 @@ import {
   DeleteBucketCommand,
   DeleteObjectCommand
 } from "@aws-sdk/client-s3"
-import * as S3StorageLayer from "../Layers/S3Storage"
 import { Pool } from "pg"
 import { drizzle } from "drizzle-orm/node-postgres"
 import { migrate } from "drizzle-orm/node-postgres/migrator"
@@ -18,6 +17,7 @@ import * as Layer from "effect/Layer"
 import * as Redacted from "effect/Redacted"
 import * as Schema from "effect/Schema"
 import {
+  AttachmentId,
   CurrentUser,
   McpTools,
   NotFound,
@@ -30,6 +30,7 @@ import {
 } from "@projectproject/shared"
 import * as Attachments from "../Services/Attachments"
 import * as AttachmentsLayer from "../Layers/Attachments"
+import * as S3StorageLayer from "../Layers/S3Storage"
 import * as Db from "../Services/Db"
 import * as DbLayer from "../Layers/Db"
 import * as OrgStorage from "../Services/OrgStorage"
@@ -49,6 +50,7 @@ import * as TicketIndex from "../Services/TicketIndex"
 import { attachmentIndex, organization, projectIndex } from "../db/schema"
 import { handlers } from "./handlers"
 import { mapToolError } from "./errorMap"
+
 const user = Schema.decodeSync(User)({
   id: "user-1",
   email: "user@example.com",
@@ -120,7 +122,7 @@ const fixture = Effect.fn("attachmentFixture")(function* (
         : Effect.succeed({ role: "member" })
     }
   })
-  const document: TicketDocs.TicketDocs["Service"]["read"] = (
+  const readTicket: TicketDocs.TicketDocs["Service"]["read"] = (
     orgSlug,
     projectSlug,
     id
@@ -174,7 +176,7 @@ const fixture = Effect.fn("attachmentFixture")(function* (
     AttachmentsLayer.AttachmentsLive.pipe(Layer.provide(dependencies)),
     projects,
     Layer.succeed(CurrentUser, user),
-    Layer.mock(TicketDocs.TicketDocs, { read: document }),
+    Layer.mock(TicketDocs.TicketDocs, { read: readTicket }),
     Layer.mock(Tickets.Tickets, {}),
     Layer.mock(Comments.Comments, {}),
     Layer.mock(Groups.Groups, {}),
@@ -192,12 +194,10 @@ const fixture = Effect.fn("attachmentFixture")(function* (
       .pipe(Effect.provide(context))
   const commit = (id: string) =>
     handlers
-      .commit_ticket_attachment(
-        Schema.decodeSync(McpTools.commit_ticket_attachment.input)({
-          ...scope,
-          attachmentId: id
-        })
-      )
+      .commit_ticket_attachment({
+        ...scope,
+        attachmentId: Schema.decodeSync(AttachmentId)(id)
+      })
       .pipe(Effect.provide(context))
   const rows = db
     .select()
