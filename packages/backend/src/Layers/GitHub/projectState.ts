@@ -130,8 +130,6 @@ const PullRequestConnectionSchema = Schema.Struct({
 
 type PullRequestNode = typeof PullRequestSchema.Type
 type PullRequestConnection = typeof PullRequestConnectionSchema.Type
-type ProjectStatePullRequestConnection = Pick<PullRequestConnection, "nodes">
-
 const decodePullRequestConnection = Schema.decodeUnknownEffect(
   PullRequestConnectionSchema
 )
@@ -155,19 +153,23 @@ const decodeDiscoveredBranchesResponse = Schema.decodeUnknownEffect(
   DiscoveredBranchesResponseSchema
 )
 
-interface FetchProjectStateBatchResponse {
-  readonly repository:
-    | ({
-        readonly defaultBranchRef: BranchRef | null
-      } & {
-        readonly [key: string]:
-          | BranchRef
-          | ProjectStatePullRequestConnection
-          | null
-          | undefined
-      })
-    | null
-}
+const FetchProjectStateBatchResponseSchema = Schema.Struct({
+  repository: Schema.NullOr(
+    Schema.StructWithRest(
+      Schema.Struct({
+        defaultBranchRef: Schema.NullOr(Schema.Struct({ name: Schema.String }))
+      }),
+      [Schema.Record(Schema.String, Schema.Unknown)]
+    )
+  )
+})
+
+const decodeFetchProjectStateBatchResponse = Schema.decodeUnknownEffect(
+  FetchProjectStateBatchResponseSchema
+)
+
+type FetchProjectStateBatchResponse =
+  typeof FetchProjectStateBatchResponseSchema.Type
 
 interface ListBranchesResponse {
   readonly repository: {
@@ -523,7 +525,7 @@ export const fetchProjectStatesWithToken = (
                 branches: pendingBranches.length
               },
               (signal) =>
-                gql<FetchProjectStateBatchResponse>(batch.query, {
+                gql<unknown>(batch.query, {
                   owner,
                   name,
                   ...batch.variables,
@@ -531,13 +533,20 @@ export const fetchProjectStatesWithToken = (
                 }),
               narrow(["RepoGone", "RateLimited"] as const)
             )
-            firstResponse ??= response
+            const decodedResponse = yield* decodeFetchProjectStateBatchResponse(
+              response
+            ).pipe(
+              Effect.mapError((cause) =>
+                GitHubError.invalidResponse("fetchProjectStateBatch", cause)
+              )
+            )
+            firstResponse ??= decodedResponse
 
-            if (!response.repository) return yield* new RepoGone()
+            if (!decodedResponse.repository) return yield* new RepoGone()
 
             const nextPendingBranches: Array<string> = []
             for (const [index, branch] of pendingBranches.entries()) {
-              const pullRequests = response.repository[`p${index}`]
+              const pullRequests = decodedResponse.repository[`p${index}`]
               const decodedPullRequests = yield* decodePullRequestConnection(
                 pullRequests
               ).pipe(

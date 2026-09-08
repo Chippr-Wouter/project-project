@@ -54,7 +54,10 @@ import { GitHub } from "../Services/GitHub"
 import { ProjectDocs } from "../Services/ProjectDocs"
 import { TicketIndex } from "../Services/TicketIndex"
 import type { MarkdownError } from "../Services/Markdown"
-import type { MalformedTicketDocument } from "../Services/TicketDocs"
+import type {
+  MalformedTicketDocument,
+  TicketDocument
+} from "../Services/TicketDocs"
 import { TicketDocs } from "../Services/TicketDocs"
 import * as TicketDocumentLock from "../ticketDocumentLock"
 import { Users } from "../Services/Users"
@@ -1006,60 +1009,77 @@ export const ProjectsLive = Layer.effect(
         )
       })
 
-    const clearTicketPrMetadata = (
+    const withClearedTicketPrMetadata = <A, E, R>(
       orgSlug: string,
-      slug: string
-    ): Effect.Effect<void, MarkdownError> =>
+      slug: string,
+      switchRepository: Effect.Effect<A, E, R>
+    ): Effect.Effect<A, E | MarkdownError, R> =>
       Effect.gen(function* () {
         const project = yield* ticketIndex
           .projectFor(orgSlug, slug)
           .pipe(Effect.orDie)
         const ids = yield* ticketDocs.listIds(orgSlug, slug)
-        yield* Effect.forEach(
-          ids,
-          (id) =>
-            ticketDocumentLock.withTicketDocumentLock(
-              orgSlug,
-              slug,
-              id,
-              Effect.gen(function* () {
-                const ticket = yield* ticketDocs.read(orgSlug, slug, id).pipe(
-                  Effect.catchTag("NotFound", () => Effect.succeed(null)),
-                  Effect.catchTag("MalformedTicketDocument", (error) =>
-                    Effect.logWarning(
-                      "Skipping unreadable ticket pr metadata"
-                    ).pipe(
-                      Effect.annotateLogs({
-                        orgSlug,
-                        slug,
-                        ticketId: id,
-                        error
-                      }),
-                      Effect.as(null)
-                    )
+        const originals: Array<TicketDocument> = []
+        const clearAndSwitch = Effect.gen(function* () {
+          for (const id of ids) {
+            const ticket = yield* ticketDocs.read(orgSlug, slug, id).pipe(
+              Effect.catchTags({
+                NotFound: () => Effect.succeed(null),
+                MalformedTicketDocument: (error) =>
+                  Effect.logWarning(
+                    "Skipping unreadable ticket pr metadata"
+                  ).pipe(
+                    Effect.annotateLogs({ orgSlug, slug, ticketId: id, error }),
+                    Effect.as(null)
                   )
-                )
-                if (
-                  ticket === null ||
-                  (ticket.pr === null &&
-                    ticket.prState === null &&
-                    ticket.lastTransitionedPr === null)
-                ) {
-                  return
-                }
-                const next = {
-                  ...ticket,
-                  pr: null,
-                  prState: null,
-                  lastTransitionedPr: null,
-                  updatedAt: yield* DateTime.nowAsDate
-                }
-                yield* ticketDocs.write(orgSlug, slug, id, next)
-                yield* ticketIndex.upsertTicket(project, next)
               })
-            ),
-          { concurrency: 8 }
+            )
+            if (
+              ticket === null ||
+              (ticket.pr === null &&
+                ticket.prState === null &&
+                ticket.lastTransitionedPr === null)
+            ) {
+              continue
+            }
+            const next = {
+              ...ticket,
+              pr: null,
+              prState: null,
+              lastTransitionedPr: null,
+              updatedAt: yield* DateTime.nowAsDate
+            }
+            yield* ticketDocs.write(orgSlug, slug, id, next)
+            originals.push(ticket)
+            yield* ticketIndex.upsertTicket(project, next)
+          }
+          return yield* switchRepository
+        }).pipe(
+          Effect.onError(() =>
+            Effect.forEach(
+              originals,
+              (ticket) =>
+                Effect.gen(function* () {
+                  yield* ticketDocs.write(orgSlug, slug, ticket.id, ticket)
+                  yield* ticketIndex.upsertTicket(project, ticket)
+                }),
+              { discard: true }
+            ).pipe(Effect.orDie)
+          ),
+          Effect.uninterruptible
         )
+        return yield* [...ids]
+          .sort()
+          .reduceRight(
+            (effect, id) =>
+              ticketDocumentLock.withTicketDocumentLock(
+                orgSlug,
+                slug,
+                id,
+                effect
+              ),
+            clearAndSwitch
+          )
       })
 
     const attachProjectInviteGrant = (
@@ -1639,11 +1659,7 @@ export const ProjectsLive = Layer.effect(
             (currentConnection.repoId !== next.repoId ||
               currentConnection.repoOwner !== next.repoOwner ||
               currentConnection.repoName !== next.repoName)
-          if (repoChanged) {
-            yield* clearTicketPrMetadata(orgSlug, slug)
-          }
-
-          yield* sql
+          const switchRepository = sql
             .withTransaction(
               Effect.gen(function* () {
                 const activeLinks = yield* db
@@ -1735,6 +1751,10 @@ export const ProjectsLive = Layer.effect(
               })
             )
             .pipe(Effect.catchTag("SqlError", Effect.die))
+
+          yield* repoChanged
+            ? withClearedTicketPrMetadata(orgSlug, slug, switchRepository)
+            : switchRepository
 
           const members = yield* loadMembers(slug)
           const pendingMembers = yield* loadPendingMembers(slug)
