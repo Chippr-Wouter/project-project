@@ -1,4 +1,5 @@
-import { Atom, Result } from "@effect-atom/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import * as Atom from "effect/unstable/reactivity/Atom"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import { runtime } from "@/runtime"
@@ -38,26 +39,23 @@ export const figmaProfileBaseAtom = runtime
 
 export const figmaProfileAtom = Atom.optimistic(figmaProfileBaseAtom)
 
-export const disconnectFigmaProfileAtom = Atom.optimisticFn(
-  figmaProfileAtom,
-  {
-    reducer: (current) =>
-      Result.isSuccess(current)
-        ? Result.success(
-            { ...current.value, connected: false },
-            { waiting: true }
-          )
-        : current,
-    fn: runtime.fn(
-      Effect.fn(function* (_input: void, get) {
-        const client = yield* ApiClient
-        const profile = yield* client.figma.disconnectProfile()
-        get.refresh(figmaProfileBaseAtom)
-        return profile
-      })
-    )
-  }
-)
+export const disconnectFigmaProfileAtom = Atom.optimisticFn(figmaProfileAtom, {
+  reducer: (current) =>
+    Result.isSuccess(current)
+      ? Result.success(
+          { ...current.value, connected: false },
+          { waiting: true }
+        )
+      : current,
+  fn: runtime.fn(
+    Effect.fn(function* (_input: void, get) {
+      const client = yield* ApiClient
+      const profile = yield* client.figma.disconnectProfile()
+      get.refresh(figmaProfileBaseAtom)
+      return profile
+    })
+  )
+})
 
 export const figmaProjectStatusBaseAtom = Atom.family((key: string) => {
   const { orgSlug, slug } = splitProjectKey(key)
@@ -66,7 +64,7 @@ export const figmaProjectStatusBaseAtom = Atom.family((key: string) => {
       Effect.gen(function* () {
         const client = yield* ApiClient
         return yield* client.figma.projectStatus({
-          path: { orgSlug, slug }
+          params: { orgSlug, slug }
         })
       })
     )
@@ -91,7 +89,7 @@ export const connectFigmaProjectAtom = Atom.family((key: string) => {
       Effect.fn(function* (input: ConnectFigmaProjectInput, get) {
         const client = yield* ApiClient
         const status = yield* client.figma.connectProject({
-          path: { orgSlug, slug },
+          params: { orgSlug, slug },
           payload: input
         })
         get.refresh(figmaProjectStatusBaseAtom(key))
@@ -105,9 +103,7 @@ export const figmaTicketLinksNoTicketKey = ""
 
 export const figmaTicketLinksAtom = Atom.family((key: string) => {
   if (key === figmaTicketLinksNoTicketKey) {
-    return runtime.atom(
-      Effect.succeed([] as ReadonlyArray<FigmaLinkMetadata>)
-    )
+    return runtime.atom(Effect.succeed([] as ReadonlyArray<FigmaLinkMetadata>))
   }
   const { orgSlug, slug, id } = splitTicketKey(key)
   return runtime
@@ -115,7 +111,7 @@ export const figmaTicketLinksAtom = Atom.family((key: string) => {
       Effect.gen(function* () {
         const client = yield* ApiClient
         return yield* client.figma.ticketLinks({
-          path: { orgSlug, slug, id }
+          params: { orgSlug, slug, id }
         })
       })
     )
@@ -136,7 +132,7 @@ export const disconnectFigmaProjectAtom = Atom.family((key: string) => {
       Effect.fn(function* (_input: void, get) {
         const client = yield* ApiClient
         const status = yield* client.figma.disconnectProject({
-          path: { orgSlug, slug }
+          params: { orgSlug, slug }
         })
         get.refresh(figmaProjectStatusBaseAtom(key))
         return status

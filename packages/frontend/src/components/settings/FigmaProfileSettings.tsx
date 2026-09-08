@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
-import { Result, useAtomSet, useAtomValue } from "@effect-atom/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import { figmaProfileAtom, disconnectFigmaProfileAtom } from "@/atoms/figma"
 import { ErrorPage } from "@/components/ErrorPage"
 import { Button } from "@/components/ui/button"

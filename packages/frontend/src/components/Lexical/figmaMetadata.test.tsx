@@ -1,6 +1,6 @@
 import { cleanup, render } from "@testing-library/react"
 import * as Schema from "effect/Schema"
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it } from "vite-plus/test"
 import { TicketId, type FigmaRef } from "@projectproject/shared"
 import {
   FigmaTicketProvider,

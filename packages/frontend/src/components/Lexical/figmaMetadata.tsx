@@ -1,6 +1,11 @@
 import { createContext, use, type ReactNode } from "react"
-import { Result, useAtomValue } from "@effect-atom/atom-react"
-import { figmaRefKey, type FigmaRef, type TicketId } from "@projectproject/shared"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import { useAtomValue } from "@effect/atom-react"
+import {
+  figmaRefKey,
+  type FigmaRef,
+  type TicketId
+} from "@projectproject/shared"
 import {
   figmaTicketLinksAtom,
   figmaTicketLinksNoTicketKey

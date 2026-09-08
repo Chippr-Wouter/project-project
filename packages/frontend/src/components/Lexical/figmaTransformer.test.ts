@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "vite-plus/test"
 import { FIGMA_MARKDOWN_RE, formatFigmaMarkdown } from "./figmaTransformer"
 
 const KEY = "aBcDeF1234567890GhIjKl"
@@ -45,7 +45,9 @@ describe("FIGMA_MARKDOWN_RE", () => {
 
   it("does not match an attachment link", () => {
     expect(
-      FIGMA_MARKDOWN_RE.test("[f](/api/attachments/acme/01JBX7Q2K9ZWCVE8MTQ4RXPGHN)")
+      FIGMA_MARKDOWN_RE.test(
+        "[f](/api/attachments/acme/01JBX7Q2K9ZWCVE8MTQ4RXPGHN)"
+      )
     ).toBe(false)
   })
 })
