@@ -10,7 +10,7 @@ import { drizzle } from "drizzle-orm/pg-proxy"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import { describe, expect } from "vitest"
+import { describe, expect, vi } from "vitest"
 import * as schema from "../db/schema"
 import { Db } from "../Services/Db"
 import { Figma } from "../Services/Figma"
@@ -213,6 +213,31 @@ const proxyDb = (
 
 const emptyDb = () => proxyDb(() => [])
 
+const recordingDb = (
+  respond: (sql: string) => ReadonlyArray<ReadonlyArray<unknown>>
+) => {
+  const calls: Array<string> = []
+  const params: Array<unknown> = []
+  const db = drizzle(
+    async (sql: string, args: Array<unknown>) => {
+      calls.push(sql)
+      params.push(...args)
+      return { rows: respond(sql).map((row) => [...row]) }
+    },
+    { schema }
+  )
+  return { calls, params, db }
+}
+
+const JOINED = 'inner join "figma_link_index"'
+
+const referencedLink = (input: {
+  readonly fetchedAt: string | null
+  readonly lastCheckStatus: string | null
+}) => [
+  ["link-1", "FILEKEY123", "12:34", input.fetchedAt, input.lastCheckStatus]
+]
+
 const failingDb = () => {
   const db = drizzle(
     async () => {
@@ -292,13 +317,13 @@ describe("reconcileTicket never fails a ticket save", () => {
   )
 
   it.live(
-    "succeeds and writes no error status when the project has no figma connection",
+    "succeeds and records a self-describing status when the project has no figma connection",
     () =>
       Effect.gen(function* () {
-        const { calls, db } = proxyDb((sql) =>
+        const { db, params } = recordingDb((sql) =>
           sql.startsWith("select") && sql.includes("project_index")
             ? [["org-1"]]
-            : sql.startsWith("insert") && sql.includes("figma_link_index")
+            : sql.startsWith('insert into "figma_link_index"')
               ? [["link-1"]]
               : []
         )
@@ -308,9 +333,8 @@ describe("reconcileTicket never fails a ticket save", () => {
         )
         yield* Effect.sleep("100 millis")
         expect(exit._tag).toBe("Success")
-        expect(
-          calls.filter((sql) => sql.startsWith('update "figma_link_index"'))
-        ).toEqual([])
+        expect(params).toContain("figma_not_connected")
+        expect(params).not.toContain("secret-pat")
       })
   )
 
@@ -335,6 +359,76 @@ describe("reconcileTicket never fails a ticket save", () => {
       expect(exit._tag).toBe("Success")
       expect(calls.filter((sql) => !sql.startsWith("select"))).toEqual([])
     })
+  )
+})
+
+describe("reconcileTicket resolves references it did not just add", () => {
+  it.live(
+    "resolves an existing reference whose metadata never landed, with nothing newly added",
+    () =>
+      Effect.gen(function* () {
+        const { calls, params, db } = recordingDb((sql) =>
+          sql.includes(JOINED)
+            ? referencedLink({ fetchedAt: null, lastCheckStatus: null })
+            : []
+        )
+        const exit = yield* reconcile(harness({ db }), BODY)
+        yield* Effect.sleep("100 millis")
+
+        expect(exit._tag).toBe("Success")
+        expect(
+          calls.filter((sql) => sql.startsWith('insert into "figma_reference"'))
+        ).toEqual([])
+        expect(params).toContain("figma_auth_invalid")
+      })
+  )
+
+  it.live(
+    "retries an existing reference whose last check recorded a missing connection",
+    () =>
+      Effect.gen(function* () {
+        const { params, db } = recordingDb((sql) =>
+          sql.includes(JOINED)
+            ? referencedLink({
+                fetchedAt: "2026-09-04T11:59:00.000Z",
+                lastCheckStatus: "error"
+              })
+            : []
+        )
+        yield* reconcile(harness({ db }), BODY)
+        yield* Effect.sleep("100 millis")
+
+        expect(params).toContain("figma_auth_invalid")
+      })
+  )
+
+  it.live(
+    "never re-fetches an existing reference whose metadata is fresh",
+    () =>
+      Effect.gen(function* () {
+        const fetchSpy = vi.fn(() => Promise.reject(new Error("no network")))
+        vi.stubGlobal("fetch", fetchSpy)
+        const getFile = vi.fn(() => Effect.fail(new FigmaAuthInvalid()))
+        const fresh = DateTime.formatIso(
+          DateTime.subtract(yield* DateTime.now, { minutes: 1 })
+        )
+        const { calls, db } = recordingDb((sql) =>
+          sql.includes(JOINED)
+            ? referencedLink({ fetchedAt: fresh, lastCheckStatus: "ok" })
+            : []
+        )
+
+        const exit = yield* reconcile(harness({ db, figma: { getFile } }), BODY)
+        yield* Effect.sleep("100 millis")
+        vi.unstubAllGlobals()
+
+        expect(exit._tag).toBe("Success")
+        expect(getFile).not.toHaveBeenCalled()
+        expect(fetchSpy).not.toHaveBeenCalled()
+        expect(
+          calls.filter((sql) => sql.startsWith('update "figma_link_index"'))
+        ).toEqual([])
+      })
   )
 })
 

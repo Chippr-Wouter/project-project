@@ -225,7 +225,8 @@ export const FigmaLinksLive = Layer.effect(
       }).pipe(
         Effect.catchTag("FigmaNotConnected", () =>
           Effect.logDebug("figma metadata skipped: project not connected").pipe(
-            Effect.annotateLogs({ orgSlug, projectSlug: slug })
+            Effect.annotateLogs({ orgSlug, projectSlug: slug }),
+            Effect.zipRight(recordError(entry.linkId, "figma_not_connected"))
           )
         ),
         Effect.catchTags({
@@ -250,7 +251,7 @@ export const FigmaLinksLive = Layer.effect(
         )
       )
 
-    const resolveAdded = (
+    const resolveLinks = (
       orgSlug: string,
       slug: string,
       entries: ReadonlyArray<{
@@ -329,7 +330,9 @@ export const FigmaLinksLive = Layer.effect(
           .select({
             linkId: figmaReference.linkId,
             fileKey: figmaLinkIndex.fileKey,
-            nodeId: figmaLinkIndex.nodeId
+            nodeId: figmaLinkIndex.nodeId,
+            fetchedAt: figmaLinkIndex.fetchedAt,
+            lastCheckStatus: figmaLinkIndex.lastCheckStatus
           })
           .from(figmaReference)
           .innerJoin(
@@ -345,10 +348,7 @@ export const FigmaLinksLive = Layer.effect(
           )
 
         const existingByKey = new Map(
-          existingRows.map((row) => [
-            `${row.fileKey}/${row.nodeId ?? ""}`,
-            row.linkId
-          ])
+          existingRows.map((row) => [`${row.fileKey}/${row.nodeId ?? ""}`, row])
         )
 
         const plan = planFigmaReferences({
@@ -358,8 +358,8 @@ export const FigmaLinksLive = Layer.effect(
 
         if (plan.removed.length > 0) {
           const linkIds = plan.removed.flatMap((key) => {
-            const linkId = existingByKey.get(key)
-            return linkId === undefined ? [] : [linkId]
+            const row = existingByKey.get(key)
+            return row === undefined ? [] : [row.linkId]
           })
           if (linkIds.length > 0) {
             yield* db
@@ -375,48 +375,57 @@ export const FigmaLinksLive = Layer.effect(
           }
         }
 
-        if (plan.added.length === 0) return
-
-        const project = yield* db.query.projectIndex.findFirst({
-          columns: { organizationId: true },
-          where: eq(projectIndex.slug, slug)
-        })
-        if (project === undefined) return yield* new NotFound()
-
-        const added: Array<{
-          readonly linkId: string
-          readonly ref: FigmaRef
-        }> = []
+        const now = yield* DateTime.nowAsDate
         const toResolve: Array<{
           readonly linkId: string
           readonly ref: FigmaRef
         }> = []
-        for (const key of plan.added) {
-          const ref = byKey.get(key)
-          if (ref === undefined) continue
-          const link = yield* upsertLink(project.organizationId, orgSlug, ref)
-          if (link === null) continue
-          added.push({ linkId: link.id, ref })
-          if (link.resolve) toResolve.push({ linkId: link.id, ref })
+        for (const [key, ref] of byKey) {
+          const row = existingByKey.get(key)
+          if (row === undefined) continue
+          if (needsFigmaMetadata(row, now)) {
+            toResolve.push({ linkId: row.linkId, ref })
+          }
         }
 
-        if (added.length === 0) return
+        if (plan.added.length > 0) {
+          const project = yield* db.query.projectIndex.findFirst({
+            columns: { organizationId: true },
+            where: eq(projectIndex.slug, slug)
+          })
+          if (project === undefined) return yield* new NotFound()
 
-        yield* db
-          .insert(figmaReference)
-          .values(
-            added.map((entry) => ({
-              linkId: entry.linkId,
-              orgSlug,
-              projectSlug: slug,
-              ticketId
-            }))
-          )
-          .onConflictDoNothing()
+          const added: Array<{
+            readonly linkId: string
+            readonly ref: FigmaRef
+          }> = []
+          for (const key of plan.added) {
+            const ref = byKey.get(key)
+            if (ref === undefined) continue
+            const link = yield* upsertLink(project.organizationId, orgSlug, ref)
+            if (link === null) continue
+            added.push({ linkId: link.id, ref })
+            if (link.resolve) toResolve.push({ linkId: link.id, ref })
+          }
+
+          if (added.length > 0) {
+            yield* db
+              .insert(figmaReference)
+              .values(
+                added.map((entry) => ({
+                  linkId: entry.linkId,
+                  orgSlug,
+                  projectSlug: slug,
+                  ticketId
+                }))
+              )
+              .onConflictDoNothing()
+          }
+        }
 
         if (toResolve.length === 0) return
 
-        yield* Effect.forkDaemon(resolveAdded(orgSlug, slug, toResolve))
+        yield* Effect.forkDaemon(resolveLinks(orgSlug, slug, toResolve))
       })
 
     const reconcileTicket: FigmaLinksShape["reconcileTicket"] = (
