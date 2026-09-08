@@ -5,7 +5,8 @@ import { runtime } from "@/runtime"
 import { ApiClient } from "@/services/ApiClient"
 import {
   TicketId,
-  type ConnectFigmaProjectInput
+  type ConnectFigmaProjectInput,
+  type FigmaLinkMetadata
 } from "@projectproject/shared"
 
 const splitProjectKey = (key: string): { orgSlug: string; slug: string } => {
@@ -100,7 +101,14 @@ export const connectFigmaProjectAtom = Atom.family((key: string) => {
   })
 })
 
+export const figmaTicketLinksNoTicketKey = ""
+
 export const figmaTicketLinksAtom = Atom.family((key: string) => {
+  if (key === figmaTicketLinksNoTicketKey) {
+    return runtime.atom(
+      Effect.succeed([] as ReadonlyArray<FigmaLinkMetadata>)
+    )
+  }
   const { orgSlug, slug, id } = splitTicketKey(key)
   return runtime
     .atom(

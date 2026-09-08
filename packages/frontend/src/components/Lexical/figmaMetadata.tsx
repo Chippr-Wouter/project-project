@@ -1,7 +1,10 @@
 import { createContext, use, type ReactNode } from "react"
 import { Result, useAtomValue } from "@effect-atom/atom-react"
 import { figmaRefKey, type FigmaRef, type TicketId } from "@projectproject/shared"
-import { figmaTicketLinksAtom } from "@/atoms/figma"
+import {
+  figmaTicketLinksAtom,
+  figmaTicketLinksNoTicketKey
+} from "@/atoms/figma"
 import { ticketKey } from "@/atoms/tickets"
 
 export interface FigmaLinkMetadata {
@@ -31,17 +34,16 @@ export const useFigmaMetadata = (
   ref: FigmaRef | null
 ): FigmaLinkMetadata | null => {
   const target = use(FigmaTicketContext)
-  if (target === null || ref === null) return null
-  const result = useAtomValue(
-    figmaTicketLinksAtom(
-      ticketKey(target.orgSlug, target.slug, target.ticketId)
-    )
-  )
-  if (!Result.isSuccess(result)) return null
-  const key = figmaRefKey(ref)
+  const key =
+    target === null
+      ? figmaTicketLinksNoTicketKey
+      : ticketKey(target.orgSlug, target.slug, target.ticketId)
+  const result = useAtomValue(figmaTicketLinksAtom(key))
+  if (ref === null || !Result.isSuccess(result)) return null
+  const refKey = figmaRefKey(ref)
   return (
     result.value.find(
-      (link) => `${link.fileKey}/${link.nodeId ?? ""}` === key
+      (link) => `${link.fileKey}/${link.nodeId ?? ""}` === refKey
     ) ?? null
   )
 }
