@@ -24,7 +24,7 @@ export class AttachmentUploads extends Context.Service<
     readonly prepare: (
       ticket: TicketAttachmentUpload,
       userId: string,
-      input: PrepareAttachmentInput
+      input: Omit<PrepareAttachmentInput, "byteSize">
     ) => Effect.Effect<PrepareAttachmentResult, AttachmentUploadError>
     readonly receive: (
       token: string,

@@ -171,25 +171,27 @@ export const AttachmentUploadsLive = Layer.effect(
           ) {
             return yield* new AttachmentTypeRejected({ contentType })
           }
-          const bytes = new Uint8Array(prepared.byteSize)
+          const chunks: Array<Uint8Array> = []
           let offset = 0
           yield* body.pipe(
             Stream.runForEach((chunk) =>
               Effect.gen(function* () {
-                if (offset + chunk.byteLength > bytes.byteLength)
+                if (offset + chunk.byteLength > ATTACHMENT_MAX_BYTES)
                   return yield* new AttachmentTooLarge({
                     maxBytes: ATTACHMENT_MAX_BYTES
                   })
-                bytes.set(chunk, offset)
+                chunks.push(chunk)
                 offset += chunk.byteLength
                 return undefined
               })
             )
           )
-          if (offset !== bytes.byteLength)
+          if (offset === 0)
             return yield* new AttachmentTooLarge({
               maxBytes: ATTACHMENT_MAX_BYTES
             })
+
+          const bytes = Buffer.concat(chunks, offset)
 
           return yield* sql
             .withTransaction(
@@ -200,6 +202,11 @@ export const AttachmentUploadsLive = Layer.effect(
                 yield* checkExpiry
                 yield* requireTicket(grant, grant.userId)
                 if (row.status === "pending") {
+                  yield* db
+                    .update(attachmentIndex)
+                    .set({ byteSize: bytes.byteLength })
+                    .where(eq(attachmentIndex.id, row.id))
+                    .pipe(Effect.orDie)
                   const connection = yield* orgStorage.requireConnection(
                     grant.orgSlug
                   )

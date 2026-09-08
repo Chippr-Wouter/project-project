@@ -266,7 +266,7 @@ export const McpTools = {
     description:
       "Prepare an attachment upload for an existing ticket. Requires organization storage " +
       "and project membership. Accepts non-empty files up to 25 MiB: PNG, JPEG, GIF, " +
-      "WebP, AVIF, PDF, ZIP, gzip, or tar. Supply filename, contentType, and exact byteSize. " +
+      "WebP, AVIF, PDF, ZIP, gzip, or tar. Supply filename and contentType; the server measures the file size. " +
       "POST the local file to the returned uploadUrl: curl --fail-with-body --request POST " +
       "--data-binary '@/path/to/file' --header 'Content-Type: <contentType>' '<uploadUrl>'. " +
       "The HTTP response returns the committed id, permanent url, filename, and contentType; " +
@@ -281,7 +281,8 @@ export const McpTools = {
       orgSlug: Slug,
       projectSlug: Slug,
       ticketId: TicketId,
-      ...PrepareAttachmentInput.fields
+      filename: PrepareAttachmentInput.fields.filename,
+      contentType: PrepareAttachmentInput.fields.contentType
     }),
     output: PrepareAttachmentResult,
     errors: [

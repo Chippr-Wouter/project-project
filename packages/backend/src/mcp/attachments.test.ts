@@ -88,7 +88,7 @@ const connection: S3Storage.S3Connection = {
   accessKeyId: "test",
   secretAccessKey: "test"
 }
-const upload = { filename: "screen.png", contentType: "image/png", byteSize: 4 }
+const upload = { filename: "screen.png", contentType: "image/png" }
 const bytes = new Uint8Array([137, 80, 78, 71])
 
 const fixture = Effect.fn("attachmentFixture")(function* (
@@ -313,14 +313,15 @@ describe.skipIf(!databaseUrl)("MCP attachment upload with Postgres", () => {
           filename: upload.filename,
           contentType: upload.contentType
         })
-        expect(yield* f.rows).toMatchObject([{ status: "live" }])
-        const retry = yield* f.post(
-          prepared.uploadUrl,
-          new Uint8Array([1, 2, 3, 4])
-        )
+        expect(yield* f.rows).toMatchObject([
+          { status: "live", byteSize: bytes.byteLength }
+        ])
+        const retry = yield* f.post(prepared.uploadUrl, new Uint8Array([1, 2]))
         expect(yield* Effect.promise(() => retry.json())).toEqual(committed)
         expect(f.writes).toHaveLength(1)
-        expect([...f.objects.values()]).toEqual([bytes])
+        expect([...f.objects.values()].map((value) => [...value])).toEqual([
+          [...bytes]
+        ])
       }).pipe(Effect.scoped, Effect.provide(dbLayer))
   )
 
@@ -406,26 +407,20 @@ describe.skipIf(!databaseUrl)("MCP attachment upload with Postgres", () => {
       }).pipe(Effect.scoped, Effect.provide(dbLayer))
   )
 
-  it.effect.each([
-    { contentType: "text/plain", byteSize: 4, tag: "AttachmentTypeRejected" },
-    { contentType: "image/png", byteSize: 0, tag: "AttachmentTooLarge" },
-    {
-      contentType: "image/png",
-      byteSize: 25 * 1024 * 1024 + 1,
-      tag: "AttachmentTooLarge"
-    }
-  ])("rejects invalid metadata before persistence: $tag", (input) =>
+  it.effect("rejects unsupported types before persistence", () =>
     Effect.gen(function* () {
       const f = yield* fixture()
       expect(
-        (yield* Effect.flip(f.prepare({ ...upload, ...input })))._tag
-      ).toBe(input.tag)
+        (yield* Effect.flip(
+          f.prepare({ ...upload, contentType: "text/plain" })
+        ))._tag
+      ).toBe("AttachmentTypeRejected")
       expect(yield* f.rows).toEqual([])
     }).pipe(Effect.scoped, Effect.provide(dbLayer))
   )
 
   it.effect(
-    "rejects mismatched types and short/oversized streams without writing to S3",
+    "rejects mismatched types and empty/oversized streams without writing to S3",
     () =>
       Effect.gen(function* () {
         const f = yield* fixture()
@@ -434,10 +429,10 @@ describe.skipIf(!databaseUrl)("MCP attachment upload with Postgres", () => {
           (yield* f.post(prepared.uploadUrl, bytes, "text/plain")).status
         ).toBe(415)
         expect(
-          (yield* f.post(prepared.uploadUrl, new Uint8Array(3))).status
+          (yield* f.post(prepared.uploadUrl, new Uint8Array(0))).status
         ).toBe(413)
         const oversized = Stream.concat(
-          Stream.make(new Uint8Array(5)),
+          Stream.make(new Uint8Array(25 * 1024 * 1024 + 1)),
           Stream.die("must stop reading")
         )
         expect(
@@ -475,7 +470,9 @@ describe.skipIf(!databaseUrl)("MCP attachment upload with Postgres", () => {
         expect(yield* f.rows).toMatchObject([{ status: "pending" }])
         f.options.missingObject = false
         expect((yield* f.post(prepared.uploadUrl)).status).toBe(200)
-        expect(yield* f.rows).toMatchObject([{ status: "live" }])
+        expect(yield* f.rows).toMatchObject([
+          { status: "live", byteSize: bytes.byteLength }
+        ])
       }).pipe(Effect.scoped, Effect.provide(dbLayer))
   )
 
@@ -483,7 +480,7 @@ describe.skipIf(!databaseUrl)("MCP attachment upload with Postgres", () => {
     Effect.gen(function* () {
       const f = yield* fixture()
       const size = 25 * 1024 * 1024
-      const prepared = yield* f.prepare({ ...upload, byteSize: size })
+      const prepared = yield* f.prepare()
       const maximum = new Uint8Array(size)
       const tooMuch = Stream.make(maximum, new Uint8Array(1))
       expect(
@@ -491,9 +488,13 @@ describe.skipIf(!databaseUrl)("MCP attachment upload with Postgres", () => {
       ).toBe("AttachmentTooLarge")
       expect(f.writes).toHaveLength(0)
       expect(
-        (yield* f.receive(prepared.uploadUrl, Stream.make(maximum))).id
+        (yield* f.receive(
+          prepared.uploadUrl,
+          Stream.make(maximum.subarray(0, 17), maximum.subarray(17))
+        )).id
       ).toBe(prepared.id)
       expect([...f.objects.values()][0]).toHaveLength(size)
+      expect(yield* f.rows).toMatchObject([{ byteSize: size, status: "live" }])
     }).pipe(Effect.scoped, Effect.provide(dbLayer))
   )
 
@@ -584,15 +585,17 @@ describe.skipIf(!databaseUrl)("MCP attachment upload with Postgres", () => {
 })
 
 describe("MCP attachment contracts", () => {
-  it("rejects malformed ticket IDs and fractional sizes", () => {
+  it("requires a ticket but no byte size", () => {
     const scope = { orgSlug: "acme", projectSlug: "demo", ticketId: "T-122" }
     expect(
       Schema.is(McpTools.prepare_ticket_attachment.input)({
         ...scope,
-        ...upload,
-        byteSize: 1.5
+        ...upload
       })
-    ).toBe(false)
+    ).toBe(true)
+    expect(
+      Object.keys(McpTools.prepare_ticket_attachment.input.fields)
+    ).not.toContain("byteSize")
     expect(
       Schema.is(McpTools.prepare_ticket_attachment.input)({
         ...scope,
