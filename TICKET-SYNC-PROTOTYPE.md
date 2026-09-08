@@ -7,11 +7,11 @@ The ticket overview now supports checkpointed bootstrap and delta polling for th
 - Bootstrap returns active ticket metadata and an epoch/revision checkpoint.
 - Delta returns upserts, deleted IDs, the next checkpoint, a reset flag and a hasMore flag.
 - Poll every two seconds while the overview is mounted; also poll on window focus and online events. Overlapping triggers in a tab are coalesced while a request is running.
-- Persist the updated snapshot and checkpoint together in one IndexedDB transaction, then invalidate ticket atoms.
+- Persist changed ticket records and the checkpoint together in one IndexedDB transaction, then invalidate ticket atoms. Ordinary delta commits avoid reading or rewriting the complete stored collection; resolving a concurrent checkpoint change may rehydrate it.
 - Each tab keeps its own in-memory snapshot. When another tab has advanced the shared IndexedDB record, a stale response adopts that persisted snapshot instead of overwriting it.
 - A new epoch or a checkpoint ahead of the server requests a fresh bootstrap.
 - Delta pages cover at most 1,000 log entries. Each poll drains available pages before completing.
-- Confirmed ticket mutations catch up the replica before refreshing list atoms. Typed catch-up failures are logged without reporting an already committed server mutation as failed; background polling retries.
+- Confirmed ticket mutations catch up an existing replica before refreshing list atoms. The detail refresh runs alongside catch-up. Detail-only pages poll using checkpoint metadata without hydrating the full collection; if no replica exists, edits do not bootstrap one. Typed catch-up failures are logged without reporting an already committed server mutation as failed; background polling retries.
 - Active metadata queries in default created-descending order use the complete replica. Search, archive, group filters, other ordering, and cursors retain server filtering and pagination. Counts use the same coverage boundary without an ordering restriction.
 - List invalidation uses the benchmark stack's project-scoped keys; background deltas do not refetch ticket bodies.
 
@@ -90,13 +90,13 @@ Frontend checks:
 bunx vp test run --project frontend packages/frontend/src/atoms/ticketSyncPrototype.test.ts packages/frontend/src/components/TicketList/SectionList.test.tsx
 ```
 
-Local database: PROTOTYPE-ticket-sync-v2. It is separate from previous snapshot experiments. The [cache lifecycle slice](CACHE-LIFECYCLE-PROTOTYPE.md) adds account ownership, revocation, and cross-tab cleanup; it does not import unowned v1 snapshots.
+Local database: PROTOTYPE-ticket-sync-v2. Its schema version 2 stores individual tickets in `ticket` and checkpoint metadata in `snapshot`. The upgrade preserves auth/project generations and discards the old full-snapshot cache, causing one fresh bootstrap when the overview is next opened. Close older prototype tabs before upgrading so they do not block the schema change. It is separate from previous snapshot experiments. The [cache lifecycle slice](CACHE-LIFECYCLE-PROTOTYPE.md) adds account ownership, revocation, and cross-tab cleanup; it does not import unowned v1 snapshots.
 
 ## Limits before promotion
 
 - No log retention/compaction or automatic epoch rotation. An operator replacing the log must change the epoch and bootstrap clients again.
 - The prototype serializes writes per project on one head row. Throughput and contention are unmeasured.
-- A single snapshot record is rewritten for each nonempty delta. Per-ticket object stores would reduce large-project persistence work.
+- Bootstrap still inserts the complete collection before first display. Individual ticket records make incremental persistence cheap but increase this one-time write cost.
 - Project scope remains restricted to the fixture. Account partitioning, logout cleanup, and confirmed project-access revocation are implemented; offline authenticated startup remains unresolved.
 - Only changes published to ticket_index are tracked. Project configuration that affects derived metadata, memberships, related entities, and live GitHub data require their own invalidation/sync treatment.
 - No offline mutation queue or complete optimistic-mutation reconciliation. This tests server mutations followed by local convergence.

@@ -1,5 +1,7 @@
 # T-118: IndexedDB integration remeasurement
 
+Follow-up: [incremental persistence fix and paired production measurements](t118-indexeddb-save-fix.md).
+
 Measured September 8, 2026 at `f62908a0eb76213e420555ae4f1b8ab6dfc9ef3a`, after merging benchmark-stack tip `e0ad10a2a` (PR #152). The sync cache removes pagination gaps during the measured scrolling workload, but does not make first display faster on localhost. Confirmed title saves were slower with sync; code inspection identifies awaited replica catch-up and snapshot persistence as added work.
 
 ## Production browser variants

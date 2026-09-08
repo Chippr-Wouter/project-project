@@ -6,7 +6,7 @@ import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import { TicketSyncSnapshotPrototype } from "@projectproject/shared"
+import { Ticket, TicketSyncSnapshotPrototype } from "@projectproject/shared"
 import { ticketSyncPrototypeEnabled } from "@/atoms/ticketSyncPrototype"
 
 export class TicketSyncStorageError extends Schema.TaggedError<TicketSyncStorageError>()(
@@ -32,7 +32,7 @@ const projectTable = IndexedDbTable.make({
     generation: Schema.Int
   })
 })
-const snapshotTable = IndexedDbTable.make({
+const legacySnapshotTable = IndexedDbTable.make({
   name: "snapshot",
   keyPath: "id",
   indexes: { byAccount: "accountId" },
@@ -43,14 +43,46 @@ const snapshotTable = IndexedDbTable.make({
     ...TicketSyncSnapshotPrototype.fields
   })
 })
+const snapshotTable = IndexedDbTable.make({
+  name: "snapshot",
+  keyPath: "id",
+  indexes: { byAccount: "accountId" },
+  schema: Schema.Struct({
+    id: Schema.String,
+    accountId: Schema.String,
+    generation: Schema.Int,
+    checkpoint: TicketSyncSnapshotPrototype.fields.checkpoint
+  })
+})
+const ticketTable = IndexedDbTable.make({
+  name: "ticket",
+  keyPath: "id",
+  indexes: { byAccount: "accountId", byProject: "projectId" },
+  schema: Schema.Struct({
+    id: Schema.String,
+    accountId: Schema.String,
+    projectId: Schema.String,
+    ticket: Ticket
+  })
+})
 const database = IndexedDbDatabase.make(
-  IndexedDbVersion.make(authTable, projectTable, snapshotTable),
+  IndexedDbVersion.make(authTable, projectTable, legacySnapshotTable),
   Effect.fn("migrateTicketSyncPrototype")(function* (migration) {
     yield* migration.createObjectStore("auth")
     yield* migration.createObjectStore("project")
     yield* migration.createObjectStore("snapshot")
     yield* migration.createIndex("project", "byAccount")
     yield* migration.createIndex("snapshot", "byAccount")
+  })
+).add(
+  IndexedDbVersion.make(authTable, projectTable, snapshotTable, ticketTable),
+  Effect.fn("normalizeTicketSyncStorage")(function* (previous, migration) {
+    yield* previous.deleteObjectStore("snapshot")
+    yield* migration.createObjectStore("snapshot")
+    yield* migration.createIndex("snapshot", "byAccount")
+    yield* migration.createObjectStore("ticket")
+    yield* migration.createIndex("ticket", "byAccount")
+    yield* migration.createIndex("ticket", "byProject")
   })
 )
 

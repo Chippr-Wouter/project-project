@@ -411,10 +411,10 @@ export const updateTicketAtom = Atom.family((key: string) => {
           params: { orgSlug, slug, id },
           payload
         })
-        yield* refreshReplicaAfterMutation(orgSlug, slug)
-        if (unsaved === payload) unsaved = {}
         const remote = ticketRemoteAtom(ticketKey(orgSlug, slug, id))
         get.refresh(remote)
+        yield* refreshReplicaAfterMutation(orgSlug, slug)
+        if (unsaved === payload) unsaved = {}
         yield* Reactivity.invalidate([`ticket-lists/${orgSlug}/${slug}`])
         yield* get
           .result(remote, { suspendOnWaiting: true })

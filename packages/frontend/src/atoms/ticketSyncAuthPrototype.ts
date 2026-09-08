@@ -54,7 +54,7 @@ export const refreshReplicaAfterMutation = Effect.fn(
       return
     const { owner } = yield* authenticateTicketSyncPrototype()
     const sync = yield* TicketSync.TicketSync
-    yield* sync.poll(owner, { orgSlug, slug })
+    yield* sync.poll(owner, { orgSlug, slug }, { bootstrap: false })
   },
   Effect.catch((error) =>
     Effect.logWarning("Ticket replica catch-up failed", { error: error._tag })

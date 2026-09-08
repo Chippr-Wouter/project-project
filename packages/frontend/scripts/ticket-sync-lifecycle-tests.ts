@@ -245,26 +245,6 @@ type IdManager = {
   readonly onIndexGetAll?: (index: IDBIndex) => void
 }
 
-const idbMethods = () => ({
-  put: Object.getOwnPropertyDescriptor(IDBObjectStore.prototype, "put")?.value,
-  get: Object.getOwnPropertyDescriptor(IDBObjectStore.prototype, "get")?.value,
-  getAll: Object.getOwnPropertyDescriptor(IDBObjectStore.prototype, "getAll")
-    ?.value,
-  indexGetAll: Object.getOwnPropertyDescriptor(IDBIndex.prototype, "getAll")
-    ?.value
-})
-
-const checkIdbMethodsRestored = (original: ReturnType<typeof idbMethods>) => {
-  const current = idbMethods()
-  check(
-    current.put === original.put &&
-      current.get === original.get &&
-      current.getAll === original.getAll &&
-      current.indexGetAll === original.indexGetAll,
-    "IndexedDB instrumentation was not restored"
-  )
-}
-
 const instrumentIndexedDb = (manager: IdManager) => {
   const stores = IDBObjectStore.prototype
   const indexes = IDBIndex.prototype
@@ -282,10 +262,10 @@ const instrumentIndexedDb = (manager: IdManager) => {
     !indexGetAllDescriptor
   )
     throw new Error("IndexedDB methods cannot be instrumented")
-  const put = putDescriptor.value
-  const get = getDescriptor.value
-  const getAll = getAllDescriptor.value
-  const indexGetAll = indexGetAllDescriptor.value
+  // oxlint-disable-next-line typescript/unbound-method
+  const { put, get, getAll } = stores
+  // oxlint-disable-next-line typescript/unbound-method
+  const { getAll: indexGetAll } = indexes
 
   stores.put = function (
     this: IDBObjectStore,
@@ -306,33 +286,17 @@ const instrumentIndexedDb = (manager: IdManager) => {
   }
   stores.getAll = function (
     this: IDBObjectStore,
-    query?: IDBValidKey | IDBKeyRange | null,
-    count?: number
+    ...args: Parameters<typeof getAll>
   ) {
-    const request =
-      query === undefined
-        ? count === undefined
-          ? getAll.call(this)
-          : getAll.call(this, undefined, count)
-        : count === undefined
-          ? getAll.call(this, query)
-          : getAll.call(this, query, count)
+    const request = getAll.apply(this, args)
     manager.onGetAll?.(this)
     return request
   }
   indexes.getAll = function (
     this: IDBIndex,
-    query?: IDBValidKey | IDBKeyRange | null,
-    count?: number
+    ...args: Parameters<typeof indexGetAll>
   ) {
-    const request =
-      query === undefined
-        ? count === undefined
-          ? indexGetAll.call(this)
-          : indexGetAll.call(this, undefined, count)
-        : count === undefined
-          ? indexGetAll.call(this, query)
-          : indexGetAll.call(this, query, count)
+    const request = indexGetAll.apply(this, args)
     manager.onIndexGetAll?.(this)
     return request
   }
@@ -522,7 +486,6 @@ export async function runTicketSyncLifecycleTests() {
     let emptyTicketGets = 0
     let emptyTicketGetAlls = 0
     let emptyTicketIndexGetAlls = 0
-    const emptyMethods = idbMethods()
     const restoreEmpty = instrumentIndexedDb({
       onGet: (store) => {
         if (store.name === "ticket") emptyTicketGets++
@@ -544,9 +507,10 @@ export async function runTicketSyncLifecycleTests() {
     } finally {
       restoreEmpty()
     }
-    checkIdbMethodsRestored(emptyMethods)
-    check(snapshotRequests === 0, "Empty checkpoint poll bootstrapped")
-    check(deltaRequests === 0, "Empty checkpoint poll requested a delta")
+    check(
+      [snapshotRequests, deltaRequests].every((count) => count === 0),
+      "Empty checkpoint poll requested network data"
+    )
     check(
       emptyTicketGets + emptyTicketGetAlls + emptyTicketIndexGetAlls === 0,
       "Empty checkpoint poll read ticket rows"
@@ -572,7 +536,6 @@ export async function runTicketSyncLifecycleTests() {
     let ticketGetAlls = 0
     let ticketIndexGetAlls = 0
     let snapshotGets = 0
-    const originalMethods = idbMethods()
     const restore = instrumentIndexedDb({
       onPut: (store, value) => {
         if (store.name !== "ticket" || !Predicate.isObject(value)) return
@@ -584,6 +547,7 @@ export async function runTicketSyncLifecycleTests() {
       },
       onGetAll: (store) => {
         if (store.name === "ticket") ticketGetAlls++
+        if (store.name === "snapshot") snapshotGets++
       },
       onIndexGetAll: (index) => {
         if (index.objectStore.name === "ticket") ticketIndexGetAlls++
@@ -597,7 +561,6 @@ export async function runTicketSyncLifecycleTests() {
     } finally {
       restore()
     }
-    checkIdbMethodsRestored(originalMethods)
     check(changed, "Persisted checkpoint delta was not reported")
     check(snapshotRequests === 1, "Fresh poll fetched a bootstrap snapshot")
     check(deltaRequests === 1, "Fresh poll did not request one delta")
@@ -640,6 +603,40 @@ export async function runTicketSyncLifecycleTests() {
         ),
       "Subsequent read did not hydrate all persisted tickets"
     )
+  })
+  await test("checkpoint-only polling rejects invalid delta checkpoints", async ({
+    create
+  }) => {
+    const first = create(respond)
+    const initialSync = await first.runPromise(TicketSync.TicketSync)
+    await first.runPromise(initialSync.read(await owner(first), params))
+    await first.dispose()
+    for (const checkpoint of [
+      { epoch: "unexpected", revision: 2 },
+      { epoch: "test", revision: 0 }
+    ]) {
+      const runtime = create(async () =>
+        Response.json({ ...delta, checkpoint })
+      )
+      const sync = await runtime.runPromise(TicketSync.TicketSync)
+      const account = await owner(runtime)
+      check(
+        Exit.isFailure(
+          await runtime.runPromiseExit(sync.poll(account, params))
+        ),
+        "Invalid checkpoint was accepted without a hydrated snapshot"
+      )
+      check(
+        snapshotRevision(await readStore("snapshot")) === 1,
+        "Invalid delta advanced the checkpoint"
+      )
+      check(
+        (await runtime.runPromise(sync.read(account, params)))[0]?.title ===
+          "Original",
+        "Invalid delta changed a ticket"
+      )
+      await runtime.dispose()
+    }
   })
   await test("ticket delta commits are atomic with its checkpoint", async ({
     create

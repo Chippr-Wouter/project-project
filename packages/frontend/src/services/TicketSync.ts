@@ -40,6 +40,8 @@ const projectKey = (
   owner: TicketSyncOwnerPrototype,
   params: TicketSyncParamsPrototype
 ) => JSON.stringify([owner.server, owner.userId, params.orgSlug, params.slug])
+const ticketRecordKey = (projectId: string, ticketId: string) =>
+  JSON.stringify([projectId, ticketId])
 const sameOwner = (
   left: TicketSyncOwnerPrototype | undefined | null,
   right: TicketSyncOwnerPrototype
@@ -180,6 +182,7 @@ export const make = Effect.gen(function* () {
     owner: TicketSyncOwnerPrototype
   ) {
     const db = yield* storage.database
+    yield* db.from("ticket").delete("byAccount").equals(accountKey(owner))
     yield* db.from("snapshot").delete("byAccount").equals(accountKey(owner))
     yield* db.from("project").delete("byAccount").equals(accountKey(owner))
   })
@@ -218,7 +221,7 @@ export const make = Effect.gen(function* () {
         return { owner: { server, userId, generation }, previous }
       }).pipe(
         db.withTransaction({
-          tables: ["auth", "project", "snapshot"],
+          tables: ["auth", "project", "snapshot", "ticket"],
           mode: "readwrite"
         })
       )
@@ -274,7 +277,7 @@ export const make = Effect.gen(function* () {
         return true
       }).pipe(
         db.withTransaction({
-          tables: ["auth", "project", "snapshot"],
+          tables: ["auth", "project", "snapshot", "ticket"],
           mode: "readwrite"
         })
       )
@@ -304,14 +307,50 @@ export const make = Effect.gen(function* () {
       yield* notify({ owner: localOwner, project: null }, true)
   })
 
+  const loadSnapshot = Effect.fn("loadTicketSyncSnapshot")(function* (
+    id: string,
+    checkpoint: Snapshot["checkpoint"]
+  ) {
+    const db = yield* storage.database
+    const rows = yield* db.from("ticket").select("byProject").equals(id)
+    return applyTicketDeltaPrototype(
+      { checkpoint, items: [] },
+      {
+        checkpoint,
+        items: rows.map((row) => row.ticket),
+        deleted: [],
+        reset: false,
+        hasMore: false
+      }
+    )
+  })
+  const persistTickets = Effect.fn("persistTicketSyncRows")(function* (
+    owner: TicketSyncOwnerPrototype,
+    id: string,
+    items: Snapshot["items"]
+  ) {
+    const db = yield* storage.database
+    if (items.length === 0) return
+    yield* db.from("ticket").upsertAll(
+      items.map((ticket) => ({
+        id: ticketRecordKey(id, ticket.id),
+        accountId: accountKey(owner),
+        projectId: id,
+        ticket
+      }))
+    )
+  })
+
   type ProjectLease = {
     readonly id: string
     readonly generation: number
+    readonly checkpoint: Snapshot["checkpoint"] | undefined
     readonly snapshot: Snapshot | undefined
   }
   const prepareProject = Effect.fn("prepareTicketSyncProject")(function* (
     owner: TicketSyncOwnerPrototype,
-    params: TicketSyncParamsPrototype
+    params: TicketSyncParamsPrototype,
+    hydrate: boolean
   ) {
     if (!isFixture(params)) return yield* new NotFound()
     if (!sameOwner(activeOwner, owner)) return yield* new Unauthorized()
@@ -324,18 +363,22 @@ export const make = Effect.gen(function* () {
         project = { id, accountId: accountKey(owner), generation: 0 }
         yield* db.from("project").upsert(project)
       }
-      const cached = memory.get(id)
-      if (cached?.generation === project.generation)
-        return { id, generation: project.generation, snapshot: cached.snapshot }
       const saved = (yield* db.from("snapshot").select().equals(id))[0]
-      return {
-        id,
-        generation: project.generation,
-        snapshot: saved?.generation === project.generation ? saved : undefined
-      }
+      const checkpoint =
+        saved?.generation === project.generation ? saved.checkpoint : undefined
+      const cached = memory.get(id)
+      const snapshot =
+        checkpoint &&
+        cached?.generation === project.generation &&
+        sameCheckpoint(cached.snapshot.checkpoint, checkpoint)
+          ? cached.snapshot
+          : checkpoint && hydrate
+            ? yield* loadSnapshot(id, checkpoint)
+            : undefined
+      return { id, generation: project.generation, checkpoint, snapshot }
     }).pipe(
       db.withTransaction({
-        tables: ["auth", "project", "snapshot"],
+        tables: ["auth", "project", "snapshot", "ticket"],
         mode: "readwrite"
       })
     )
@@ -353,6 +396,7 @@ export const make = Effect.gen(function* () {
     projectVersions.set(id, lease.generation)
     if (lease.snapshot)
       memory.set(id, { generation: lease.generation, snapshot: lease.snapshot })
+    else memory.delete(id)
     return lease
   })
   const clearProject = Effect.fn("clearTicketSyncProject")(function* (
@@ -370,6 +414,7 @@ export const make = Effect.gen(function* () {
       const project = (yield* db.from("project").select().equals(lease.id))[0]
       if (!project || project.generation !== lease.generation) return false
       const saved = (yield* db.from("snapshot").select().equals(lease.id))[0]
+      yield* db.from("ticket").delete("byProject").equals(lease.id)
       yield* db.from("snapshot").delete().equals(lease.id)
       yield* db
         .from("project")
@@ -377,7 +422,7 @@ export const make = Effect.gen(function* () {
       return saved !== undefined
     }).pipe(
       db.withTransaction({
-        tables: ["auth", "project", "snapshot"],
+        tables: ["auth", "project", "snapshot", "ticket"],
         mode: "readwrite"
       })
     )
@@ -418,65 +463,95 @@ export const make = Effect.gen(function* () {
       | {
           readonly kind: "delta"
           readonly value: Delta
-          readonly base: Snapshot
+          readonly base: Snapshot["checkpoint"]
         }
   ) {
     const db = yield* storage.database
-    const snapshot = yield* Effect.gen(function* () {
+    if (
+      change.kind === "delta" &&
+      (change.value.checkpoint.epoch !== change.base.epoch ||
+        change.value.checkpoint.revision < change.base.revision)
+    )
+      return yield* Effect.die("Invalid delta checkpoint")
+    const committed = yield* Effect.gen(function* () {
       yield* requireOwner(owner)
       const project = (yield* db.from("project").select().equals(lease.id))[0]
       if (project?.generation !== lease.generation) return yield* new NotFound()
       const previous = (yield* db.from("snapshot").select().equals(lease.id))[0]
+      if (change.kind === "delta" && !previous)
+        return { checkpoint: undefined, snapshot: undefined }
       if (
-        change.kind === "delta" &&
         previous &&
-        !sameCheckpoint(previous.checkpoint, change.base.checkpoint)
+        (change.kind === "delta"
+          ? !sameCheckpoint(previous.checkpoint, change.base)
+          : !lease.checkpoint ||
+            !sameCheckpoint(previous.checkpoint, lease.checkpoint))
       )
-        return previous
-      if (
-        change.kind === "snapshot" &&
-        previous &&
-        (!lease.snapshot ||
-          !sameCheckpoint(previous.checkpoint, lease.snapshot.checkpoint))
-      )
-        return previous
-      const next =
+        return {
+          checkpoint: previous.checkpoint,
+          snapshot:
+            lease.snapshot || change.kind === "snapshot"
+              ? yield* loadSnapshot(lease.id, previous.checkpoint)
+              : undefined
+        }
+      const snapshot =
         change.kind === "snapshot"
           ? change.value
-          : applyTicketDeltaPrototype(previous ?? change.base, change.value)
+          : lease.snapshot
+            ? applyTicketDeltaPrototype(lease.snapshot, change.value)
+            : undefined
+      if (change.kind === "snapshot") {
+        yield* db.from("ticket").delete("byProject").equals(lease.id)
+        yield* persistTickets(owner, lease.id, change.value.items)
+      } else {
+        for (const id of change.value.deleted)
+          yield* db
+            .from("ticket")
+            .delete()
+            .equals(ticketRecordKey(lease.id, id))
+        yield* persistTickets(owner, lease.id, change.value.items)
+      }
       yield* db.from("snapshot").upsert({
         id: lease.id,
         accountId: accountKey(owner),
         generation: lease.generation,
-        ...next
+        checkpoint: change.value.checkpoint
       })
-      return next
+      return { checkpoint: change.value.checkpoint, snapshot }
     }).pipe(
       db.withTransaction({
-        tables: ["auth", "project", "snapshot"],
+        tables: ["auth", "project", "snapshot", "ticket"],
         mode: "readwrite"
       })
     )
     if (!sameOwner(activeOwner, owner)) return yield* new Unauthorized()
     if (projectVersions.get(lease.id) !== lease.generation)
       return yield* new NotFound()
-    memory.set(lease.id, { generation: lease.generation, snapshot })
-    return snapshot
+    if (committed.snapshot)
+      memory.set(lease.id, {
+        generation: lease.generation,
+        snapshot: committed.snapshot
+      })
+    else memory.delete(lease.id)
+    return committed
   })
   const readTicketSyncPrototype = Effect.fn("readTicketSyncPrototype")(
     function* (
       owner: TicketSyncOwnerPrototype,
       params: TicketSyncParamsPrototype
     ) {
-      const lease = yield* prepareProject(owner, params)
+      const lease = yield* prepareProject(owner, params, true)
       if (lease.snapshot) return lease.snapshot.items
       const incoming = yield* client.tickets
         .prototypeSyncSnapshot({ params })
         .pipe(handleDenied(owner, lease))
-      return (yield* commit(owner, lease, {
+      const committed = yield* commit(owner, lease, {
         kind: "snapshot",
         value: incoming
-      }).pipe(handleDenied(owner, lease))).items
+      }).pipe(handleDenied(owner, lease))
+      if (!committed.snapshot)
+        return yield* Effect.die("Bootstrap committed without ticket data")
+      return committed.snapshot.items
     },
     replicaLock.withPermits(1)
   )
@@ -484,25 +559,27 @@ export const make = Effect.gen(function* () {
   const pollTicketSyncPrototype = Effect.fn("pollTicketSyncPrototype")(
     function* (
       owner: TicketSyncOwnerPrototype,
-      params: TicketSyncParamsPrototype
+      params: TicketSyncParamsPrototype,
+      options: { readonly bootstrap?: boolean } = {}
     ) {
-      let lease = yield* prepareProject(owner, params)
+      let lease = yield* prepareProject(owner, params, false)
+      if (!lease.checkpoint && options.bootstrap === false) return false
       let changed = false
-      while (lease.snapshot) {
+      while (lease.checkpoint) {
         const delta = yield* client.tickets
-          .prototypeSyncDelta({ params, query: lease.snapshot.checkpoint })
+          .prototypeSyncDelta({ params, query: lease.checkpoint })
           .pipe(handleDenied(owner, lease))
         if (!delta.reset) {
-          if (sameCheckpoint(delta.checkpoint, lease.snapshot.checkpoint))
-            return changed
-          yield* commit(owner, lease, {
+          if (sameCheckpoint(delta.checkpoint, lease.checkpoint)) return changed
+          const committed = yield* commit(owner, lease, {
             kind: "delta",
             value: delta,
-            base: lease.snapshot
+            base: lease.checkpoint
           }).pipe(handleDenied(owner, lease))
+          if (!committed.checkpoint) break
           changed = true
           if (!delta.hasMore) return true
-          lease = yield* prepareProject(owner, params)
+          lease = yield* prepareProject(owner, params, false)
           continue
         }
         break

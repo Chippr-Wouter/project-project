@@ -4,13 +4,13 @@ This slice adds account ownership and cleanup to the checkpointed ticket replica
 
 The cache belongs to a server, authenticated user, and project. A network failure preserves cached tickets. Confirmed logout, account switching, or lost project access revokes the corresponding cache ownership and removes its ticket data.
 
-Revocation must also reject work already in flight. The owner generation and snapshot write are checked in one IndexedDB transaction, so a delayed response cannot recreate data after another tab has cleared it. In-memory results are published only after that transaction commits.
+Revocation must also reject work already in flight. The owner generation, changed ticket records, and checkpoint are checked/written in one IndexedDB transaction, so a delayed response cannot recreate data after another tab has cleared it. In-memory results are published only after that transaction commits.
 
 Authentication is part of this boundary: a delayed identity response must not reactivate an owner revoked since the request started. The UI must also discard previous successful atom values when identity changes, because normal background refresh intentionally retains them.
 
 ## Implementation
 
-The first-party Effect IndexedDB modules own schema decoding and transactions. Auth and project generations are checked in the same transaction that persists each snapshot. Scoped BroadcastChannel subscriptions notify other tabs. Revocation does not wait for the replica's network semaphore.
+The first-party Effect IndexedDB modules own schema decoding and transactions. Auth and project generations are checked in the same transaction that persists changed ticket rows and checkpoint metadata. Scoped BroadcastChannel subscriptions notify other tabs. Revocation does not wait for the replica's network semaphore.
 
 The lifecycle listener mounts above the router, including while initial route loaders are pending. Confirmed revocation hides the old view and reloads the document, disposing existing atom values and previous-success UI references. This is an intentional prototype boundary; ordinary delta synchronization does not reload the page.
 
