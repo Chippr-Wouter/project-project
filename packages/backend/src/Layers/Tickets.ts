@@ -664,6 +664,7 @@ export const TicketsLive = Layer.effect(
           orgSlug,
           slug,
           document.id,
+          document.title,
           document.body
         )
         yield* ticketIndex.upsertTicket(indexProject, document)
@@ -732,6 +733,7 @@ export const TicketsLive = Layer.effect(
           orgSlug,
           slug,
           document.id,
+          document.title,
           document.body
         )
         yield* ticketIndex.upsertTicket(indexProject, document)
@@ -800,7 +802,7 @@ export const TicketsLive = Layer.effect(
 
         yield* ticketDocs.write(orgSlug, slug, id, next)
         yield* attachments.reconcileTicket(orgSlug, slug, id, next.body)
-        yield* figmaLinks.reconcileTicket(orgSlug, slug, id, next.body)
+        yield* figmaLinks.reconcileTicket(orgSlug, slug, id, next.title, next.body)
         yield* ticketIndex.upsertTicket(indexProject, next)
 
         const projectGithub = yield* projects.getGithubIntegration(
@@ -825,7 +827,7 @@ export const TicketsLive = Layer.effect(
         const indexProject = yield* ticketIndex.projectFor(orgSlug, slug)
         yield* groups.removeTicketFromAllGroups(orgSlug, slug, id)
         yield* attachments.reconcileTicket(orgSlug, slug, id, "")
-        yield* figmaLinks.reconcileTicket(orgSlug, slug, id, "")
+        yield* figmaLinks.reconcileTicket(orgSlug, slug, id, "", "")
         yield* ticketDocs.remove(orgSlug, slug, id)
         yield* ticketIndex.deleteTicket(indexProject, id)
       })

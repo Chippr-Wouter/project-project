@@ -330,10 +330,14 @@ const harness = (input: {
     )
   )
 
-const reconcile = (layer: Layer.Layer<FigmaLinks>, body: string) =>
+const reconcile = (
+  layer: Layer.Layer<FigmaLinks>,
+  body: string,
+  title = "Fix login bug"
+) =>
   FigmaLinks.pipe(
     Effect.flatMap((links) =>
-      Effect.exit(links.reconcileTicket("acme", "web", "WEB-1", body))
+      Effect.exit(links.reconcileTicket("acme", "web", "WEB-1", title, body))
     ),
     Effect.provide(layer)
   )
@@ -575,9 +579,6 @@ describe("reconcileTicket dev mode backlink", () => {
           if (sql.startsWith('insert into "figma_link_index"')) {
             return [["link-1"]]
           }
-          if (sql.startsWith("select") && sql.includes("ticket_index")) {
-            return [["Fix login bug"]]
-          }
           return []
         })
         const exit = yield* reconcile(
@@ -593,6 +594,45 @@ describe("reconcileTicket dev mode backlink", () => {
         expect(input.nodeId).toBe("12:34")
         expect(input.name.startsWith("WEB-1 · ")).toBe(true)
         expect(params).toContain("dev-99")
+      })
+  )
+
+  it.live(
+    "backlinks a newly created ticket's figma link on the very first save, with no second edit",
+    () =>
+      Effect.gen(function* () {
+        const createDevResource = vi.fn(
+          (
+            _credential: unknown,
+            _input: {
+              readonly fileKey: string
+              readonly nodeId: string
+              readonly name: string
+              readonly url: string
+            }
+          ) => Effect.succeed("dev-42")
+        )
+        const { params, db } = recordingDb((sql) => {
+          if (sql.startsWith("select") && sql.includes("project_index")) {
+            return [["org-1"]]
+          }
+          if (sql.startsWith('insert into "figma_link_index"')) {
+            return [["link-1"]]
+          }
+          return []
+        })
+        const exit = yield* reconcile(
+          harness({ db, figma: { createDevResource } }),
+          BODY,
+          "Brand new ticket"
+        )
+        yield* Effect.sleep("100 millis")
+
+        expect(exit._tag).toBe("Success")
+        expect(createDevResource).toHaveBeenCalledTimes(1)
+        const [, input] = createDevResource.mock.calls[0]
+        expect(input.name).toBe("WEB-1 · Brand new ticket")
+        expect(params).toContain("dev-42")
       })
   )
 

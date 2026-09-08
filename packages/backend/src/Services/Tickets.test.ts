@@ -218,14 +218,15 @@ const makeRecordingFigmaLinks = () => {
     readonly orgSlug: string
     readonly slug: string
     readonly ticketId: string
+    readonly title: string
     readonly body: string
   }> = []
   return {
     calls,
     layer: makeFakeFigmaLinks({
-      reconcileTicket: (orgSlug, slug, ticketId, body) =>
+      reconcileTicket: (orgSlug, slug, ticketId, title, body) =>
         Effect.sync(() => {
-          calls.push({ orgSlug, slug, ticketId, body })
+          calls.push({ orgSlug, slug, ticketId, title, body })
         })
     })
   }
@@ -567,7 +568,9 @@ it.effect(
       expect(attachments.calls).toEqual([
         { orgSlug: "org", slug: "p", ticketId: "T-1", body: "" }
       ])
-      expect(figmaLinks.calls).toEqual(attachments.calls)
+      expect(figmaLinks.calls).toEqual([
+        { orgSlug: "org", slug: "p", ticketId: "T-1", title: "", body: "" }
+      ])
     }).pipe(Effect.provide(layer))
   }
 )

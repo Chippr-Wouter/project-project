@@ -12,12 +12,7 @@ import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import { ulid } from "ulid"
-import {
-  figmaLinkIndex,
-  figmaReference,
-  projectIndex,
-  ticketIndex
-} from "../db/schema"
+import { figmaLinkIndex, figmaReference, projectIndex } from "../db/schema"
 import { Db } from "../Services/Db"
 import {
   Figma,
@@ -290,6 +285,7 @@ export const FigmaLinksLive = Layer.effect(
       orgSlug: string,
       slug: string,
       ticketId: string,
+      title: string,
       entries: ReadonlyArray<{
         readonly linkId: string
         readonly ref: FigmaRef
@@ -297,24 +293,6 @@ export const FigmaLinksLive = Layer.effect(
     ) =>
       Effect.gen(function* () {
         if (entries.length === 0) return
-        const ticket = yield* db
-          .select({ title: ticketIndex.title })
-          .from(ticketIndex)
-          .where(
-            and(
-              eq(ticketIndex.orgSlug, orgSlug),
-              eq(ticketIndex.projectSlug, slug),
-              eq(ticketIndex.ticketId, ticketId)
-            )
-          )
-          .limit(1)
-        const title = ticket[0]?.title
-        if (title === undefined) {
-          yield* Effect.logDebug(
-            "figma backlink skipped: ticket not indexed yet"
-          ).pipe(Effect.annotateLogs({ orgSlug, projectSlug: slug, ticketId }))
-          return
-        }
 
         const credential = yield* integrations.credentialFor(
           orgSlug,
@@ -498,6 +476,7 @@ export const FigmaLinksLive = Layer.effect(
       orgSlug: string,
       slug: string,
       ticketId: string,
+      title: string,
       body: string
     ) =>
       Effect.gen(function* () {
@@ -637,7 +616,7 @@ export const FigmaLinksLive = Layer.effect(
               yield* resolveLinks(orgSlug, slug, toResolve)
             }
             if (toBacklink.length > 0) {
-              yield* createBacklinks(orgSlug, slug, ticketId, toBacklink)
+              yield* createBacklinks(orgSlug, slug, ticketId, title, toBacklink)
             }
             if (removalsToRetract.length > 0) {
               yield* retractBacklinks(orgSlug, slug, ticketId, removalsToRetract)
@@ -650,9 +629,10 @@ export const FigmaLinksLive = Layer.effect(
       orgSlug,
       slug,
       ticketId,
+      title,
       body
     ) =>
-      reconcile(orgSlug, slug, ticketId, body).pipe(
+      reconcile(orgSlug, slug, ticketId, title, body).pipe(
         Effect.catchAllCause((cause) =>
           Effect.logWarning("figma reconciliation skipped").pipe(
             Effect.annotateLogs({

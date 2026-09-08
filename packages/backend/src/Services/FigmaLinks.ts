@@ -36,6 +36,7 @@ export interface FigmaLinksShape {
     orgSlug: string,
     slug: string,
     ticketId: string,
+    title: string,
     body: string
   ) => Effect.Effect<void>
   readonly listForTicket: (
