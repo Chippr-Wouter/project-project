@@ -1,12 +1,29 @@
 import { Atom, Result } from "@effect-atom/atom-react"
 import * as Effect from "effect/Effect"
+import * as Schema from "effect/Schema"
 import { runtime } from "@/runtime"
 import { ApiClient } from "@/services/ApiClient"
-import type { ConnectFigmaProjectInput } from "@projectproject/shared"
+import {
+  TicketId,
+  type ConnectFigmaProjectInput
+} from "@projectproject/shared"
 
 const splitProjectKey = (key: string): { orgSlug: string; slug: string } => {
   const sep = key.indexOf("/")
   return { orgSlug: key.slice(0, sep), slug: key.slice(sep + 1) }
+}
+
+const makeTicketId = Schema.decodeUnknownSync(TicketId)
+
+const splitTicketKey = (
+  key: string
+): { orgSlug: string; slug: string; id: TicketId } => {
+  const parts = key.split("/")
+  return {
+    orgSlug: parts[0],
+    slug: parts[1],
+    id: makeTicketId(parts.slice(2).join("/"))
+  }
 }
 
 export const figmaProfileBaseAtom = runtime
@@ -81,6 +98,20 @@ export const connectFigmaProjectAtom = Atom.family((key: string) => {
       })
     )
   })
+})
+
+export const figmaTicketLinksAtom = Atom.family((key: string) => {
+  const { orgSlug, slug, id } = splitTicketKey(key)
+  return runtime
+    .atom(
+      Effect.gen(function* () {
+        const client = yield* ApiClient
+        return yield* client.figma.ticketLinks({
+          path: { orgSlug, slug, id }
+        })
+      })
+    )
+    .pipe(Atom.setIdleTTL("30 seconds"))
 })
 
 export const disconnectFigmaProjectAtom = Atom.family((key: string) => {

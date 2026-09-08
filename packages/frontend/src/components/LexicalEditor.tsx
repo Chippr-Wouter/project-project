@@ -50,6 +50,7 @@ import { ATTACHMENT_TRANSFORMER } from "./Lexical/attachmentTransformer"
 import { FigmaExtension } from "./Lexical/FigmaExtension"
 import { FigmaPlugin } from "./Lexical/FigmaPlugin"
 import { FIGMA_TRANSFORMER } from "./Lexical/figmaTransformer"
+import { FigmaTicketProvider } from "./Lexical/figmaMetadata"
 import {
   HORIZONTAL_RULE,
   HorizontalRuleEnterExtension
@@ -396,38 +397,49 @@ export function LexicalEditor({
     </div>
   ))
 
+  const figmaTarget =
+    attachments === undefined
+      ? null
+      : {
+          orgSlug: attachments.orgSlug,
+          slug: attachments.slug,
+          ticketId: attachments.ticketId
+        }
+
   return (
     <div ref={wrapperRef} className={cn("group/editing prose-md", className)}>
       <LexicalExtensionComposer
         extension={extension}
         contentEditable={contentEditable}
       >
-        <MentionsPlugin />
-        <FigmaPlugin />
-        {attachments !== undefined && attachments.uploadsEnabled ? (
-          <AttachmentsPlugin
-            orgSlug={attachments.orgSlug}
-            slug={attachments.slug}
-            ticketId={attachments.ticketId}
+        <FigmaTicketProvider target={figmaTarget}>
+          <MentionsPlugin />
+          <FigmaPlugin />
+          {attachments !== undefined && attachments.uploadsEnabled ? (
+            <AttachmentsPlugin
+              orgSlug={attachments.orgSlug}
+              slug={attachments.slug}
+              ticketId={attachments.ticketId}
+            />
+          ) : null}
+          <LinkBlurActivationPlugin />
+          <MarkdownShortcutPlugin transformers={transformers} />
+          <OnChangePlugin
+            onChange={(editorState) => {
+              editorState.read(() => {
+                const next = $convertToMarkdownString(transformers)
+                const changed = nextMarkdownChange(liveRef.current, next)
+                if (changed === null) return
+                liveRef.current = changed
+                onDraftChange?.(next)
+                pending.current = changed
+                setStatus("dirty")
+                scheduleRef.current()
+              })
+            }}
+            ignoreSelectionChange
           />
-        ) : null}
-        <LinkBlurActivationPlugin />
-        <MarkdownShortcutPlugin transformers={transformers} />
-        <OnChangePlugin
-          onChange={(editorState) => {
-            editorState.read(() => {
-              const next = $convertToMarkdownString(transformers)
-              const changed = nextMarkdownChange(liveRef.current, next)
-              if (changed === null) return
-              liveRef.current = changed
-              onDraftChange?.(next)
-              pending.current = changed
-              setStatus("dirty")
-              scheduleRef.current()
-            })
-          }}
-          ignoreSelectionChange
-        />
+        </FigmaTicketProvider>
       </LexicalExtensionComposer>
     </div>
   )
