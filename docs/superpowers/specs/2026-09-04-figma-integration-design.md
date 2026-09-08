@@ -90,6 +90,20 @@ user has connected one, otherwise the project credential, otherwise fails
 learns which kind it got, so supporting both models costs one code path plus a
 second settings surface — not two parallel implementations.
 
+**Reconciliation deliberately passes `userId: null`, so it always uses the
+project credential.** Reconciliation populates `figma_link_index`, which is a
+cache shared across everyone in the org. Resolving it with whichever member
+happened to save the ticket would let one person's broader Figma access
+populate names and thumbnails that colleagues with narrower access then read —
+a quiet permission leak through a cache. A single project identity keeps what
+is cached consistent with what the project as a whole is entitled to see.
+
+The personal connection is therefore reserved for genuinely per-user, uncached
+reads. **There are none today**, so connecting Figma on your profile currently
+changes nothing you can observe; the resolver preference exists so that the
+first such feature does not have to retrofit it. The profile settings copy says
+as much rather than implying an effect it does not have.
+
 Credentials are encrypted at rest through `SecretCrypto`.
 
 ### The two seams use different credential types

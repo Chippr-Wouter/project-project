@@ -14,7 +14,7 @@
   "figma_error_rate_limited": "Figma is rate limiting us. Try again shortly.",
   "figma_profile_connect_button": "Connect Figma",
   "figma_profile_connected_status": "Connected as {handle}",
-  "figma_profile_description": "Connect your own Figma account so designs resolve with your permissions.",
+  "figma_profile_description": "Connect your own Figma account. Design names and previews are resolved once per project using the project's token, so this does not change what you see today — it is here for features that read Figma as you.",
   "figma_profile_disconnect_button": "Disconnect",
   "figma_profile_disconnected_status": "Not connected",
   "figma_profile_title": "Figma",
