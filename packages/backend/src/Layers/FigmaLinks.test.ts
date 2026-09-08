@@ -557,7 +557,17 @@ describe("reconcileTicket dev mode backlink", () => {
     "creates a figma dev resource for a newly added node-level reference and persists the id",
     () =>
       Effect.gen(function* () {
-        const createDevResource = vi.fn(() => Effect.succeed("dev-99"))
+        const createDevResource = vi.fn(
+          (
+            _credential: unknown,
+            _input: {
+              readonly fileKey: string
+              readonly nodeId: string
+              readonly name: string
+              readonly url: string
+            }
+          ) => Effect.succeed("dev-99")
+        )
         const { params, db } = recordingDb((sql) => {
           if (sql.startsWith("select") && sql.includes("project_index")) {
             return [["org-1"]]
@@ -578,10 +588,7 @@ describe("reconcileTicket dev mode backlink", () => {
 
         expect(exit._tag).toBe("Success")
         expect(createDevResource).toHaveBeenCalledTimes(1)
-        const [, input] = createDevResource.mock.calls[0] as [
-          unknown,
-          { fileKey: string; nodeId: string; name: string; url: string }
-        ]
+        const [, input] = createDevResource.mock.calls[0]
         expect(input.fileKey).toBe("FILEKEY123")
         expect(input.nodeId).toBe("12:34")
         expect(input.name.startsWith("WEB-1 · ")).toBe(true)
