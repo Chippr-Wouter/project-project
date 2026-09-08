@@ -41,3 +41,22 @@ export const ticketSyncLifecyclePrototypeAtom = runtime.atom(
     return yield* Effect.never
   })
 )
+
+export const refreshReplicaAfterMutation = Effect.fn(
+  "refreshReplicaAfterMutation"
+)(
+  function* (orgSlug: string, slug: string) {
+    if (
+      !ticketSyncPrototypeEnabled ||
+      orgSlug !== "measure" ||
+      slug !== "ten-thousand"
+    )
+      return
+    const { owner } = yield* authenticateTicketSyncPrototype()
+    const sync = yield* TicketSync.TicketSync
+    yield* sync.poll(owner, { orgSlug, slug })
+  },
+  Effect.catch((error) =>
+    Effect.logWarning("Ticket replica catch-up failed", { error: error._tag })
+  )
+)

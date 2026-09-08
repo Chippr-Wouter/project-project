@@ -25,6 +25,17 @@ export const usesTicketReplicaPrototype = (orgSlug: string, slug: string) =>
   orgSlug === "measure" &&
   slug === "ten-thousand"
 
+export const supportsReplicaCountQuery = (query: TicketCountQuery) =>
+  query.filter?.groupId === undefined &&
+  query.filter?.archived !== true &&
+  !query.q?.trim()
+
+export const supportsReplicaListQuery = (query: TicketListQuery) =>
+  supportsReplicaCountQuery(query) &&
+  query.sort.key === "created" &&
+  query.sort.dir === "desc" &&
+  query.cursor === undefined
+
 const table = IndexedDbTable.make({
   name: "snapshot",
   schema: Schema.Struct({ id: Schema.String, items: Schema.Array(Ticket) }),
@@ -86,14 +97,8 @@ export const replicaListPrototype = Effect.fn("replicaListPrototype")(
     userId: string,
     owner: TicketSyncOwnerPrototype | null
   ) {
-    if (
-      query.sort.key !== "created" ||
-      query.sort.dir !== "desc" ||
-      query.filter?.groupId
-    )
-      return yield* Effect.die(
-        "Prototype supports default sort and no sprint filter"
-      )
+    if (!supportsReplicaListQuery(query))
+      return yield* Effect.die("Unsupported local replica query")
     if (ticketSyncPrototypeEnabled && !owner)
       return yield* Effect.die("Missing authenticated replica owner")
     const all = yield* owner
@@ -115,7 +120,7 @@ export const replicaCountPrototype = Effect.fn("replicaCountPrototype")(
     userId: string,
     owner: TicketSyncOwnerPrototype | null
   ) {
-    if (query.filter?.groupId)
+    if (!supportsReplicaCountQuery(query))
       return yield* Effect.die("Prototype does not support sprint filters")
     if (ticketSyncPrototypeEnabled && !owner)
       return yield* Effect.die("Missing authenticated replica owner")

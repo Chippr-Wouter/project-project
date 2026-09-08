@@ -10,7 +10,6 @@ import {
 } from "@projectproject/shared"
 import { CurrentOrg } from "../Services/CurrentOrg"
 import { Projects } from "../Services/Projects"
-import { Tickets } from "../Services/Tickets"
 import { TicketIndex } from "../Services/TicketIndex"
 import { indexEntryToTicket } from "../Layers/Tickets"
 
@@ -46,22 +45,30 @@ export const syncSnapshotPrototype = Effect.fn(function* (
 ) {
   const user = yield* authorize(orgSlug, slug)
   const sql = yield* SqlClient.SqlClient
-  const tickets = yield* Tickets
+  const index = yield* TicketIndex
+  const projects = yield* Projects
   return yield* sql
     .withTransaction(
       Effect.gen(function* () {
         yield* sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY`
         const checkpoint = yield* head
-        const page = yield* tickets.list(
+        const project = yield* index.projectFor(orgSlug, slug)
+        const entries = yield* index.query(
+          project,
+          { sort: { key: "created", dir: "desc" } },
+          { viewerId: user.id, limit: 10002 }
+        )
+        if (entries.length > 10001)
+          return yield* Effect.die("Prototype snapshot limit exceeded")
+        const github = yield* projects.getGithubIntegration(
           orgSlug,
           user.id,
-          slug,
-          { sort: { key: "created", dir: "desc" } },
-          10001
+          slug
         )
-        if (page.nextCursor)
-          return yield* Effect.die("Prototype snapshot limit exceeded")
-        return { checkpoint, items: page.items }
+        return {
+          checkpoint,
+          items: entries.map(({ entry }) => indexEntryToTicket(entry, github))
+        }
       })
     )
     .pipe(
@@ -102,13 +109,22 @@ export const syncDeltaPrototype = Effect.fn(function* (
         )(raw)
         const ids = [...new Set(changes.map((change) => change.id))]
         const project = yield* index.projectFor(orgSlug, slug)
-        const entries = yield* index.list(project, ids)
+        const entries =
+          ids.length === 0
+            ? []
+            : yield* index.query(
+                project,
+                { sort: { key: "id", dir: "asc" } },
+                { viewerId: user.id, ticketIds: ids, limit: ids.length }
+              )
         const github = yield* projects.getGithubIntegration(
           orgSlug,
           user.id,
           slug
         )
-        const items = entries.map((entry) => indexEntryToTicket(entry, github))
+        const items = entries.map(({ entry }) =>
+          indexEntryToTicket(entry, github)
+        )
         const present = new Set(items.map((item) => item.id))
         const revision = changes.at(-1)?.revision ?? since.revision
         return {

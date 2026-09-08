@@ -486,21 +486,26 @@ export const make = Effect.gen(function* () {
       owner: TicketSyncOwnerPrototype,
       params: TicketSyncParamsPrototype
     ) {
-      const lease = yield* prepareProject(owner, params)
-      if (lease.snapshot) {
+      let lease = yield* prepareProject(owner, params)
+      let changed = false
+      while (lease.snapshot) {
         const delta = yield* client.tickets
           .prototypeSyncDelta({ params, query: lease.snapshot.checkpoint })
           .pipe(handleDenied(owner, lease))
         if (!delta.reset) {
           if (sameCheckpoint(delta.checkpoint, lease.snapshot.checkpoint))
-            return false
+            return changed
           yield* commit(owner, lease, {
             kind: "delta",
             value: delta,
             base: lease.snapshot
           }).pipe(handleDenied(owner, lease))
-          return true
+          changed = true
+          if (!delta.hasMore) return true
+          lease = yield* prepareProject(owner, params)
+          continue
         }
+        break
       }
       const incoming = yield* client.tickets
         .prototypeSyncSnapshot({ params })

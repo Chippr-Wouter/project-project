@@ -3,6 +3,8 @@ import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
 import * as ManagedRuntime from "effect/ManagedRuntime"
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient"
+import * as HttpApiClient from "effect/unstable/httpapi/HttpApiClient"
+import { AppApi } from "@projectproject/shared"
 import * as ApiClient from "../src/services/ApiClient"
 import * as TicketSync from "../src/services/TicketSync"
 
@@ -61,7 +63,12 @@ function clients() {
   function create(fetcher: typeof fetch) {
     const runtime = ManagedRuntime.make(
       TicketSync.layer.pipe(
-        Layer.provideMerge(ApiClient.ApiClient.Default),
+        Layer.provideMerge(
+          Layer.effect(
+            ApiClient.ApiClient,
+            HttpApiClient.make(AppApi, { baseUrl: "/api" })
+          ).pipe(Layer.provide(FetchHttpClient.layer))
+        ),
         Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetcher))
       )
     )
@@ -98,7 +105,13 @@ export async function runTicketSyncLifecycleTests() {
       )
       results.push({ name, passed: true })
     } catch (error) {
-      results.push({ name, passed: false, error: String(error) })
+      results.push({
+        name,
+        passed: false,
+        error:
+          String(error) +
+          (error instanceof Error ? `: ${String(error.cause)}` : "")
+      })
     } finally {
       await context.close()
     }
@@ -227,6 +240,33 @@ export async function runTicketSyncLifecycleTests() {
       (await runtime.runPromise(sync.read(account, params)))[0]?.title ===
         "Original",
       "Transport failure lost cached data"
+    )
+  })
+  await test("one poll drains all delta pages", async ({ create }) => {
+    let pages = 0
+    const runtime = create(async (input) => {
+      const url = input instanceof Request ? input.url : input.toString()
+      if (!url.includes("sync-delta")) return Response.json(snapshot)
+      pages++
+      return Response.json({
+        ...delta,
+        checkpoint: { epoch: "test", revision: pages + 1 },
+        items: [{ ...ticket, title: `Page ${pages}` }],
+        hasMore: pages < 3
+      })
+    })
+    const sync = await runtime.runPromise(TicketSync.TicketSync)
+    const account = await owner(runtime)
+    await runtime.runPromise(sync.read(account, params))
+    check(
+      await runtime.runPromise(sync.poll(account, params)),
+      "Expected changes"
+    )
+    check(pages === 3, "Poll stopped before the last page")
+    check(
+      (await runtime.runPromise(sync.read(account, params)))[0]?.title ===
+        "Page 3",
+      "Last delta page was not committed"
     )
   })
   return results

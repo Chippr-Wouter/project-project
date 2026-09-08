@@ -10,15 +10,30 @@ The ticket overview now supports checkpointed bootstrap and delta polling for th
 - Persist the updated snapshot and checkpoint together in one IndexedDB transaction, then invalidate ticket atoms.
 - Each tab keeps its own in-memory snapshot. When another tab has advanced the shared IndexedDB record, a stale response adopts that persisted snapshot instead of overwriting it.
 - A new epoch or a checkpoint ahead of the server requests a fresh bootstrap.
-- Delta pages cover at most 1,000 log entries. Further catch-up continues on subsequent polls.
+- Delta pages cover at most 1,000 log entries. Each poll drains available pages before completing.
+- Confirmed ticket mutations catch up the replica before refreshing list atoms. Typed catch-up failures are logged without reporting an already committed server mutation as failed; background polling retries.
+- Active metadata queries in default created-descending order use the complete replica. Search, archive, group filters, other ordering, and cursors retain server filtering and pagination. Counts use the same coverage boundary without an ordering restriction.
+- List invalidation uses the benchmark stack's project-scoped keys; background deltas do not refetch ticket bodies.
 
 This remains an opt-in, fixture-specific prototype. Existing cursor and bulk-bootstrap experiments remain selectable separately.
+
+## Benchmark stack integration — September 8, 2026
+
+Merged `origin/fix/T-118-index-publication` (PR #152, top of the benchmark stack). Verification used a production frontend build and the disposable database on port 55439, backend on 3110, and preview on 4196.
+
+- Default overview: 10,000 loaded tickets across three sections, 29 mounted rows; warm reload issued zero snapshot requests.
+- Search: three server list requests, 50 loaded tickets per section.
+- API title edit: present in the immediately following delta and then the visible overview. Original title restored.
+- Archive: delta emitted the ticket ID as a tombstone; active snapshot contained 9,999 tickets. Unarchive restored the ticket.
+- Workspace typecheck and production build passed. Focused tests: 43 frontend and 19 backend tests passed; six browser tests with real IndexedDB passed, including draining three delta pages in one poll.
+
+These checks verify integration behavior; they are not a new before/after latency benchmark. Browser test clients now construct their own typed HTTP layer because the incoming production API layer explicitly binds global fetch.
 
 ## Consistency boundary
 
 The disposable database has a project head row and a change log. An AFTER trigger on ticket_index increments the head and appends the changed ticket ID in the same transaction as the index mutation. The head row lock serializes revision allocation through commit: a later writer cannot commit a higher revision while an earlier revision is still uncommitted. Rollback undoes both revision and log entry.
 
-Both endpoint reads use a REPEATABLE READ, READ ONLY transaction. Snapshot reads the checkpoint and ticket list in that transaction. Delta reads the head, bounded changed IDs and their current metadata in the same view. Missing IDs become tombstones. Delta payloads represent current metadata for changed IDs, not historical versions of each edit.
+Both endpoint reads use a REPEATABLE READ, READ ONLY transaction. Snapshot reads the checkpoint and active ticket index in that transaction, bypassing normal list pagination. Delta reads the head, bounded changed IDs and their current active metadata in the same view. Missing or archived IDs become tombstones. Delta payloads represent current metadata for changed IDs, not historical versions of each edit.
 
 Consequently a committed index mutation is either visible in the snapshot or appears after its checkpoint. This boundary concerns the recoverable index: markdown stays canonical, and external file changes become visible to sync when indexing/reconciliation publishes them.
 
