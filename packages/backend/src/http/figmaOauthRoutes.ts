@@ -2,7 +2,7 @@ import {
   HttpRouter,
   HttpServerRequest,
   HttpServerResponse
-} from "@effect/platform"
+} from "effect/unstable/http"
 import * as Config from "effect/Config"
 import * as Effect from "effect/Effect"
 import { toWebHeaders } from "./toWebHeaders"
@@ -53,7 +53,7 @@ const figmaOauthStartRoute = Effect.gen(function* () {
       return HttpServerResponse.redirect(redirectUrl, { status: 302 })
     })
   ),
-  Effect.catchAllCause((cause) =>
+  Effect.catchCause((cause) =>
     Effect.gen(function* () {
       yield* Effect.logError("figma oauth start route failure", cause)
       const redirectUrl = yield* profileSettingsUrl({
@@ -101,7 +101,7 @@ const figmaOauthCallbackRoute = Effect.gen(function* () {
         return HttpServerResponse.redirect(redirectUrl, { status: 302 })
       })
   }),
-  Effect.catchAllCause((cause) =>
+  Effect.catchCause((cause) =>
     Effect.gen(function* () {
       yield* Effect.logError("figma oauth callback route failure", cause)
       const redirectUrl = yield* profileSettingsUrl({
@@ -112,7 +112,10 @@ const figmaOauthCallbackRoute = Effect.gen(function* () {
   )
 )
 
-export const figmaOauthRoutes = HttpRouter.empty.pipe(
-  HttpRouter.get("/start", figmaOauthStartRoute),
-  HttpRouter.get("/callback", figmaOauthCallbackRoute)
+export const figmaOauthRoutes = HttpRouter.addAll(
+  [
+    HttpRouter.route("GET", "/start", figmaOauthStartRoute),
+    HttpRouter.route("GET", "/callback", figmaOauthCallbackRoute)
+  ],
+  { prefix: "/api/integrations/figma/oauth" }
 )

@@ -7,7 +7,7 @@ import {
 } from "@projectproject/shared"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
-import { afterEach, describe, expect, vi } from "vitest"
+import { afterEach, describe, expect, vi } from "vite-plus/test"
 import { figmaAuthHeader, figmaImageScale, Figma } from "../Services/Figma"
 import { FigmaLive } from "./Figma"
 
@@ -93,25 +93,19 @@ describe("FigmaLive status mapping", () => {
     }).pipe(Effect.provide(FigmaLive))
   )
 
-  it.effect(
-    "maps 429 to FigmaRateLimited reading the Retry-After header",
-    () =>
-      Effect.gen(function* () {
-        vi.stubGlobal(
-          "fetch",
-          vi.fn(async () =>
-            jsonResponse(
-              429,
-              { message: "slow down" },
-              { "Retry-After": "42" }
-            )
-          )
+  it.effect("maps 429 to FigmaRateLimited reading the Retry-After header", () =>
+    Effect.gen(function* () {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () =>
+          jsonResponse(429, { message: "slow down" }, { "Retry-After": "42" })
         )
-        const figma = yield* Figma
-        const error = yield* Effect.flip(figma.getFile(credential, "abc123"))
-        if (!Schema.is(FigmaRateLimited)(error)) throw error
-        expect(error.retryAfterSeconds).toBe(42)
-      }).pipe(Effect.provide(FigmaLive))
+      )
+      const figma = yield* Figma
+      const error = yield* Effect.flip(figma.getFile(credential, "abc123"))
+      if (!Schema.is(FigmaRateLimited)(error)) throw error
+      expect(error.retryAfterSeconds).toBe(42)
+    }).pipe(Effect.provide(FigmaLive))
   )
 
   it.effect(
@@ -346,19 +340,21 @@ describe("FigmaLive subtle behaviours", () => {
     }).pipe(Effect.provide(FigmaLive))
   )
 
-  it.effect("getNodeName fails with FigmaFileNotFound when the node is absent", () =>
-    Effect.gen(function* () {
-      vi.stubGlobal(
-        "fetch",
-        vi.fn(async () => jsonResponse(200, { nodes: {} }))
-      )
-      const figma = yield* Figma
-      const error = yield* Effect.flip(
-        figma.getNodeName(credential, "abc123", "1:2")
-      )
-      if (!Schema.is(FigmaFileNotFound)(error)) throw error
-      expect(error.fileKey).toBe("abc123")
-    }).pipe(Effect.provide(FigmaLive))
+  it.effect(
+    "getNodeName fails with FigmaFileNotFound when the node is absent",
+    () =>
+      Effect.gen(function* () {
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(async () => jsonResponse(200, { nodes: {} }))
+        )
+        const figma = yield* Figma
+        const error = yield* Effect.flip(
+          figma.getNodeName(credential, "abc123", "1:2")
+        )
+        if (!Schema.is(FigmaFileNotFound)(error)) throw error
+        expect(error.fileKey).toBe("abc123")
+      }).pipe(Effect.provide(FigmaLive))
   )
 
   it.effect(

@@ -7,13 +7,14 @@ import {
   type FigmaRef
 } from "@projectproject/shared"
 import { and, asc, eq, inArray, isNull } from "drizzle-orm"
+import * as Cause from "effect/Cause"
 import * as Config from "effect/Config"
 import * as Data from "effect/Data"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import { ulid } from "ulid"
-import { figmaLinkIndex, figmaReference, projectIndex } from "../db/schema"
+import { figmaLinkIndex, figmaReference } from "../db/schema"
 import { CurrentOrg, requireOrgAdmin } from "../Services/CurrentOrg"
 import { Db } from "../Services/Db"
 import {
@@ -53,13 +54,11 @@ const publicBaseUrl = Config.string("BETTER_AUTH_URL").pipe(
 )
 
 const ticketUrl = (orgSlug: string, slug: string, ticketId: string) =>
-  Effect.map(
-    publicBaseUrl,
-    (base) =>
-      new URL(
-        `/orgs/${orgSlug}/projects/${slug}/tickets/${ticketId}`,
-        base
-      ).toString()
+  Effect.map(publicBaseUrl, (base) =>
+    new URL(
+      `/orgs/${orgSlug}/projects/${slug}/tickets/${ticketId}`,
+      base
+    ).toString()
   )
 
 export const needsFigmaMetadata = (
@@ -117,7 +116,7 @@ export const figmaLinkMetadata = (input: {
   lastModified:
     input.lastModified === null
       ? null
-      : DateTime.unsafeFromDate(input.lastModified)
+      : DateTime.fromDateUnsafe(input.lastModified)
 })
 
 export const FigmaLinksLive = Layer.effect(
@@ -182,12 +181,12 @@ export const FigmaLinksLive = Layer.effect(
         })
         return yield* uploadThumbnail(connection, key, bytes)
       }).pipe(
-        Effect.catchAllCause((cause) =>
+        Effect.catchCause((cause) =>
           Effect.logDebug("figma thumbnail skipped").pipe(
             Effect.annotateLogs({
               orgSlug,
               fileKey: ref.fileKey,
-              cause: String(cause)
+              cause: Cause.pretty(cause)
             }),
             Effect.as(null)
           )
@@ -247,7 +246,7 @@ export const FigmaLinksLive = Layer.effect(
         Effect.catchTag("FigmaNotConnected", () =>
           Effect.logDebug("figma metadata skipped: project not connected").pipe(
             Effect.annotateLogs({ orgSlug, projectSlug: slug }),
-            Effect.zipRight(recordError(entry.linkId, "figma_not_connected"))
+            Effect.andThen(recordError(entry.linkId, "figma_not_connected"))
           )
         ),
         Effect.catchTags({
@@ -260,13 +259,13 @@ export const FigmaLinksLive = Layer.effect(
           FigmaError: (error) =>
             recordError(entry.linkId, figmaCheckReason(error))
         }),
-        Effect.catchAllCause((cause) =>
+        Effect.catchCause((cause) =>
           Effect.logWarning("figma metadata resolution failed").pipe(
             Effect.annotateLogs({
               orgSlug,
               projectSlug: slug,
               fileKey: entry.ref.fileKey,
-              cause: String(cause)
+              cause: Cause.pretty(cause)
             })
           )
         )
@@ -311,15 +310,12 @@ export const FigmaLinksLive = Layer.effect(
           (entry) =>
             Effect.gen(function* () {
               if (entry.ref.nodeId === null) return
-              const devResourceId = yield* figma.createDevResource(
-                credential,
-                {
-                  fileKey: entry.ref.fileKey,
-                  nodeId: entry.ref.nodeId,
-                  name,
-                  url
-                }
-              )
+              const devResourceId = yield* figma.createDevResource(credential, {
+                fileKey: entry.ref.fileKey,
+                nodeId: entry.ref.nodeId,
+                name,
+                url
+              })
               if (devResourceId === null) return
               yield* db
                 .update(figmaReference)
@@ -337,17 +333,17 @@ export const FigmaLinksLive = Layer.effect(
         )
       }).pipe(
         Effect.catchTag("FigmaNotConnected", () =>
-          Effect.logDebug(
-            "figma backlink skipped: project not connected"
-          ).pipe(Effect.annotateLogs({ orgSlug, projectSlug: slug, ticketId }))
+          Effect.logDebug("figma backlink skipped: project not connected").pipe(
+            Effect.annotateLogs({ orgSlug, projectSlug: slug, ticketId })
+          )
         ),
-        Effect.catchAllCause((cause) =>
+        Effect.catchCause((cause) =>
           Effect.logWarning("figma backlink failed").pipe(
             Effect.annotateLogs({
               orgSlug,
               projectSlug: slug,
               ticketId,
-              cause: String(cause)
+              cause: Cause.pretty(cause)
             })
           )
         )
@@ -390,7 +386,7 @@ export const FigmaLinksLive = Layer.effect(
                   )
                 )
             }).pipe(
-              Effect.catchAllCause((cause) =>
+              Effect.catchCause((cause) =>
                 Effect.logWarning(
                   "figma backlink retraction failed; reference retained for retry"
                 ).pipe(
@@ -399,7 +395,7 @@ export const FigmaLinksLive = Layer.effect(
                     projectSlug: slug,
                     ticketId,
                     fileKey: entry.fileKey,
-                    cause: String(cause)
+                    cause: Cause.pretty(cause)
                   })
                 )
               )
@@ -412,13 +408,13 @@ export const FigmaLinksLive = Layer.effect(
             "figma backlink retraction skipped: project not connected"
           ).pipe(Effect.annotateLogs({ orgSlug, projectSlug: slug, ticketId }))
         ),
-        Effect.catchAllCause((cause) =>
+        Effect.catchCause((cause) =>
           Effect.logWarning("figma backlink retraction failed").pipe(
             Effect.annotateLogs({
               orgSlug,
               projectSlug: slug,
               ticketId,
-              cause: String(cause)
+              cause: Cause.pretty(cause)
             })
           )
         )
@@ -573,7 +569,9 @@ export const FigmaLinksLive = Layer.effect(
         if (plan.added.length > 0) {
           const project = yield* db.query.projectIndex.findFirst({
             columns: { organizationId: true },
-            where: eq(projectIndex.slug, slug)
+            where: {
+              RAW: (table, operators) => operators.eq(table.slug, slug)!
+            }
           })
           if (project === undefined) return yield* new NotFound()
 
@@ -614,7 +612,7 @@ export const FigmaLinksLive = Layer.effect(
           return
         }
 
-        yield* Effect.forkDaemon(
+        yield* Effect.forkDetach(
           Effect.gen(function* () {
             if (toResolve.length > 0) {
               yield* resolveLinks(orgSlug, slug, toResolve)
@@ -623,7 +621,12 @@ export const FigmaLinksLive = Layer.effect(
               yield* createBacklinks(orgSlug, slug, ticketId, title, toBacklink)
             }
             if (removalsToRetract.length > 0) {
-              yield* retractBacklinks(orgSlug, slug, ticketId, removalsToRetract)
+              yield* retractBacklinks(
+                orgSlug,
+                slug,
+                ticketId,
+                removalsToRetract
+              )
             }
           })
         )
@@ -637,13 +640,13 @@ export const FigmaLinksLive = Layer.effect(
       body
     ) =>
       reconcile(orgSlug, slug, ticketId, title, body).pipe(
-        Effect.catchAllCause((cause) =>
+        Effect.catchCause((cause) =>
           Effect.logWarning("figma reconciliation skipped").pipe(
             Effect.annotateLogs({
               orgSlug,
               projectSlug: slug,
               ticketId,
-              cause: String(cause)
+              cause: Cause.pretty(cause)
             })
           )
         ),

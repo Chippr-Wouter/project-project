@@ -1,4 +1,4 @@
-import { HttpApiBuilder } from "@effect/platform"
+import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { AppApi, CurrentUser } from "@projectproject/shared"
 import * as Effect from "effect/Effect"
 import { CurrentOrg } from "../Services/CurrentOrg"
@@ -24,57 +24,57 @@ export const FigmaHandlerLive = HttpApiBuilder.group(
           return yield* integrations.disconnectProfile(user.id)
         })
       )
-      .handle("projectStatus", ({ path }) =>
+      .handle("projectStatus", ({ params }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const integrations = yield* FigmaIntegrations
           return yield* integrations.getProjectStatus(
             org.orgSlug,
             user.id,
-            path.slug
+            params.slug
           )
         })
       )
-      .handle("connectProject", ({ path, payload }) =>
+      .handle("connectProject", ({ params, payload }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const integrations = yield* FigmaIntegrations
           return yield* integrations.connectProject(
             org.orgSlug,
             user.id,
-            path.slug,
+            params.slug,
             payload.accessToken
           )
         })
       )
-      .handle("disconnectProject", ({ path }) =>
+      .handle("disconnectProject", ({ params }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const integrations = yield* FigmaIntegrations
           return yield* integrations.disconnectProject(
             org.orgSlug,
             user.id,
-            path.slug
+            params.slug
           )
         })
       )
-      .handle("ticketLinks", ({ path }) =>
+      .handle("ticketLinks", ({ params }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser
           const currentOrg = yield* CurrentOrg
-          const org = yield* currentOrg.resolve(path.orgSlug, user.id)
+          const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const figmaLinks = yield* FigmaLinks
           return yield* figmaLinks.listForTicket(
             org.orgSlug,
             user.id,
-            path.slug,
-            path.id
+            params.slug,
+            params.id
           )
         })
       )

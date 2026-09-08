@@ -88,6 +88,6 @@ export interface FigmaLinksShape {
   >
 }
 
-export class FigmaLinks extends Context.Tag(
+export class FigmaLinks extends Context.Service<FigmaLinks, FigmaLinksShape>()(
   "@projectproject/backend/Services/FigmaLinks"
-)<FigmaLinks, FigmaLinksShape>() {}
+) {}

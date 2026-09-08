@@ -4,16 +4,17 @@ import {
   FigmaError,
   FigmaNotConnected
 } from "@projectproject/shared"
-import { drizzle } from "drizzle-orm/pg-proxy"
+import { makeWithDefaults } from "drizzle-orm/effect-postgres"
+import { PgClient } from "@effect/sql-pg"
 import { createHash } from "node:crypto"
 import * as ConfigProvider from "effect/ConfigProvider"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Redacted from "effect/Redacted"
 import * as Schema from "effect/Schema"
-import { afterEach, describe, expect, vi } from "vitest"
+import { afterEach, describe, expect, vi } from "vite-plus/test"
 import { chooseCredential, isTokenExpired } from "../Services/FigmaIntegrations"
-import * as schema from "../db/schema"
+import { relations } from "../db/schema"
 import {
   consumeOauthStateQuery,
   exchangeAuthorizationCode,
@@ -26,7 +27,7 @@ import {
 } from "./FigmaIntegrations"
 
 const at = (iso: string): Date =>
-  DateTime.toDate(DateTime.unsafeMake(Date.parse(iso)))
+  DateTime.toDate(DateTime.makeUnsafe(Date.parse(iso)))
 
 describe("chooseCredential", () => {
   it("prefers the personal oauth token", () => {
@@ -292,7 +293,12 @@ describe("figmaOAuthClient", () => {
       const error = yield* Effect.flip(figmaOAuthClient)
       if (!Schema.is(FigmaError)(error)) throw error
       expect(error.reason).toBe("figma_oauth_unconfigured")
-    }).pipe(Effect.withConfigProvider(ConfigProvider.fromMap(new Map())))
+    }).pipe(
+      Effect.provideService(
+        ConfigProvider.ConfigProvider,
+        ConfigProvider.fromUnknown({})
+      )
+    )
   )
 
   it.effect("fails FigmaError when only the client id is present", () =>
@@ -300,8 +306,9 @@ describe("figmaOAuthClient", () => {
       const error = yield* Effect.flip(figmaOAuthClient)
       expect(Schema.is(FigmaError)(error)).toBe(true)
     }).pipe(
-      Effect.withConfigProvider(
-        ConfigProvider.fromMap(new Map([["FIGMA_CLIENT_ID", "client-id"]]))
+      Effect.provideService(
+        ConfigProvider.ConfigProvider,
+        ConfigProvider.fromUnknown({ FIGMA_CLIENT_ID: "client-id" })
       )
     )
   )
@@ -312,19 +319,18 @@ describe("figmaOAuthClient", () => {
       expect(configured.clientId).toBe("client-id")
       expect(Redacted.isRedacted(configured.clientSecret)).toBe(true)
     }).pipe(
-      Effect.withConfigProvider(
-        ConfigProvider.fromMap(
-          new Map([
-            ["FIGMA_CLIENT_ID", "client-id"],
-            ["FIGMA_CLIENT_SECRET", "client-secret"]
-          ])
-        )
+      Effect.provideService(
+        ConfigProvider.ConfigProvider,
+        ConfigProvider.fromUnknown({
+          FIGMA_CLIENT_ID: "client-id",
+          FIGMA_CLIENT_SECRET: "client-secret"
+        })
       )
     )
   )
 })
 
-const emptyConfig = ConfigProvider.fromMap(new Map())
+const emptyConfig = ConfigProvider.fromUnknown({})
 
 describe("credentialFor without oauth configuration", () => {
   afterEach(() => {
@@ -357,7 +363,7 @@ describe("credentialFor without oauth configuration", () => {
           token: "project-pat"
         })
         expect(fetchMock).not.toHaveBeenCalled()
-      }).pipe(Effect.withConfigProvider(emptyConfig))
+      }).pipe(Effect.provideService(ConfigProvider.ConfigProvider, emptyConfig))
   )
 
   it.effect(
@@ -378,7 +384,7 @@ describe("credentialFor without oauth configuration", () => {
         })
 
         expect(credential).toEqual({ _tag: "Bearer", token: "fresh-token" })
-      }).pipe(Effect.withConfigProvider(emptyConfig))
+      }).pipe(Effect.provideService(ConfigProvider.ConfigProvider, emptyConfig))
   )
 
   it.effect(
@@ -401,7 +407,7 @@ describe("credentialFor without oauth configuration", () => {
         )
         if (!Schema.is(FigmaError)(error)) throw error
         expect(error.reason).toBe("figma_oauth_unconfigured")
-      }).pipe(Effect.withConfigProvider(emptyConfig))
+      }).pipe(Effect.provideService(ConfigProvider.ConfigProvider, emptyConfig))
   )
 })
 
@@ -410,12 +416,20 @@ const proxyDb = (rows: ReadonlyArray<ReadonlyArray<unknown>> = []) => {
     readonly sql: string
     readonly params: ReadonlyArray<unknown>
   }> = []
-  const db = drizzle(
-    async (sql: string, params: Array<unknown>) => {
-      calls.push({ sql, params })
-      return { rows: rows.map((row) => [...row]) }
+  const client = {
+    unsafe: (sql: string, params: ReadonlyArray<unknown>) => {
+      const run = Effect.sync(() => {
+        calls.push({ sql, params })
+        return rows
+      })
+      return { values: run, withoutTransform: run, raw: run }
     },
-    { schema }
+    withTransaction: <A, E, R>(effect: Effect.Effect<A, E, R>) => effect
+  }
+  const db = Effect.runSync(
+    makeWithDefaults({ relations }).pipe(
+      Effect.provideService(PgClient.PgClient, client as never)
+    )
   )
   return { calls, db }
 }
@@ -430,10 +444,10 @@ const STATE = "raw-state-value"
 const STATE_HASH = createHash("sha256").update(STATE).digest("hex")
 
 const CONSUME_WHERE_CLAUSE =
-  '("user_figma_oauth_state"."state_hash" = $2 and ' +
-  '"user_figma_oauth_state"."user_id" = $3 and ' +
-  '"user_figma_oauth_state"."consumed_at" is null and ' +
-  '"user_figma_oauth_state"."expires_at" > $4)'
+  '(("user_figma_oauth_state"."state_hash" = $2) and ' +
+  '("user_figma_oauth_state"."user_id" = $3) and ' +
+  '(("user_figma_oauth_state"."consumed_at" is null)) and ' +
+  '("user_figma_oauth_state"."expires_at" > $4))'
 
 const consumeQuery = () =>
   consumeOauthStateQuery(
@@ -467,8 +481,11 @@ describe("oauth state replay defences", () => {
   it.effect("rejects a state the guarded update did not match", () =>
     Effect.gen(function* () {
       const { calls, db } = proxyDb([])
-      const consumed = yield* Effect.promise(() =>
-        consumeOauthStateQuery(db, "user-1", STATE, at("2026-09-04T12:00:00Z"))
+      const consumed = yield* consumeOauthStateQuery(
+        db,
+        "user-1",
+        STATE,
+        at("2026-09-04T12:00:00Z")
       )
 
       const error = yield* Effect.flip(requireConsumedState(consumed))
@@ -483,8 +500,11 @@ describe("oauth state replay defences", () => {
   it.effect("accepts a state the guarded update claimed exactly once", () =>
     Effect.gen(function* () {
       const { db } = proxyDb([["state-1"]])
-      const consumed = yield* Effect.promise(() =>
-        consumeOauthStateQuery(db, "user-1", STATE, at("2026-09-04T12:00:00Z"))
+      const consumed = yield* consumeOauthStateQuery(
+        db,
+        "user-1",
+        STATE,
+        at("2026-09-04T12:00:00Z")
       )
 
       expect(consumed).toEqual([{ id: "state-1" }])
@@ -508,7 +528,7 @@ describe("startOauthFlow", () => {
       if (!Schema.is(FigmaError)(error)) throw error
       expect(error.reason).toBe("figma_oauth_unconfigured")
       expect(calls).toEqual([])
-    }).pipe(Effect.withConfigProvider(emptyConfig))
+    }).pipe(Effect.provideService(ConfigProvider.ConfigProvider, emptyConfig))
   )
 })
 

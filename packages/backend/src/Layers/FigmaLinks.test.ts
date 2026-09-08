@@ -1,4 +1,3 @@
-import "@effect/sql-drizzle/Pg"
 import { it } from "@effect/vitest"
 import {
   FigmaAuthInvalid,
@@ -7,12 +6,13 @@ import {
   NotFound,
   StorageNotConnected
 } from "@projectproject/shared"
-import { drizzle } from "drizzle-orm/pg-proxy"
+import { makeWithDefaults } from "drizzle-orm/effect-postgres"
+import { PgClient } from "@effect/sql-pg"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import { describe, expect, vi } from "vitest"
-import * as schema from "../db/schema"
+import { describe, expect, vi } from "vite-plus/test"
+import { relations } from "../db/schema"
 import { CurrentOrg } from "../Services/CurrentOrg"
 import { Db } from "../Services/Db"
 import { Figma } from "../Services/Figma"
@@ -143,7 +143,7 @@ describe("figmaCheckReason", () => {
 
 describe("needsFigmaMetadata", () => {
   const at = (iso: string): Date =>
-    DateTime.toDate(DateTime.unsafeMake(Date.parse(iso)))
+    DateTime.toDate(DateTime.makeUnsafe(Date.parse(iso)))
 
   const now = at("2026-09-04T12:00:00Z")
 
@@ -228,17 +228,34 @@ describe("figmaLinkMetadata", () => {
 const BODY =
   "see https://www.figma.com/design/FILEKEY123/Spec?node-id=12-34 please"
 
+const effectDb = (
+  execute: (
+    sql: string,
+    params: ReadonlyArray<unknown>
+  ) => ReadonlyArray<unknown>
+) => {
+  const client = {
+    unsafe: (sql: string, params: ReadonlyArray<unknown>) => {
+      const run = Effect.sync(() => execute(sql, params))
+      return { values: run, withoutTransform: run, raw: run }
+    },
+    withTransaction: <A, E, R>(effect: Effect.Effect<A, E, R>) => effect
+  }
+  return Effect.runSync(
+    makeWithDefaults({ relations }).pipe(
+      Effect.provideService(PgClient.PgClient, client as never)
+    )
+  )
+}
+
 const proxyDb = (
   respond: (sql: string) => ReadonlyArray<ReadonlyArray<unknown>>
 ) => {
   const calls: Array<string> = []
-  const db = drizzle(
-    async (sql: string) => {
-      calls.push(sql)
-      return { rows: respond(sql).map((row) => [...row]) }
-    },
-    { schema }
-  )
+  const db = effectDb((sql) => {
+    calls.push(sql)
+    return respond(sql).map((row) => [...row])
+  })
   return { calls, db }
 }
 
@@ -249,14 +266,11 @@ const recordingDb = (
 ) => {
   const calls: Array<string> = []
   const params: Array<unknown> = []
-  const db = drizzle(
-    async (sql: string, args: Array<unknown>) => {
-      calls.push(sql)
-      params.push(...args)
-      return { rows: respond(sql).map((row) => [...row]) }
-    },
-    { schema }
-  )
+  const db = effectDb((sql, args) => {
+    calls.push(sql)
+    params.push(...args)
+    return respond(sql).map((row) => [...row])
+  })
   return { calls, params, db }
 }
 
@@ -278,17 +292,14 @@ const referencedLink = (input: {
 ]
 
 const failingDb = () => {
-  const db = drizzle(
-    async () => {
-      throw new Error('relation "figma_reference" does not exist')
-    },
-    { schema }
-  )
+  const db = effectDb(() => {
+    throw new Error('relation "figma_reference" does not exist')
+  })
   return { calls: [] as Array<string>, db }
 }
 
 const harness = (input: {
-  readonly db: ReturnType<typeof emptyDb>["db"]
+  readonly db: ReturnType<typeof effectDb>
   readonly credential?: Effect.Effect<
     never,
     FigmaAuthInvalid | FigmaNotConnected
@@ -544,20 +555,17 @@ describe("reconcileTicket metadata resolution", () => {
   it.live("records an error status without logging the credential", () =>
     Effect.gen(function* () {
       const params: Array<unknown> = []
-      const db = drizzle(
-        async (sql: string, args: Array<unknown>) => {
-          params.push(...args)
-          if (sql.startsWith("select") && sql.includes("project_index")) {
-            return { rows: [["org-1"]] }
-          }
-          if (sql.startsWith('insert into "figma_link_index"')) {
-            return { rows: [["link-1"]] }
-          }
-          return { rows: [] }
-        },
-        { schema }
-      )
-      yield* reconcile(harness({ db: db as never }), BODY)
+      const db = effectDb((sql, args) => {
+        params.push(...args)
+        if (sql.startsWith("select") && sql.includes("project_index")) {
+          return [["org-1"]]
+        }
+        if (sql.startsWith('insert into "figma_link_index"')) {
+          return [["link-1"]]
+        }
+        return []
+      })
+      yield* reconcile(harness({ db }), BODY)
       yield* Effect.sleep("100 millis")
       expect(params).not.toContain("secret-pat")
       expect(params).toContain("figma_auth_invalid")
@@ -645,29 +653,27 @@ describe("reconcileTicket dev mode backlink", () => {
       })
   )
 
-  it.live(
-    "does not create a dev resource for a file-level reference",
-    () =>
-      Effect.gen(function* () {
-        const createDevResource = vi.fn(() => Effect.succeed("dev-1"))
-        const { db } = recordingDb((sql) => {
-          if (sql.startsWith("select") && sql.includes("project_index")) {
-            return [["org-1"]]
-          }
-          if (sql.startsWith('insert into "figma_link_index"')) {
-            return [["link-1"]]
-          }
-          return []
-        })
-        const exit = yield* reconcile(
-          harness({ db, figma: { createDevResource } }),
-          "https://www.figma.com/design/FILEKEY123/Spec"
-        )
-        yield* Effect.sleep("100 millis")
-
-        expect(exit._tag).toBe("Success")
-        expect(createDevResource).not.toHaveBeenCalled()
+  it.live("does not create a dev resource for a file-level reference", () =>
+    Effect.gen(function* () {
+      const createDevResource = vi.fn(() => Effect.succeed("dev-1"))
+      const { db } = recordingDb((sql) => {
+        if (sql.startsWith("select") && sql.includes("project_index")) {
+          return [["org-1"]]
+        }
+        if (sql.startsWith('insert into "figma_link_index"')) {
+          return [["link-1"]]
+        }
+        return []
       })
+      const exit = yield* reconcile(
+        harness({ db, figma: { createDevResource } }),
+        "https://www.figma.com/design/FILEKEY123/Spec"
+      )
+      yield* Effect.sleep("100 millis")
+
+      expect(exit._tag).toBe("Success")
+      expect(createDevResource).not.toHaveBeenCalled()
+    })
   )
 
   it.effect(

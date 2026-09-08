@@ -78,6 +78,6 @@ export interface FigmaShape {
   ) => Effect.Effect<void, FigmaCallError>
 }
 
-export class Figma extends Context.Tag(
+export class Figma extends Context.Service<Figma, FigmaShape>()(
   "@projectproject/backend/Services/Figma"
-)<Figma, FigmaShape>() {}
+) {}

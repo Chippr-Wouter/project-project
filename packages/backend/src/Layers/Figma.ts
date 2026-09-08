@@ -174,7 +174,7 @@ const findExistingDevResourceId = (
           ? String(id)
           : null
     }),
-    Effect.catchAll(() => Effect.succeed(null))
+    Effect.catch(() => Effect.succeed(null))
   )
 
 export const FigmaLive = Layer.succeed(Figma, {

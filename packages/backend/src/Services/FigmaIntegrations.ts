@@ -82,6 +82,7 @@ export interface FigmaIntegrationsShape {
   >
 }
 
-export class FigmaIntegrations extends Context.Tag(
-  "@projectproject/backend/Services/FigmaIntegrations"
-)<FigmaIntegrations, FigmaIntegrationsShape>() {}
+export class FigmaIntegrations extends Context.Service<
+  FigmaIntegrations,
+  FigmaIntegrationsShape
+>()("@projectproject/backend/Services/FigmaIntegrations") {}

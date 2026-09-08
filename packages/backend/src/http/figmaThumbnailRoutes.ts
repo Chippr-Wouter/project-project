@@ -1,8 +1,4 @@
-import {
-  HttpRouter,
-  HttpServerRequest,
-  HttpServerResponse
-} from "@effect/platform"
+import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import * as Effect from "effect/Effect"
 import { toWebHeaders } from "./toWebHeaders"
 import { BetterAuth } from "../Services/BetterAuth"
@@ -38,22 +34,26 @@ const serveFigmaThumbnail = Effect.gen(function* () {
   })
 }).pipe(
   Effect.catchTags({
-    NotFound: () => notFound,
-    Forbidden: () => notFound,
-    StorageNotConnected: () => notFound,
+    NotFound: () => Effect.succeed(notFound),
+    Forbidden: () => Effect.succeed(notFound),
+    StorageNotConnected: () => Effect.succeed(notFound),
     StorageConfigMissing: () =>
-      HttpServerResponse.text("Storage unavailable", { status: 503 }),
+      Effect.succeed(
+        HttpServerResponse.text("Storage unavailable", { status: 503 })
+      ),
     StorageError: () =>
-      HttpServerResponse.text("Storage unavailable", { status: 502 })
+      Effect.succeed(
+        HttpServerResponse.text("Storage unavailable", { status: 502 })
+      )
   }),
-  Effect.catchAllCause((cause) =>
-    Effect.zipRight(
+  Effect.catchCause((cause) =>
+    Effect.andThen(
       Effect.logError("figma thumbnail route failure", cause),
-      HttpServerResponse.text("Figma thumbnail failed", { status: 500 })
+      Effect.succeed(
+        HttpServerResponse.text("Figma thumbnail failed", { status: 500 })
+      )
     )
   )
 )
 
-export const figmaThumbnailRoutes = HttpRouter.empty.pipe(
-  HttpRouter.get("/:orgSlug/:linkId", serveFigmaThumbnail)
-)
+export const figmaThumbnailRoutes = serveFigmaThumbnail

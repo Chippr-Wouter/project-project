@@ -3,8 +3,8 @@ import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Redacted from "effect/Redacted"
-import * as SqlClient from "@effect/sql/SqlClient"
-import type { PgRemoteDatabase } from "drizzle-orm/pg-proxy"
+import * as SqlClient from "effect/unstable/sql/SqlClient"
+import type { EffectPgDatabase } from "drizzle-orm/effect-postgres"
 import { and, desc, eq, gt, inArray, isNull } from "drizzle-orm"
 import { createHash, randomBytes } from "node:crypto"
 import {
@@ -18,15 +18,13 @@ import {
   type PersonalFigma
 } from "@projectproject/shared"
 import {
-  member as orgMember,
   organizationIntegration,
   projectFigmaIntegration,
   projectIntegrationLink,
-  projectMember,
   userFigmaIntegration,
-  userFigmaOauthState
+  userFigmaOauthState,
+  type relations
 } from "../db/schema"
-import type * as schema from "../db/schema"
 import { Db } from "../Services/Db"
 import { Figma, type FigmaCredential } from "../Services/Figma"
 import {
@@ -154,7 +152,7 @@ export const toTokenGrant = (
     accessToken,
     refreshToken,
     expiresAt: DateTime.toDate(
-      DateTime.add(DateTime.unsafeFromDate(now), { seconds })
+      DateTime.add(DateTime.fromDateUnsafe(now), { seconds })
     )
   }
 }
@@ -275,7 +273,7 @@ export const resolveCredential = <E = never>(input: {
   })
 
 export const consumeOauthStateQuery = (
-  db: PgRemoteDatabase<typeof schema>,
+  db: EffectPgDatabase<typeof relations>,
   userId: string,
   state: string,
   now: Date
@@ -299,7 +297,7 @@ export const requireConsumedState = (
   rows.length === 0 ? Effect.fail(new FigmaAuthInvalid()) : Effect.void
 
 export const startOauthFlow = (input: {
-  readonly db: PgRemoteDatabase<typeof schema>
+  readonly db: EffectPgDatabase<typeof relations>
   readonly client: Effect.Effect<FigmaOAuthClient, FigmaError>
   readonly redirectUri: Effect.Effect<string>
   readonly userId: string
@@ -363,7 +361,9 @@ export const FigmaIntegrationsLive = Layer.effect(
             lastVerifiedAt: true,
             lastCheckError: true
           },
-          where: eq(userFigmaIntegration.userId, userId)
+          where: {
+            RAW: (table, operators) => operators.eq(table.userId, userId)!
+          }
         })
         .pipe(
           Effect.orDie,
@@ -375,7 +375,7 @@ export const FigmaIntegrationsLive = Layer.effect(
             lastVerifiedAt:
               row?.lastVerifiedAt == null
                 ? null
-                : DateTime.unsafeFromDate(row.lastVerifiedAt),
+                : DateTime.fromDateUnsafe(row.lastVerifiedAt),
             lastCheckError: row?.lastCheckError ?? null
           }))
         )
@@ -533,7 +533,7 @@ export const FigmaIntegrationsLive = Layer.effect(
       db
         .delete(userFigmaIntegration)
         .where(eq(userFigmaIntegration.userId, userId))
-        .pipe(Effect.orDie, Effect.zipRight(getProfile(userId)))
+        .pipe(Effect.orDie, Effect.andThen(getProfile(userId)))
 
     const projectRow = (orgSlug: string, slug: string) =>
       ticketIndex.projectFor(orgSlug, slug)
@@ -544,20 +544,26 @@ export const FigmaIntegrationsLive = Layer.effect(
         const explicit = yield* db.query.projectMember
           .findFirst({
             columns: { role: true },
-            where: and(
-              eq(projectMember.projectSlug, slug),
-              eq(projectMember.userId, userId)
-            )
+            where: {
+              RAW: (table, operators) =>
+                operators.and(
+                  operators.eq(table.projectSlug, slug),
+                  operators.eq(table.userId, userId)
+                )!
+            }
           })
           .pipe(Effect.orDie)
         if (explicit) return explicit.role
         const orgRole = yield* db.query.member
           .findFirst({
             columns: { role: true },
-            where: and(
-              eq(orgMember.organizationId, project.organizationId),
-              eq(orgMember.userId, userId)
-            )
+            where: {
+              RAW: (table, operators) =>
+                operators.and(
+                  operators.eq(table.organizationId, project.organizationId),
+                  operators.eq(table.userId, userId)
+                )!
+            }
           })
           .pipe(Effect.orDie)
         if (orgRole?.role === "owner" || orgRole?.role === "admin") {
@@ -616,7 +622,7 @@ export const FigmaIntegrationsLive = Layer.effect(
     const storageConnected = (orgSlug: string) =>
       orgStorage.requireConnection(orgSlug).pipe(
         Effect.as(true),
-        Effect.catchAll(() => Effect.succeed(false))
+        Effect.catch(() => Effect.succeed(false))
       )
 
     const getProjectStatus = (
@@ -633,7 +639,7 @@ export const FigmaIntegrationsLive = Layer.effect(
         return {
           connected: row.status === "active",
           handle: row.handle,
-          connectedAt: DateTime.unsafeFromDate(row.connectedAt),
+          connectedAt: DateTime.fromDateUnsafe(row.connectedAt),
           lastCheckStatus: row.lastCheckStatus,
           lastCheckError: row.lastCheckError,
           storageConnected: storage
@@ -645,11 +651,14 @@ export const FigmaIntegrationsLive = Layer.effect(
         const existing = yield* db.query.organizationIntegration
           .findFirst({
             columns: { id: true },
-            where: and(
-              eq(organizationIntegration.organizationId, organizationId),
-              eq(organizationIntegration.provider, "figma"),
-              eq(organizationIntegration.status, "active")
-            )
+            where: {
+              RAW: (table, operators) =>
+                operators.and(
+                  operators.eq(table.organizationId, organizationId),
+                  operators.eq(table.provider, "figma"),
+                  operators.eq(table.status, "active")
+                )!
+            }
           })
           .pipe(Effect.orDie)
         if (existing) return existing.id
@@ -798,7 +807,9 @@ export const FigmaIntegrationsLive = Layer.effect(
       Effect.gen(function* () {
         const row = yield* db.query.userFigmaIntegration
           .findFirst({
-            where: eq(userFigmaIntegration.userId, userId)
+            where: {
+              RAW: (table, operators) => operators.eq(table.userId, userId)!
+            }
           })
           .pipe(Effect.orDie)
         if (!row) return null
