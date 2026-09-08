@@ -42,7 +42,7 @@ export const McpServerLive = Layer.effect(
         {
           capabilities: { tools: {} },
           instructions:
-            "Read-only access to the user's orgs, groups, projects, and tickets."
+            "Access the user's organizations, projects, groups, and tickets. Create and update tickets, comments, and sprints. Upload ticket attachments using prepare_ticket_attachment, an HTTP PUT from your file environment, then commit_ticket_attachment; use update_ticket to place the attachment in the description."
         }
       )
       registerAllTools(server, runtime, handlers)

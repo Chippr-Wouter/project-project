@@ -1,6 +1,8 @@
+import type * as Schema from "effect/Schema"
 import * as Effect from "effect/Effect"
 import {
   CurrentUser,
+  type McpTools,
   DEFAULT_TICKET_SORT,
   Unauthorized,
   Validation,
@@ -19,16 +21,17 @@ import {
   type UpdateGroupInput,
   type UpdateTicketInput
 } from "@projectproject/shared"
+import * as Attachments from "../Services/Attachments"
 import { Users } from "../Services/Users"
 import { BetterAuth } from "../Services/BetterAuth"
 import { Comments } from "../Services/Comments"
-import { Projects } from "../Services/Projects"
+import * as Projects from "../Services/Projects"
 import { Tickets } from "../Services/Tickets"
 import { Groups } from "../Services/Groups"
 import { Tags } from "../Services/Tags"
 import { ProjectDocs } from "../Services/ProjectDocs"
 import { GroupDocs } from "../Services/GroupDocs"
-import { TicketDocs } from "../Services/TicketDocs"
+import * as TicketDocs from "../Services/TicketDocs"
 import { TicketIndex } from "../Services/TicketIndex"
 import type { HandlersMap } from "./dispatch"
 
@@ -78,16 +81,17 @@ const dieInternal = <A, E, R>(
 // CurrentUser is intentionally absent — the dispatcher provides it per call
 // via `Effect.provideService`, so it shouldn't appear in the runtime's R.
 type Env =
+  | Attachments.Attachments
   | Users
   | BetterAuth
   | Comments
-  | Projects
+  | Projects.Projects
   | Tickets
   | Groups
   | Tags
   | ProjectDocs
   | GroupDocs
-  | TicketDocs
+  | TicketDocs.TicketDocs
   | TicketIndex
 
 const me = (_input: {}) =>
@@ -125,7 +129,7 @@ const get_org = (input: { orgSlug: string }) =>
 const list_projects = (input: { orgSlug: string } & Pagination) =>
   Effect.gen(function* () {
     const current = yield* CurrentUser
-    const projects = yield* Projects
+    const projects = yield* Projects.Projects
     return yield* projects.listPaged(
       input.orgSlug,
       current.id,
@@ -137,7 +141,7 @@ const list_projects = (input: { orgSlug: string } & Pagination) =>
 const get_project = (input: { orgSlug: string; projectSlug: string }) =>
   Effect.gen(function* () {
     const current = yield* CurrentUser
-    const projects = yield* Projects
+    const projects = yield* Projects.Projects
     return yield* projects.get(input.orgSlug, current.id, input.projectSlug)
   })
 
@@ -257,7 +261,7 @@ const list_members = (
 ) =>
   Effect.gen(function* () {
     const current = yield* CurrentUser
-    const projects = yield* Projects
+    const projects = yield* Projects.Projects
     return yield* projects.listMembersPaged(
       input.orgSlug,
       current.id,
@@ -286,7 +290,7 @@ const get_git_state = (input: {
 const get_project_doc = (input: { orgSlug: string; projectSlug: string }) =>
   Effect.gen(function* () {
     const current = yield* CurrentUser
-    const projects = yield* Projects
+    const projects = yield* Projects.Projects
     yield* projects.requireMember(input.orgSlug, current.id, input.projectSlug)
     const docs = yield* ProjectDocs
     return yield* docs.readRaw(input.orgSlug, input.projectSlug)
@@ -299,7 +303,7 @@ const get_group_doc = (input: {
 }) =>
   Effect.gen(function* () {
     const current = yield* CurrentUser
-    const projects = yield* Projects
+    const projects = yield* Projects.Projects
     yield* projects.requireMember(input.orgSlug, current.id, input.projectSlug)
     const docs = yield* GroupDocs
     return yield* docs.readRaw(input.orgSlug, input.projectSlug, input.id)
@@ -312,9 +316,9 @@ const get_ticket_doc = (input: {
 }) =>
   Effect.gen(function* () {
     const current = yield* CurrentUser
-    const projects = yield* Projects
+    const projects = yield* Projects.Projects
     yield* projects.requireMember(input.orgSlug, current.id, input.projectSlug)
-    const docs = yield* TicketDocs
+    const docs = yield* TicketDocs.TicketDocs
     return yield* docs.readRaw(input.orgSlug, input.projectSlug, input.id)
   })
 
@@ -341,6 +345,55 @@ const update_ticket = (
     const { orgSlug, projectSlug, id, ...payload } = input
     return yield* tickets.update(orgSlug, current.id, projectSlug, id, payload)
   })
+
+const requireAttachmentTicket = Effect.fn("requireAttachmentTicket")(
+  function* (input: {
+    orgSlug: string
+    projectSlug: string
+    ticketId: TicketId
+  }) {
+    const current = yield* CurrentUser
+    const projects = yield* Projects.Projects
+    yield* projects.requireMember(input.orgSlug, current.id, input.projectSlug)
+    const docs = yield* TicketDocs.TicketDocs
+    yield* docs.read(input.orgSlug, input.projectSlug, input.ticketId)
+    return current
+  }
+)
+
+const prepare_ticket_attachment = Effect.fn("prepare_ticket_attachment")(
+  function* (
+    input: Schema.Schema.Type<typeof McpTools.prepare_ticket_attachment.input>
+  ) {
+    const current = yield* requireAttachmentTicket(input)
+    const attachments = yield* Attachments.Attachments
+    const { orgSlug, projectSlug, ticketId, ...payload } = input
+    return yield* attachments.prepare(
+      orgSlug,
+      projectSlug,
+      ticketId,
+      current.id,
+      payload
+    )
+  }
+)
+
+const commit_ticket_attachment = Effect.fn("commit_ticket_attachment")(
+  function* (
+    input: Schema.Schema.Type<typeof McpTools.commit_ticket_attachment.input>
+  ) {
+    const current = yield* requireAttachmentTicket(input)
+    const attachments = yield* Attachments.Attachments
+    const { id, url, filename, contentType } = yield* attachments.commit(
+      input.orgSlug,
+      input.projectSlug,
+      input.ticketId,
+      current.id,
+      input.attachmentId
+    )
+    return { id, url, filename, contentType }
+  }
+)
 
 const create_comment = (input: {
   orgSlug: string
@@ -449,7 +502,7 @@ const rebuild_ticket_index = (input: {
 }) =>
   Effect.gen(function* () {
     const current = yield* CurrentUser
-    const projects = yield* Projects
+    const projects = yield* Projects.Projects
     yield* projects.requireRole(input.orgSlug, current.id, input.projectSlug, [
       "owner",
       "admin"
@@ -513,6 +566,8 @@ export const handlers: HandlersMap<Env> = {
   get_ticket_doc: (i) => dieInternal(get_ticket_doc(i)),
   create_ticket: (i) => dieInternal(create_ticket(i)),
   update_ticket: (i) => dieInternal(update_ticket(i)),
+  prepare_ticket_attachment: (i) => dieInternal(prepare_ticket_attachment(i)),
+  commit_ticket_attachment: (i) => dieInternal(commit_ticket_attachment(i)),
   create_comment: (i) => dieInternal(create_comment(i)),
   attach_branch: (i) => dieInternal(attach_branch(i)),
   rebuild_ticket_index: (i) => dieInternal(rebuild_ticket_index(i)),

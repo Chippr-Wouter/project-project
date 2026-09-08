@@ -55,6 +55,30 @@ export const mapToolError = (e: unknown): McpToolErrorResult => {
           : "Mention error."
       )
     }
+    case "StorageNotConnected":
+      return text(
+        "StorageNotConnected: Attachments are unavailable because this organization has not connected storage. Connect storage in organization settings, then retry."
+      )
+    case "StorageConfigMissing":
+      return text(
+        "StorageConfigMissing: Server storage configuration is missing. Ask the server administrator to configure attachment storage, then retry."
+      )
+    case "StorageError":
+      return text(
+        "StorageError: Attachment storage could not complete the operation. Check the connection in organization settings and retry."
+      )
+    case "AttachmentNotUploaded":
+      return text(
+        "AttachmentNotUploaded: The file has not been uploaded. Complete the PUT to uploadUrl, then retry commit_ticket_attachment. If the upload URL expired, prepare a new upload."
+      )
+    case "AttachmentTooLarge":
+      return text(
+        "AttachmentTooLarge: The file must be non-empty, at most 25 MiB, and match the byteSize supplied during preparation."
+      )
+    case "AttachmentTypeRejected":
+      return text(
+        "AttachmentTypeRejected: Use PNG, JPEG, GIF, WebP, AVIF, PDF, ZIP, gzip, or tar."
+      )
     case "SchemaError":
       return text(
         e instanceof Error
