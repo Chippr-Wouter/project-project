@@ -10,6 +10,7 @@ import { ticketKey } from "@/atoms/tickets"
 export interface FigmaLinkMetadata {
   readonly name: string
   readonly fileName: string
+  readonly thumbnailUrl: string | null
 }
 
 export interface FigmaTicketTarget {

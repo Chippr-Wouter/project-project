@@ -1,13 +1,21 @@
+import { useState } from "react"
 import { motion } from "motion/react"
 import type { FigmaRef } from "@projectproject/shared"
 import { transitions } from "@/lib/springs"
 import { cn } from "@/lib/utils"
 import { m } from "@/paraglide/messages"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger
+} from "@/components/ui/popover"
 import { FigmaOpen } from "./FigmaOpen"
 import { useFigmaMetadata } from "./figmaMetadata"
 
 const CHIP =
   "mx-0.5 inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-card px-2 py-0.5 align-baseline text-xs transition-colors duration-100 group-focus-within/editing:hover:bg-accent/40"
+
+const HOVER_DELAY_MS = 450
 
 export function FigmaGlyph({ className }: { className?: string }) {
   return (
@@ -53,6 +61,7 @@ export function FigmaChip({
   morphId: string
 }) {
   const metadata = useFigmaMetadata(reference)
+  const [broken, setBroken] = useState(false)
 
   if (reference === null) {
     return (
@@ -74,9 +83,11 @@ export function FigmaChip({
     slug: reference.slug
   })
   const resolvedName = name.length > 0 ? name : m.figma_chip_loading()
+  const thumbnailUrl = metadata?.thumbnailUrl ?? null
+  const showThumbnail = thumbnailUrl !== null && !broken
 
-  return (
-    <span className={CHIP} title={metadata?.fileName ?? resolvedName}>
+  const body = (
+    <>
       <motion.span
         layout="position"
         transition={transitions.morph}
@@ -93,6 +104,37 @@ export function FigmaChip({
         {resolvedName}
       </motion.span>
       {url === undefined ? null : <FigmaOpen url={url} morphId={morphId} />}
-    </span>
+    </>
+  )
+
+  if (!showThumbnail) {
+    return (
+      <span className={CHIP} title={metadata?.fileName ?? resolvedName}>
+        {body}
+      </span>
+    )
+  }
+
+  return (
+    <Popover>
+      <PopoverTrigger
+        openOnHover
+        delay={HOVER_DELAY_MS}
+        render={<span className={CHIP} title={metadata?.fileName ?? resolvedName} />}
+        contentEditable={false}
+      >
+        {body}
+      </PopoverTrigger>
+      <PopoverContent className="w-auto max-w-sm p-1.5" align="start">
+        <img
+          src={thumbnailUrl}
+          alt={m.figma_chip_thumbnail_alt({ name: resolvedName })}
+          loading="lazy"
+          decoding="async"
+          className="block max-h-72 max-w-full rounded-md object-contain"
+          onError={() => setBroken(true)}
+        />
+      </PopoverContent>
+    </Popover>
   )
 }

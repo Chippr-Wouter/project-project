@@ -1,6 +1,7 @@
 {
   "$schema": "https://inlang.com/schema/inlang-message-format",
   "figma_chip_loading": "Loading design…",
+  "figma_chip_thumbnail_alt": "Preview of {name}",
   "figma_chip_unavailable": "Design unavailable",
   "figma_embed_collapse": "Collapse",
   "figma_embed_expand": "Expand",
