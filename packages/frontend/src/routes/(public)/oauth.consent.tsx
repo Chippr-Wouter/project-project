@@ -4,7 +4,7 @@ import { createFileRoute, Navigate } from "@tanstack/react-router"
 import * as Exit from "effect/Exit"
 import { useState, type ReactNode } from "react"
 import { meAtom } from "@/atoms/auth"
-import { submitConsentAtom } from "@/atoms/oauthConsent"
+import { oauthClientNameAtom, submitConsentAtom } from "@/atoms/oauthConsent"
 import { m } from "@/paraglide/messages"
 import { Button } from "@/components/ui/button"
 import { DitherShell } from "@/components/ui/dither-shell"
@@ -63,6 +63,10 @@ function ConsentForm({
     mode: "promiseExit"
   })
   const submitState = useAtomValue(submitConsentAtom(oauthQuery))
+  const clientName = useAtomValue(oauthClientNameAtom(clientId ?? ""))
+  const displayName =
+    (Result.isSuccess(clientName) ? clientName.value : null) ??
+    m.auth_oauth_consent_client_fallback()
   const [pending, setPending] = useState<"accept" | "deny" | null>(null)
   const error = Result.isFailure(submitState) ? m.error_unknown() : null
 
@@ -85,8 +89,8 @@ function ConsentForm({
 
   return (
     <ConsentShell title={m.auth_oauth_consent_title()}>
-      <p className="text-center text-sm text-muted-foreground">
-        {m.auth_oauth_consent_subtitle({ client: clientId ?? "—" })}
+      <p className="text-center text-sm text-muted-foreground wrap-anywhere">
+        {m.auth_oauth_consent_subtitle({ client: displayName })}
       </p>
       <div className="flex w-full flex-col gap-2">
         <p className="text-sm font-medium text-foreground">
