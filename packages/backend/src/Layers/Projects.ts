@@ -1639,6 +1639,10 @@ export const ProjectsLive = Layer.effect(
             (currentConnection.repoId !== next.repoId ||
               currentConnection.repoOwner !== next.repoOwner ||
               currentConnection.repoName !== next.repoName)
+          if (repoChanged) {
+            yield* clearTicketPrMetadata(orgSlug, slug)
+          }
+
           yield* sql
             .withTransaction(
               Effect.gen(function* () {
@@ -1728,10 +1732,6 @@ export const ProjectsLive = Layer.effect(
                         : Effect.die(cause)
                     )
                   )
-
-                if (repoChanged) {
-                  yield* clearTicketPrMetadata(orgSlug, slug)
-                }
               })
             )
             .pipe(Effect.catchTag("SqlError", Effect.die))

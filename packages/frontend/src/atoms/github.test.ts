@@ -154,6 +154,23 @@ describe("mergeStaleGitStateDetails", () => {
 })
 
 describe("changedGitStateTicketIds", () => {
+  it("does not derive changes from an initial response", () => {
+    const initial = {
+      states: {
+        "T-1": {
+          tag: "branch_no_pr" as const,
+          name: "feat/T-1",
+          baseBranch: "main"
+        }
+      },
+      transitioned: [],
+      tokenStatus: "ok" as const,
+      repoStatus: "ok" as const
+    }
+
+    expect(changedGitStateTicketIds(undefined, initial)).toEqual([])
+  })
+
   it("detects webhook-driven state changes without server change lists", () => {
     const before = {
       states: {

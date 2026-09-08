@@ -112,12 +112,13 @@ export const changedGitStateTicketIds = (
   previous: GitStatesResponse | undefined,
   next: GitStatesResponse
 ): ReadonlyArray<string> => {
+  if (!previous) return []
   const ticketIds = new Set([
-    ...Object.keys(previous?.states ?? {}),
+    ...Object.keys(previous.states),
     ...Object.keys(next.states)
   ])
   return [...ticketIds].filter((ticketId) => {
-    const before = previous?.states[ticketId]
+    const before = previous.states[ticketId]
     const after = next.states[ticketId]
     if (!before) return after?.tag !== "no_branch"
     if (!after) return true
