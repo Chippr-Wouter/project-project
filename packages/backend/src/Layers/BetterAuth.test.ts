@@ -3,7 +3,8 @@ import * as Effect from "effect/Effect"
 import { BetterAuth } from "../Services/BetterAuth"
 
 const mocks = vi.hoisted(() => ({
-  findFirst: vi.fn()
+  findFirst: vi.fn(),
+  oauth2Consent: vi.fn()
 }))
 
 vi.mock("drizzle-orm/node-postgres", () => ({
@@ -21,7 +22,7 @@ vi.mock("../auth", () => ({
     handler: vi.fn(),
     api: {
       getSession: vi.fn(),
-      oAuthConsent: vi.fn()
+      oauth2Consent: mocks.oauth2Consent
     }
   }
 }))
@@ -59,3 +60,34 @@ const runGetPersonalGithub = (userId: string) =>
       return yield* service.getPersonalGithub(userId)
     }).pipe(Effect.provide(BetterAuthLive))
   )
+
+it("passes the HTTP request through when accepting OAuth consent", async () => {
+  const request = new Request(
+    "http://localhost/api/oauth-applications/consent",
+    {
+      method: "POST",
+      headers: { cookie: "session=fixture" }
+    }
+  )
+  const input = { accept: true, oauth_query: "signed-query" }
+  mocks.oauth2Consent.mockResolvedValue({
+    url: "http://localhost/callback?code=fixture"
+  })
+
+  const result = await Effect.runPromise(
+    Effect.gen(function* () {
+      const service = yield* BetterAuth
+      return yield* service.submitConsent(request, input)
+    }).pipe(Effect.provide(BetterAuthLive))
+  )
+
+  expect(mocks.oauth2Consent).toHaveBeenCalledWith({
+    asResponse: false,
+    request,
+    headers: request.headers,
+    body: input
+  })
+  expect(result).toEqual({
+    redirectURI: "http://localhost/callback?code=fixture"
+  })
+})
