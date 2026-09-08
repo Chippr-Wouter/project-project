@@ -14,7 +14,9 @@ const KEY = "aBcDeF1234567890GhIjKl"
 describe("parseFigmaUrl", () => {
   it("parses a design url with a node id", () => {
     expect(
-      parseFigmaUrl(`https://www.figma.com/design/${KEY}/Checkout?node-id=12-345`)
+      parseFigmaUrl(
+        `https://www.figma.com/design/${KEY}/Checkout?node-id=12-345`
+      )
     ).toEqual({
       kind: "design",
       fileKey: KEY,
@@ -31,7 +33,9 @@ describe("parseFigmaUrl", () => {
   })
 
   it("returns a null node id when none is present", () => {
-    expect(parseFigmaUrl(`https://figma.com/design/${KEY}/Checkout`)?.nodeId).toBeNull()
+    expect(
+      parseFigmaUrl(`https://figma.com/design/${KEY}/Checkout`)?.nodeId
+    ).toBeNull()
   })
 
   it("parses board, slides, proto and legacy file urls", () => {
@@ -42,14 +46,16 @@ describe("parseFigmaUrl", () => {
       ["file", "design"]
     ] as const
     for (const [segment, kind] of kinds) {
-      expect(parseFigmaUrl(`https://figma.com/${segment}/${KEY}/Name`)?.kind).toBe(kind)
+      expect(
+        parseFigmaUrl(`https://figma.com/${segment}/${KEY}/Name`)?.kind
+      ).toBe(kind)
     }
   })
 
   it("decodes a percent-encoded slug", () => {
-    expect(parseFigmaUrl(`https://figma.com/design/${KEY}/Design%20System`)?.slug).toBe(
-      "Design System"
-    )
+    expect(
+      parseFigmaUrl(`https://figma.com/design/${KEY}/Design%20System`)?.slug
+    ).toBe("Design System")
   })
 
   it("tolerates a missing slug", () => {
@@ -62,15 +68,21 @@ describe("parseFigmaUrl", () => {
   })
 
   it("rejects a non-figma host", () => {
-    expect(parseFigmaUrl(`https://notfigma.test/design/${KEY}/Checkout`)).toBeNull()
+    expect(
+      parseFigmaUrl(`https://notfigma.test/design/${KEY}/Checkout`)
+    ).toBeNull()
   })
 
   it("rejects a lookalike host", () => {
-    expect(parseFigmaUrl(`https://figma.com.evil.test/design/${KEY}/Checkout`)).toBeNull()
+    expect(
+      parseFigmaUrl(`https://figma.com.evil.test/design/${KEY}/Checkout`)
+    ).toBeNull()
   })
 
   it("rejects an unknown path segment", () => {
-    expect(parseFigmaUrl(`https://figma.com/community/${KEY}/Checkout`)).toBeNull()
+    expect(
+      parseFigmaUrl(`https://figma.com/community/${KEY}/Checkout`)
+    ).toBeNull()
   })
 
   it("rejects a url with no file key", () => {
@@ -87,27 +99,35 @@ describe("parseFigmaUrl", () => {
 
   it("normalises an instance node id", () => {
     expect(
-      parseFigmaUrl(`https://figma.com/design/${KEY}/A?node-id=I1-2;3-4`)?.nodeId
+      parseFigmaUrl(`https://figma.com/design/${KEY}/A?node-id=I1-2;3-4`)
+        ?.nodeId
     ).toBe("I1:2;3:4")
   })
 
   it("ignores a fragment", () => {
-    expect(parseFigmaUrl(`https://figma.com/design/${KEY}/A?node-id=1-2#foo`)?.nodeId).toBe("1:2")
+    expect(
+      parseFigmaUrl(`https://figma.com/design/${KEY}/A?node-id=1-2#foo`)?.nodeId
+    ).toBe("1:2")
   })
 
   it("accepts an uppercase host", () => {
-    expect(parseFigmaUrl(`HTTPS://FIGMA.COM/design/${KEY}/A`)?.fileKey).toBe(KEY)
+    expect(parseFigmaUrl(`HTTPS://FIGMA.COM/design/${KEY}/A`)?.fileKey).toBe(
+      KEY
+    )
   })
 })
 
 describe("figmaViewParams", () => {
   it("defaults to rich", () => {
-    expect(figmaViewParams(`https://figma.com/design/${KEY}/N`).density).toBe("rich")
+    expect(figmaViewParams(`https://figma.com/design/${KEY}/N`).density).toBe(
+      "rich"
+    )
   })
 
   it("reads compact from pp-density", () => {
     expect(
-      figmaViewParams(`https://figma.com/design/${KEY}/N?pp-density=compact`).density
+      figmaViewParams(`https://figma.com/design/${KEY}/N?pp-density=compact`)
+        .density
     ).toBe("compact")
   })
 })
@@ -150,7 +170,9 @@ describe("figmaEmbedUrl", () => {
     const url = `https://figma.com/design/${KEY}/N?node-id=1-2`
     const ref = parseFigmaUrl(url)!
     const embed = figmaEmbedUrl(ref, url)
-    expect(embed.startsWith(`https://embed.figma.com/design/${KEY}/`)).toBe(true)
+    expect(embed.startsWith(`https://embed.figma.com/design/${KEY}/`)).toBe(
+      true
+    )
     expect(embed).toContain("node-id=1%3A2")
     expect(embed).toContain("embed-host=projectproject")
   })

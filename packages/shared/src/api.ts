@@ -691,14 +691,10 @@ const FigmaGroup = HttpApiGroup.make("figma")
     })
   )
   .add(
-    HttpApiEndpoint.delete(
-      "disconnectProfile",
-      "/integrations/figma/profile",
-      {
-        success: PersonalFigma,
-        error: [Unauthorized]
-      }
-    )
+    HttpApiEndpoint.delete("disconnectProfile", "/integrations/figma/profile", {
+      success: PersonalFigma,
+      error: [Unauthorized]
+    })
   )
   .add(
     HttpApiEndpoint.get(

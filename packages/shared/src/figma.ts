@@ -117,9 +117,7 @@ export const figmaRefKey = (ref: FigmaRef): string =>
 const FIGMA_URL_CANDIDATE_RE =
   /https?:\/\/(?:www\.)?figma\.com\/(?:design|board|slides|proto|file)\/[^\s)<>"']+/g
 
-export const extractFigmaRefs = (
-  markdown: string
-): ReadonlyArray<FigmaRef> => {
+export const extractFigmaRefs = (markdown: string): ReadonlyArray<FigmaRef> => {
   const seen = new Set<string>()
   const out: Array<FigmaRef> = []
   for (const match of markdown.matchAll(FIGMA_URL_CANDIDATE_RE)) {

@@ -802,7 +802,13 @@ export const TicketsLive = Layer.effect(
 
         yield* ticketDocs.write(orgSlug, slug, id, next)
         yield* attachments.reconcileTicket(orgSlug, slug, id, next.body)
-        yield* figmaLinks.reconcileTicket(orgSlug, slug, id, next.title, next.body)
+        yield* figmaLinks.reconcileTicket(
+          orgSlug,
+          slug,
+          id,
+          next.title,
+          next.body
+        )
         yield* ticketIndex.upsertTicket(indexProject, next)
 
         const projectGithub = yield* projects.getGithubIntegration(

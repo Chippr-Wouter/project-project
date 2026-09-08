@@ -805,11 +805,7 @@ export const figmaReference = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.linkId, t.projectSlug, t.ticketId] }),
-    index("figma_reference_ticket_idx").on(
-      t.orgSlug,
-      t.projectSlug,
-      t.ticketId
-    )
+    index("figma_reference_ticket_idx").on(t.orgSlug, t.projectSlug, t.ticketId)
   ]
 )
 

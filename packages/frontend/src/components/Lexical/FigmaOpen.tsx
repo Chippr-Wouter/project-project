@@ -3,13 +3,7 @@ import { ExternalLink } from "lucide-react"
 import { transitions } from "@/lib/springs"
 import { m } from "@/paraglide/messages"
 
-export function FigmaOpen({
-  url,
-  morphId
-}: {
-  url: string
-  morphId: string
-}) {
+export function FigmaOpen({ url, morphId }: { url: string; morphId: string }) {
   return (
     <motion.a
       layoutId={`${morphId}-open`}
