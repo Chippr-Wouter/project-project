@@ -9,6 +9,7 @@ import {
   Forbidden,
   GitHubError,
   NotFound,
+  RateLimited,
   type GithubOrgIntegrationStatus,
   type Slug
 } from "@projectproject/shared"
@@ -232,7 +233,7 @@ export const GitHubIntegrationsLive = Layer.effect(
       code: string
     ): Effect.Effect<
       { redirectUrl: string },
-      NotFound | Forbidden | GitHubError
+      NotFound | Forbidden | RateLimited | GitHubError
     > =>
       Effect.gen(function* () {
         const session = yield* sessionForState(state)

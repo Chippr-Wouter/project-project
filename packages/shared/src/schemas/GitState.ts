@@ -109,7 +109,12 @@ export const GitStatesResponse = Schema.Struct({
   states: Schema.Record(Schema.String, GitState),
   transitioned: Schema.Array(TransitionRecord),
   tokenStatus: GitStateTokenStatus,
-  repoStatus: GitStateRepoStatus
+  repoStatus: GitStateRepoStatus,
+  refreshStatus: Schema.optional(
+    Schema.Literals(["fresh", "stale", "rate_limited"])
+  ),
+  retryAt: Schema.optional(Schema.Finite),
+  changedTicketIds: Schema.optional(Schema.Array(Schema.String))
 })
 export type GitStatesResponse = typeof GitStatesResponse.Type
 

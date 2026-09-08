@@ -5,7 +5,7 @@ import type * as ManagedRuntime from "effect/ManagedRuntime"
 import type { McpServer as SdkMcpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import type { BackendInfrastructureLive, BackendServicesLive } from "../runtime"
 
-type McpToolServices =
+export type McpToolServices =
   | Layer.Success<typeof BackendInfrastructureLive>
   | Layer.Success<typeof BackendServicesLive>
 

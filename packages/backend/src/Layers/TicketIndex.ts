@@ -14,7 +14,13 @@ import {
   type TicketType
 } from "@projectproject/shared"
 import type { MarkdownError } from "../Services/Markdown"
-import { organization, projectIndex, ticketIndex } from "../db/schema"
+import {
+  organization,
+  projectGithubRepository,
+  projectIndex,
+  projectIntegrationLink,
+  ticketIndex
+} from "../db/schema"
 import { Db } from "../Services/Db"
 import {
   TicketIndex,
@@ -361,6 +367,36 @@ export const TicketIndexLive = Layer.effect(
           Effect.orDie
         )
 
+    const isRepositoryBranchAttached = (repoId: string, branch: string) =>
+      db
+        .select({ ticketId: ticketIndex.ticketId })
+        .from(ticketIndex)
+        .innerJoin(
+          projectIntegrationLink,
+          eq(projectIntegrationLink.projectId, ticketIndex.projectId)
+        )
+        .innerJoin(
+          projectGithubRepository,
+          eq(
+            projectGithubRepository.projectIntegrationLinkId,
+            projectIntegrationLink.id
+          )
+        )
+        .where(
+          and(
+            eq(projectGithubRepository.repoId, repoId),
+            eq(projectIntegrationLink.provider, "github"),
+            inArray(projectIntegrationLink.status, ["active", "broken"]),
+            inArray(projectGithubRepository.status, ["active", "broken"]),
+            eq(ticketIndex.branch, branch)
+          )
+        )
+        .limit(1)
+        .pipe(
+          Effect.map((rows) => rows.length > 0),
+          Effect.orDie
+        )
+
     const upsertTicket = (
       project: TicketIndexProject,
       document: TicketDocument
@@ -564,6 +600,7 @@ export const TicketIndexLive = Layer.effect(
       findTicketIdsByTag,
       findTicketIdsByStatus,
       findTicketsByBranch,
+      isRepositoryBranchAttached,
       upsertTicket,
       markBranchStale,
       clearBranchStale,

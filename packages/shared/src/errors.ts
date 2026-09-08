@@ -114,13 +114,33 @@ export class RateLimited extends Schema.TaggedError<RateLimited>()(
   { httpApiStatus: 429 }
 ) {}
 
-// Catch-all for unexpected GitHub failures. `message` is whatever GitHub
-// surfaced — fine to display verbatim, no PII.
 export class GitHubError extends Schema.TaggedError<GitHubError>()(
   "GitHubError",
   { message: Schema.String },
   { httpApiStatus: 502 }
-) {}
+) {
+  static invalidResponse(
+    operation: "fetchProjectStateBatch" | "discoverProjectBranches",
+    cause: unknown
+  ): GitHubError {
+    const message =
+      operation === "fetchProjectStateBatch"
+        ? "GitHub returned an invalid pull-request page"
+        : "GitHub returned an invalid branch discovery response"
+    const error = new GitHubError({ message })
+    Object.defineProperty(error, "operation", {
+      configurable: true,
+      value: operation,
+      writable: false
+    })
+    Object.defineProperty(error, "cause", {
+      configurable: true,
+      value: cause,
+      writable: false
+    })
+    return error
+  }
+}
 
 // 404 — caller asked us to attach an existing branch but it isn't on the
 // remote (deleted between list and submit, or typo). The UI should refresh

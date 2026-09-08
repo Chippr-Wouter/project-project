@@ -30,7 +30,7 @@ export interface GitHubIntegrationsShape {
     code: string
   ) => Effect.Effect<
     { redirectUrl: string },
-    NotFound | Forbidden | GitHubError
+    NotFound | Forbidden | RateLimited | GitHubError
   >
   readonly listRepos: (
     orgSlug: string,

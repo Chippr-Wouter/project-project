@@ -11,6 +11,9 @@ import { EverhourLive } from "./Layers/Everhour"
 import { EverhourIntegrationsLive } from "./Layers/EverhourIntegrations"
 import { EverhourTimeTrackingLive } from "./Layers/EverhourTimeTracking"
 import { GitHubLive } from "./Layers/GitHub"
+import * as GitHubProjectStateCache from "./Layers/GitHub/projectStateCache"
+import * as GitHubRequest from "./Layers/GitHub/request"
+import * as TicketDocumentLock from "./ticketDocumentLock"
 import { GitHubIntegrationsLive } from "./Layers/GitHubIntegrations"
 import { GroupDocsLive } from "./Layers/GroupDocs"
 import { GroupsLive } from "./Layers/Groups"
@@ -30,6 +33,9 @@ import { TicketsLive } from "./Layers/Tickets"
 import { UsersLive } from "./Layers/Users"
 
 export const BackendInfrastructureLive = Layer.mergeAll(
+  GitHubProjectStateCache.layer,
+  GitHubRequest.layer,
+  TicketDocumentLock.layer,
   BetterAuthLive,
   DbLive.pipe(Layer.provideMerge(PgLive)),
   BunFileSystem.layer,

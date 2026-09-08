@@ -1,4 +1,6 @@
 import { it } from "@effect/vitest"
+import * as Deferred from "effect/Deferred"
+import * as Fiber from "effect/Fiber"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -8,12 +10,15 @@ import {
   DEFAULT_TICKET_SORT,
   NotFound,
   ProjectKey,
+  RateLimited,
   TICKET_LIST_LIMIT,
   TicketId,
   TicketStatus,
   type TicketListQuery
 } from "@projectproject/shared"
+import { applyPullRequestWebhookToTicket } from "../Layers/GitHubWebhooks"
 import { TicketsLive } from "../Layers/Tickets"
+import * as TicketDocumentLock from "../ticketDocumentLock"
 import { Attachments, type AttachmentsShape } from "./Attachments"
 import { Comments, type CommentsShape } from "./Comments"
 import { Db } from "./Db"
@@ -124,6 +129,7 @@ function makeFakeTicketDocs(initialIds: ReadonlyArray<string>) {
 
   return {
     documents,
+    service,
     layer: Layer.succeed(TicketDocs, service)
   }
 }
@@ -309,6 +315,10 @@ const makeFakeTicketIndex = (
             : []
         )
       ),
+    isRepositoryBranchAttached: (_repoId, branch) =>
+      Effect.sync(() =>
+        [...documents.values()].some((document) => document.branch === branch)
+      ),
     upsertTicket: (_project, document) =>
       Effect.sync(() => {
         documents.set(document.id, document)
@@ -398,7 +408,8 @@ function makeTicketsLayer(
     Layer.provide(options.attachments ?? makeFakeAttachments()),
     Layer.provide(options.github ?? makeFakeGitHub()),
     Layer.provide(options.ticketIndex ?? makeFakeTicketIndex(new Map())),
-    Layer.provide(FakeDb)
+    Layer.provide(FakeDb),
+    Layer.provideMerge(TicketDocumentLock.layer)
   )
 }
 
@@ -447,7 +458,8 @@ it.effect("listGitStates fetches only distinct ticket branches", () => {
       })
     ),
     Layer.provide(makeFakeTicketIndex(docs.documents)),
-    Layer.provide(FakeDb)
+    Layer.provide(FakeDb),
+    Layer.provideMerge(TicketDocumentLock.layer)
   )
 
   return Effect.gen(function* () {
@@ -467,8 +479,594 @@ it.effect("listGitStates fetches only distinct ticket branches", () => {
   }).pipe(Effect.provide(layer))
 })
 
+it.effect(
+  "listGitStates skips a stale git write when a ticket branch changes during the fetch",
+  () => {
+    const clearedBranches: string[] = []
+    const docs = makeFakeTicketDocs(["T-1"])
+    docs.documents.set(
+      "T-1",
+      makeTicketDocument("T-1", { branch: "feat/T-1-current" })
+    )
+    const indexedTicket = makeTicketDocument("T-1", {
+      branch: "feat/T-1-old"
+    })
+    const layer = TicketsLive.pipe(
+      Layer.provide(docs.layer),
+      Layer.provide(
+        makeFakeProjects("T", {
+          getGithubIntegration: () => Effect.succeed(githubIntegration)
+        })
+      ),
+      Layer.provide(FakeGroups),
+      Layer.provide(FakeComments),
+      Layer.provide(makeFakeAttachments()),
+      Layer.provide(
+        makeFakeGitHub({
+          fetchInstallationProjectStates: () =>
+            Effect.succeed({
+              defaultBranch: "main",
+              existingBranches: new Set(["feat/T-1-old"]),
+              prByBranch: new Map([
+                [
+                  "feat/T-1-old",
+                  {
+                    headRefName: "feat/T-1-old",
+                    baseRefName: "main",
+                    state: "merged",
+                    draft: false,
+                    number: 42,
+                    url: "https://github.com/acme/app/pull/42",
+                    title: "Old branch",
+                    mergedAt: null,
+                    checks: "passing"
+                  }
+                ]
+              ])
+            })
+        })
+      ),
+      Layer.provide(
+        makeFakeTicketIndex(docs.documents, {
+          clearBranchStale: (_project, ids) =>
+            Effect.sync(() => {
+              clearedBranches.push(...ids)
+            }),
+          list: () =>
+            Effect.succeed([
+              {
+                ...entryFromDocument(indexedTicket),
+                branchDeletedAt: indexedTicket.updatedAt,
+                checks: null,
+                checksHeadSha: null,
+                checksUpdatedAt: null
+              }
+            ])
+        })
+      ),
+      Layer.provide(FakeDb),
+      Layer.provideMerge(TicketDocumentLock.layer)
+    )
+
+    return Effect.gen(function* () {
+      const tickets = yield* Tickets
+      const result = yield* tickets.listGitStates("org", "user-1", "p")
+
+      expect(docs.documents.get("T-1")).toMatchObject({
+        branch: "feat/T-1-current",
+        pr: null,
+        prState: null,
+        status: ticketStatus("todo")
+      })
+      expect(result.states["T-1"]).toEqual({
+        tag: "branch_pending",
+        name: "feat/T-1-current",
+        baseBranch: "main"
+      })
+      expect(result.transitioned).toEqual([])
+      expect(clearedBranches).toEqual([])
+    }).pipe(Effect.provide(layer))
+  }
+)
+
+it.effect("listGitStates links an external branch and its existing PR", () => {
+  const docs = makeFakeTicketDocs(["T-1"])
+  const queries: Array<string | undefined> = []
+  const layer = makeTicketsLayer("T", docs.layer, {
+    projects: makeFakeProjects("T", {
+      getGithubIntegration: () => Effect.succeed(githubIntegration)
+    }),
+    ticketIndex: makeFakeTicketIndex(docs.documents),
+    github: makeFakeGitHub({
+      fetchInstallationProjectStates: (
+        _installation,
+        _owner,
+        _repo,
+        _branches,
+        query
+      ) => {
+        queries.push(query)
+        return Effect.succeed({
+          defaultBranch: "main",
+          existingBranches: new Set(["feat/T-1-external"]),
+          prByBranch: new Map([
+            [
+              "feat/T-1-external",
+              {
+                headRefName: "feat/T-1-external",
+                baseRefName: "main",
+                state: "open",
+                draft: false,
+                number: 42,
+                url: "https://github.com/acme/app/pull/42",
+                title: "External change",
+                mergedAt: null,
+                checks: "passing"
+              }
+            ]
+          ])
+        })
+      }
+    })
+  })
+  return Effect.gen(function* () {
+    const tickets = yield* Tickets
+    const result = yield* tickets.listGitStates("org", "user-1", "p")
+    expect(queries).toEqual(["T-"])
+    expect(result.changedTicketIds).toEqual(["T-1"])
+    expect(docs.documents.get("T-1")).toMatchObject({
+      branch: "feat/T-1-external",
+      pr: 42,
+      prState: "open"
+    })
+    expect(result.states["T-1"]).toMatchObject({ tag: "pr_open", number: 42 })
+    yield* tickets.listGitStates("org", "user-1", "p")
+    expect(queries).toEqual(["T-", undefined])
+  }).pipe(Effect.provide(layer))
+})
+
+it.effect(
+  "explicit unlink survives edits and refresh until manual attachment",
+  () => {
+    const docs = makeFakeTicketDocs(["T-1"])
+    docs.documents.set("T-1", makeTicketDocument("T-1", { branch: "feat/T-1" }))
+    const layer = makeTicketsLayer("T", docs.layer, {
+      projects: makeFakeProjects("T", {
+        getGithubIntegration: () => Effect.succeed(githubIntegration)
+      }),
+      ticketIndex: makeFakeTicketIndex(docs.documents),
+      github: makeFakeGitHub({
+        branchExistsInstallation: () => Effect.succeed(true),
+        fetchInstallationProjectStates: () =>
+          Effect.succeed({
+            defaultBranch: "main",
+            existingBranches: new Set(["feat/T-1"]),
+            prByBranch: new Map()
+          })
+      })
+    })
+    return Effect.gen(function* () {
+      const tickets = yield* Tickets
+      yield* tickets.clearBranch("org", "user-1", "p", "T-1")
+      yield* tickets.update("org", "user-1", "p", "T-1", { title: "Renamed" })
+      const result = yield* tickets.listGitStates("org", "user-1", "p")
+      expect(docs.documents.get("T-1")).toMatchObject({
+        branch: null,
+        branchAutoLinkDisabled: true,
+        title: "Renamed"
+      })
+      expect(result.states["T-1"]).toEqual({
+        tag: "no_branch",
+        baseBranch: "main"
+      })
+      yield* tickets.attachBranch("org", "user-1", "p", "T-1", {
+        name: "feat/T-1"
+      })
+      expect(docs.documents.get("T-1")).toMatchObject({
+        branch: "feat/T-1",
+        branchAutoLinkDisabled: false
+      })
+    }).pipe(Effect.provide(layer))
+  }
+)
+
+it.effect(
+  "automatic linking does not overwrite a manual link made during discovery",
+  () => {
+    const docs = makeFakeTicketDocs(["T-1"])
+    const layer = makeTicketsLayer("T", docs.layer, {
+      projects: makeFakeProjects("T", {
+        getGithubIntegration: () => Effect.succeed(githubIntegration)
+      }),
+      ticketIndex: makeFakeTicketIndex(docs.documents),
+      github: makeFakeGitHub({
+        fetchInstallationProjectStates: () =>
+          Effect.sync(() => {
+            docs.documents.set(
+              "T-1",
+              makeTicketDocument("T-1", { branch: "manual-branch" })
+            )
+            return {
+              defaultBranch: "main",
+              existingBranches: new Set(["feat/T-1"]),
+              prByBranch: new Map()
+            }
+          })
+      })
+    })
+    return Effect.gen(function* () {
+      const tickets = yield* Tickets
+      const result = yield* tickets.listGitStates("org", "user-1", "p")
+      expect(docs.documents.get("T-1")?.branch).toBe("manual-branch")
+      expect(result.states["T-1"]).toEqual({
+        tag: "branch_pending",
+        name: "manual-branch",
+        baseBranch: "main"
+      })
+    }).pipe(Effect.provide(layer))
+  }
+)
+
+it.effect("reserved repository branches require manual attachment", () => {
+  const docs = makeFakeTicketDocs(["T-1"])
+  const layer = makeTicketsLayer("T", docs.layer, {
+    projects: makeFakeProjects("T", {
+      getGithubIntegration: () => Effect.succeed(githubIntegration)
+    }),
+    ticketIndex: makeFakeTicketIndex(docs.documents, {
+      isRepositoryBranchAttached: (repoId, branch) => {
+        expect(repoId).toBe("repo-1")
+        expect(branch).toBe("feat/T-1")
+        return Effect.succeed(true)
+      }
+    }),
+    github: makeFakeGitHub({
+      fetchInstallationProjectStates: () =>
+        Effect.succeed({
+          defaultBranch: "main",
+          existingBranches: new Set(["feat/T-1"]),
+          prByBranch: new Map()
+        }),
+      branchExistsInstallation: () => Effect.succeed(true)
+    })
+  })
+  return Effect.gen(function* () {
+    const tickets = yield* Tickets
+    const result = yield* tickets.listGitStates("org", "user-1", "p")
+    expect(result.states["T-1"].tag).toBe("no_branch")
+    expect(result.changedTicketIds).toEqual([])
+    expect(docs.documents.get("T-1")?.branch).toBeNull()
+    yield* tickets.attachBranch("org", "user-1", "p", "T-1", {
+      name: "feat/T-1"
+    })
+    expect(docs.documents.get("T-1")?.branch).toBe("feat/T-1")
+  }).pipe(Effect.provide(layer))
+})
+
+it.effect(
+  "concurrent projects cannot automatically claim the same branch",
+  () =>
+    Effect.gen(function* () {
+      const scansReady = yield* Deferred.make<void>()
+      const checkStarted = yield* Deferred.make<void>()
+      const releaseCheck = yield* Deferred.make<void>()
+      const documents = new Map([
+        ["a", makeTicketDocument("T-1")],
+        ["b", makeTicketDocument("T-1")]
+      ])
+      let scans = 0
+      let checks = 0
+      const docs = makeFakeTicketDocs([])
+      const layer = makeTicketsLayer(
+        "T",
+        Layer.succeed(TicketDocs, {
+          ...docs.service,
+          read: (_org, slug) => Effect.succeed(documents.get(slug)!),
+          write: (_org, slug, _id, document) =>
+            Effect.sync(() => {
+              documents.set(slug, document)
+            })
+        }),
+        {
+          projects: makeFakeProjects("T", {
+            getGithubIntegration: (_org, _user, slug) =>
+              Effect.succeed({
+                ...githubIntegration,
+                projectId: slug,
+                projectSlug: slug
+              })
+          }),
+          ticketIndex: makeFakeTicketIndex(new Map(), {
+            projectFor: (orgSlug, slug) =>
+              Effect.succeed({
+                orgSlug,
+                organizationId: orgSlug,
+                projectId: slug,
+                projectSlug: slug
+              }),
+            list: (project) =>
+              Effect.sync(() => [
+                entryFromDocument(documents.get(project.projectSlug)!)
+              ]),
+            isRepositoryBranchAttached: () =>
+              Effect.gen(function* () {
+                checks += 1
+                const attached = [...documents.values()].some(
+                  (doc) => doc.branch === "feat/T-1"
+                )
+                yield* Deferred.succeed(checkStarted, undefined)
+                yield* Deferred.await(releaseCheck)
+                return attached
+              }),
+            upsertTicket: () => Effect.void
+          }),
+          github: makeFakeGitHub({
+            fetchInstallationProjectStates: () =>
+              Effect.gen(function* () {
+                scans += 1
+                if (scans === 2) yield* Deferred.succeed(scansReady, undefined)
+                yield* Deferred.await(scansReady)
+                return {
+                  defaultBranch: "main",
+                  existingBranches: new Set(["feat/T-1"]),
+                  prByBranch: new Map()
+                }
+              })
+          })
+        }
+      )
+      yield* Effect.gen(function* () {
+        const tickets = yield* Tickets
+        const scans = yield* Effect.all(
+          [
+            tickets.listGitStates("org-a", "user", "a"),
+            tickets.listGitStates("org-b", "user", "b")
+          ],
+          { concurrency: 2 }
+        ).pipe(Effect.forkChild)
+        yield* Deferred.await(checkStarted)
+        yield* Effect.yieldNow
+        expect(checks).toBe(1)
+        yield* Deferred.succeed(releaseCheck, undefined)
+        const results = yield* Fiber.join(scans)
+        expect(checks).toBe(2)
+        expect(
+          [...documents.values()].filter((doc) => doc.branch === "feat/T-1")
+        ).toHaveLength(1)
+        expect(
+          results.flatMap((result) => result.changedTicketIds ?? [])
+        ).toEqual(["T-1"])
+      }).pipe(Effect.provide(layer))
+    })
+)
+
+it.effect("manual unlink waits for a webhook write and remains unlinked", () =>
+  Effect.gen(function* () {
+    const writeStarted = yield* Deferred.make<void>()
+    const releaseWrite = yield* Deferred.make<void>()
+    const docs = makeFakeTicketDocs(["T-1"])
+    docs.documents.set("T-1", makeTicketDocument("T-1", { branch: "feat/T-1" }))
+    const coordinatedDocs: TicketDocsShape = {
+      ...docs.service,
+      write: (org, slug, id, document) =>
+        Effect.gen(function* () {
+          if (document.pr === 42) {
+            yield* Deferred.succeed(writeStarted, undefined)
+            yield* Deferred.await(releaseWrite)
+          }
+          yield* docs.service.write(org, slug, id, document)
+        })
+    }
+    const indexLayer = makeFakeTicketIndex(docs.documents)
+    const layer = makeTicketsLayer(
+      "T",
+      Layer.succeed(TicketDocs, coordinatedDocs),
+      {
+        projects: makeFakeProjects("T", {
+          getGithubIntegration: () => Effect.succeed(githubIntegration)
+        }),
+        ticketIndex: indexLayer
+      }
+    )
+    return yield* Effect.gen(function* () {
+      const tickets = yield* Tickets
+      const index = yield* TicketIndex
+      const ticketDocumentLock = yield* TicketDocumentLock.TicketDocumentLock
+      const webhook = yield* Effect.forkChild(
+        applyPullRequestWebhookToTicket(
+          {
+            ticketDocs: coordinatedDocs,
+            ticketIndex: index,
+            ticketDocumentLock
+          },
+          {
+            orgSlug: "org",
+            projectSlug: "p",
+            organizationId: "org-1",
+            projectId: "project-1",
+            ticketId: "T-1",
+            branch: "feat/T-1"
+          },
+          {
+            installationId: "123",
+            repositoryId: "repo-1",
+            branch: "feat/T-1",
+            number: 42,
+            state: "open"
+          },
+          "delivery-1"
+        )
+      )
+      yield* Deferred.await(writeStarted)
+      const unlink = yield* Effect.forkChild(
+        tickets.clearBranch("org", "user-1", "p", "T-1")
+      )
+      yield* Effect.yieldNow
+      yield* Deferred.succeed(releaseWrite, undefined)
+      yield* Fiber.join(webhook)
+      yield* Fiber.join(unlink)
+      expect(docs.documents.get("T-1")).toMatchObject({
+        branch: null,
+        pr: null,
+        prState: null,
+        branchAutoLinkDisabled: true
+      })
+    }).pipe(Effect.provide(Layer.merge(layer, indexLayer)))
+  }).pipe(Effect.scoped)
+)
+
+it.effect(
+  "rate-limited refresh keeps the persisted branch and exposes retry time",
+  () => {
+    const docs = makeFakeTicketDocs(["T-1"])
+    docs.documents.set("T-1", makeTicketDocument("T-1", { branch: "feat/T-1" }))
+    const layer = makeTicketsLayer("T", docs.layer, {
+      projects: makeFakeProjects("T", {
+        getGithubIntegration: () => Effect.succeed(githubIntegration)
+      }),
+      ticketIndex: makeFakeTicketIndex(docs.documents),
+      github: makeFakeGitHub({
+        fetchInstallationProjectStates: () =>
+          Effect.fail(new RateLimited({ resetAt: 1234 }))
+      })
+    })
+    return Effect.gen(function* () {
+      const tickets = yield* Tickets
+      const result = yield* tickets.listGitStates("org", "user-1", "p")
+      expect(result).toMatchObject({
+        refreshStatus: "rate_limited",
+        retryAt: 1234,
+        changedTicketIds: [],
+        transitioned: []
+      })
+      expect(result.states["T-1"]).toEqual({
+        tag: "branch_pending",
+        name: "feat/T-1",
+        baseBranch: "main"
+      })
+    }).pipe(Effect.provide(layer))
+  }
+)
+
+it.effect(
+  "stale GitHub snapshots display known PRs without applying transitions or automatic links",
+  () => {
+    const docs = makeFakeTicketDocs(["T-1", "T-2"])
+    docs.documents.set("T-1", makeTicketDocument("T-1", { branch: "feat/T-1" }))
+    const layer = makeTicketsLayer("T", docs.layer, {
+      projects: makeFakeProjects("T", {
+        getGithubIntegration: () => Effect.succeed(githubIntegration)
+      }),
+      ticketIndex: makeFakeTicketIndex(docs.documents),
+      github: makeFakeGitHub({
+        fetchInstallationProjectStates: () =>
+          Effect.succeed({
+            defaultBranch: "main",
+            refreshStatus: "stale",
+            existingBranches: new Set(["feat/T-1", "feat/T-2"]),
+            prByBranch: new Map([
+              [
+                "feat/T-1",
+                {
+                  headRefName: "feat/T-1",
+                  baseRefName: "main",
+                  state: "merged",
+                  draft: false,
+                  number: 42,
+                  url: "https://github.com/acme/app/pull/42",
+                  title: "Merged",
+                  mergedAt: null,
+                  checks: "passing"
+                }
+              ]
+            ])
+          })
+      })
+    })
+    return Effect.gen(function* () {
+      const tickets = yield* Tickets
+      const result = yield* tickets.listGitStates("org", "user-1", "p")
+      expect(result).toMatchObject({
+        refreshStatus: "stale",
+        changedTicketIds: [],
+        transitioned: []
+      })
+      expect(result.states["T-1"]).toMatchObject({
+        tag: "pr_merged",
+        number: 42
+      })
+      expect(docs.documents.get("T-1")).toMatchObject({
+        status: ticketStatus("todo"),
+        pr: null
+      })
+      expect(docs.documents.get("T-2")?.branch).toBeNull()
+    }).pipe(Effect.provide(layer))
+  }
+)
+
+it.effect(
+  "an older cached GitHub snapshot cannot undo a newer persisted merge",
+  () => {
+    const docs = makeFakeTicketDocs(["T-1"])
+    docs.documents.set(
+      "T-1",
+      makeTicketDocument("T-1", {
+        branch: "feat/T-1",
+        pr: 42,
+        prState: "merged",
+        lastTransitionedPr: 42,
+        status: ticketStatus("done")
+      })
+    )
+    const layer = makeTicketsLayer("T", docs.layer, {
+      projects: makeFakeProjects("T", {
+        getGithubIntegration: () => Effect.succeed(githubIntegration)
+      }),
+      ticketIndex: makeFakeTicketIndex(docs.documents),
+      github: makeFakeGitHub({
+        fetchInstallationProjectStates: () =>
+          Effect.succeed({
+            defaultBranch: "main",
+            fetchedAt: isoDate("2026-03-31T23:59:00Z"),
+            existingBranches: new Set(["feat/T-1"]),
+            prByBranch: new Map([
+              [
+                "feat/T-1",
+                {
+                  headRefName: "feat/T-1",
+                  baseRefName: "main",
+                  state: "open",
+                  draft: false,
+                  number: 42,
+                  url: "https://github.com/acme/app/pull/42",
+                  title: "Open",
+                  mergedAt: null,
+                  checks: "passing"
+                }
+              ]
+            ])
+          })
+      })
+    })
+    return Effect.gen(function* () {
+      const tickets = yield* Tickets
+      const result = yield* tickets.listGitStates("org", "user-1", "p")
+      expect(result.changedTicketIds).toEqual([])
+      expect(result.states["T-1"]).toMatchObject({
+        tag: "pr_merged",
+        number: 42
+      })
+      expect(docs.documents.get("T-1")?.prState).toBe("merged")
+    }).pipe(Effect.provide(layer))
+  }
+)
+
 it.effect("createBranch writes markdown and upserts the ticket index", () => {
   const docs = makeFakeTicketDocs(["T-1"])
+  docs.documents.set(
+    "T-1",
+    makeTicketDocument("T-1", { branchAutoLinkDisabled: true })
+  )
   const index = makeRecordingTicketIndex(docs.documents)
   const createdBranches: Array<{
     readonly owner: string
@@ -498,6 +1096,7 @@ it.effect("createBranch writes markdown and upserts the ticket index", () => {
     })
 
     expect(updated.branch).toBe("feat/T-1")
+    expect(docs.documents.get("T-1")?.branchAutoLinkDisabled).toBe(false)
     expect(docs.documents.get("T-1")?.branch).toBe("feat/T-1")
     expect(createdBranches).toEqual([
       {

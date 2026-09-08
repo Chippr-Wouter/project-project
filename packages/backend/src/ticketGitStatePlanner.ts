@@ -4,7 +4,47 @@ import type {
   TicketStatus,
   TransitionRecord
 } from "@projectproject/shared"
+import { ticketIdsInBranch } from "./branchTicketId"
 import type { RawProjectStates } from "./Services/GitHub"
+
+type AutomaticBranchLinkTicket = Pick<TicketGitStateInput, "id" | "branch"> & {
+  readonly archivedAt?: Date | null
+}
+
+export function planAutomaticBranchLinks(
+  tickets: ReadonlyArray<AutomaticBranchLinkTicket>,
+  branches: ReadonlySet<string>,
+  defaultBranch: string
+): ReadonlyMap<TicketId, string> {
+  const attachedBranches = new Set(
+    tickets.flatMap((ticket) => (ticket.branch === null ? [] : [ticket.branch]))
+  )
+  const eligibleIds = new Set(
+    tickets
+      .filter((ticket) => ticket.branch === null && ticket.archivedAt == null)
+      .map((ticket) => ticket.id)
+  )
+  const candidates = new Map<TicketId, Set<string>>()
+
+  for (const branch of branches) {
+    if (branch === defaultBranch || attachedBranches.has(branch)) continue
+    const ids = ticketIdsInBranch(branch)
+    if (ids.size !== 1) continue
+    const id = ids.values().next().value
+    if (id === undefined || !eligibleIds.has(id)) continue
+    const branchesForId = candidates.get(id) ?? new Set<string>()
+    branchesForId.add(branch)
+    candidates.set(id, branchesForId)
+  }
+
+  const links = new Map<TicketId, string>()
+  for (const [id, candidateBranches] of candidates) {
+    if (candidateBranches.size !== 1) continue
+    const [branch] = candidateBranches
+    if (branch !== undefined) links.set(id, branch)
+  }
+  return links
+}
 
 export interface TicketGitStateInput {
   readonly id: TicketId
@@ -40,6 +80,14 @@ export function planPullRequestWebhookTicket(
   ticket: TicketGitStateInput,
   pr: PullRequestWebhookInput
 ): TicketGitStateWrite | null {
+  if (
+    ticket.pr === pr.number &&
+    ticket.prState === "merged" &&
+    pr.state !== "merged"
+  ) {
+    return null
+  }
+
   if (pr.state === "merged") {
     if (ticket.status !== "done" && ticket.lastTransitionedPr !== pr.number) {
       return {

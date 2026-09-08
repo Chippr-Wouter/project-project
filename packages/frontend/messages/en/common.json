@@ -14,6 +14,7 @@
   "error_everhour_config_missing": "Everhour encryption is not configured on the server.",
   "error_everhour_rate_limited": "Everhour rate limited the sync. Try again in {seconds} seconds.",
   "error_everhour_upstream": "Everhour returned an error: {message}",
+  "error_github_rate_limited": "GitHub rate limited this request. Try again later.",
   "error_mention_invalid": "A mention in this content doesn't point to a real person or ticket.",
   "error_page_body": "An unexpected error stopped this page from loading. Try again, or head back.",
   "error_page_code": "500",

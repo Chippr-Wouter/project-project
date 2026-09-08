@@ -19,6 +19,7 @@ import {
   ProjectOwnerRemovalBlocked,
   ProjectKey,
   RepoGone,
+  RateLimited,
   Role,
   Validation
 } from "@projectproject/shared"
@@ -55,6 +56,7 @@ import { TicketIndex } from "../Services/TicketIndex"
 import type { MarkdownError } from "../Services/Markdown"
 import type { MalformedTicketDocument } from "../Services/TicketDocs"
 import { TicketDocs } from "../Services/TicketDocs"
+import * as TicketDocumentLock from "../ticketDocumentLock"
 import { Users } from "../Services/Users"
 import {
   Projects,
@@ -128,6 +130,7 @@ export const ProjectsLive = Layer.effect(
     const ticketIndex = yield* TicketIndex
     const users = yield* Users
     const github = yield* GitHub
+    const ticketDocumentLock = yield* TicketDocumentLock.TicketDocumentLock
 
     const orgIdFromSlug = (orgSlug: string): Effect.Effect<string, NotFound> =>
       db.query.organization
@@ -975,25 +978,30 @@ export const ProjectsLive = Layer.effect(
         yield* Effect.forEach(
           ids,
           (id) =>
-            Effect.gen(function* () {
-              const ticket = yield* ticketDocs
-                .read(orgSlug, slug, id)
-                .pipe(Effect.catchTag("NotFound", () => Effect.succeed(null)))
-              if (
-                ticket === null ||
-                ticket.status === "done" ||
-                !ticket.assignees.includes(userId)
-              ) {
-                return
-              }
-              const next = {
-                ...ticket,
-                assignees: ticket.assignees.filter((id) => id !== userId),
-                updatedAt: yield* DateTime.nowAsDate
-              }
-              yield* ticketDocs.write(orgSlug, slug, id, next)
-              yield* ticketIndex.upsertTicket(project, next)
-            }),
+            ticketDocumentLock.withTicketDocumentLock(
+              orgSlug,
+              slug,
+              id,
+              Effect.gen(function* () {
+                const ticket = yield* ticketDocs
+                  .read(orgSlug, slug, id)
+                  .pipe(Effect.catchTag("NotFound", () => Effect.succeed(null)))
+                if (
+                  ticket === null ||
+                  ticket.status === "done" ||
+                  !ticket.assignees.includes(userId)
+                ) {
+                  return
+                }
+                const next = {
+                  ...ticket,
+                  assignees: ticket.assignees.filter((id) => id !== userId),
+                  updatedAt: yield* DateTime.nowAsDate
+                }
+                yield* ticketDocs.write(orgSlug, slug, id, next)
+                yield* ticketIndex.upsertTicket(project, next)
+              })
+            ),
           { concurrency: 8 }
         )
       })
@@ -1010,41 +1018,46 @@ export const ProjectsLive = Layer.effect(
         yield* Effect.forEach(
           ids,
           (id) =>
-            Effect.gen(function* () {
-              const ticket = yield* ticketDocs.read(orgSlug, slug, id).pipe(
-                Effect.catchTag("NotFound", () => Effect.succeed(null)),
-                Effect.catchTag("MalformedTicketDocument", (error) =>
-                  Effect.logWarning(
-                    "Skipping unreadable ticket pr metadata"
-                  ).pipe(
-                    Effect.annotateLogs({
-                      orgSlug,
-                      slug,
-                      ticketId: id,
-                      error
-                    }),
-                    Effect.as(null)
+            ticketDocumentLock.withTicketDocumentLock(
+              orgSlug,
+              slug,
+              id,
+              Effect.gen(function* () {
+                const ticket = yield* ticketDocs.read(orgSlug, slug, id).pipe(
+                  Effect.catchTag("NotFound", () => Effect.succeed(null)),
+                  Effect.catchTag("MalformedTicketDocument", (error) =>
+                    Effect.logWarning(
+                      "Skipping unreadable ticket pr metadata"
+                    ).pipe(
+                      Effect.annotateLogs({
+                        orgSlug,
+                        slug,
+                        ticketId: id,
+                        error
+                      }),
+                      Effect.as(null)
+                    )
                   )
                 )
-              )
-              if (
-                ticket === null ||
-                (ticket.pr === null &&
-                  ticket.prState === null &&
-                  ticket.lastTransitionedPr === null)
-              ) {
-                return
-              }
-              const next = {
-                ...ticket,
-                pr: null,
-                prState: null,
-                lastTransitionedPr: null,
-                updatedAt: yield* DateTime.nowAsDate
-              }
-              yield* ticketDocs.write(orgSlug, slug, id, next)
-              yield* ticketIndex.upsertTicket(project, next)
-            }),
+                if (
+                  ticket === null ||
+                  (ticket.pr === null &&
+                    ticket.prState === null &&
+                    ticket.lastTransitionedPr === null)
+                ) {
+                  return
+                }
+                const next = {
+                  ...ticket,
+                  pr: null,
+                  prState: null,
+                  lastTransitionedPr: null,
+                  updatedAt: yield* DateTime.nowAsDate
+                }
+                yield* ticketDocs.write(orgSlug, slug, id, next)
+                yield* ticketIndex.upsertTicket(project, next)
+              })
+            ),
           { concurrency: 8 }
         )
       })
@@ -1578,6 +1591,7 @@ export const ProjectsLive = Layer.effect(
       | GitHubTokenExpired
       | GitHubScopeInsufficient
       | RepoGone
+      | RateLimited
       | GitHubError
       | MarkdownError
     > =>

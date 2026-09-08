@@ -27,6 +27,7 @@ import {
   type TicketDocsShape,
   type TicketDocument
 } from "./TicketDocs"
+import * as TicketDocumentLock from "../ticketDocumentLock"
 
 const isoDate = (s: string) => DateTime.toDate(DateTime.makeUnsafe(s))
 const setTestNow = TestClock.setTime(
@@ -169,6 +170,7 @@ function makeFakeDocs(initial?: {
     findTicketIdsByTag: () => Effect.succeed([]),
     findTicketIdsByStatus: () => Effect.succeed([]),
     findTicketsByBranch: () => Effect.succeed([]),
+    isRepositoryBranchAttached: () => Effect.succeed(false),
     upsertTicket: (_project, document) =>
       Effect.sync(() => {
         ticketsById.set(document.id, document)
@@ -287,7 +289,8 @@ function makeGroupsLayer(
     Layer.provide(fakeDocs.groupLayer),
     Layer.provide(fakeDocs.ticketLayer),
     Layer.provide(fakeDocs.ticketIndexLayer),
-    Layer.provide(makeFakeProjects(projects))
+    Layer.provide(makeFakeProjects(projects)),
+    Layer.provide(TicketDocumentLock.layer)
   )
 }
 
@@ -1216,7 +1219,8 @@ it.effect(
       Layer.provide(fakeDocs.groupLayer),
       Layer.provide(fakeDocs.ticketLayer),
       Layer.provide(fakeDocs.ticketIndexLayer),
-      Layer.provide(makeFakeProjects({ role: "admin" }))
+      Layer.provide(makeFakeProjects({ role: "admin" })),
+      Layer.provide(TicketDocumentLock.layer)
     )
     return Effect.gen(function* () {
       const groups = yield* Groups
