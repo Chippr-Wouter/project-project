@@ -74,6 +74,17 @@ const withClient = <A>(
 export const S3StorageLive = Layer.succeed(
   S3Storage,
   S3Storage.of({
+    putObject: (connection, key, contentType, bytes) =>
+      withClient(connection, async (client) => {
+        await client.send(
+          new PutObjectCommand({
+            Bucket: connection.bucket,
+            Key: key,
+            ContentType: contentType,
+            Body: bytes
+          })
+        )
+      }),
     presignPut: (connection, key, contentType, expiresInSeconds) =>
       withClient(connection, (client) =>
         getSignedUrl(

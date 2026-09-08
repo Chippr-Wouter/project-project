@@ -72,6 +72,7 @@ import * as Redacted from "effect/Redacted"
 import { createHmac, timingSafeEqual } from "node:crypto"
 import { projectIndex } from "./db/schema"
 import { AttachmentsHandlerLive } from "./handlers/attachments"
+import { attachmentUploadRoute } from "./http/attachmentUploadRoutes"
 import { attachmentRoutes } from "./http/attachmentRoutes"
 import { AuthHandlerLive } from "./handlers/auth"
 import { CommentsHandlerLive } from "./handlers/comments"
@@ -411,6 +412,7 @@ const RouteLive = Layer.mergeAll(
     "/api/attachments/:orgSlug/:attachmentId",
     attachmentRoutes
   ),
+  HttpRouter.add("POST", "/api/attachment-uploads", attachmentUploadRoute),
   HttpRouter.add("*", "/mcp", mcpRoute),
   Layer.mergeAll(ApiLive, SwaggerLive).pipe(Layer.provide(ApiRouterLive))
 )

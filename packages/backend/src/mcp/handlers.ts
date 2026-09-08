@@ -21,7 +21,7 @@ import {
   type UpdateGroupInput,
   type UpdateTicketInput
 } from "@projectproject/shared"
-import * as Attachments from "../Services/Attachments"
+import * as AttachmentUploads from "../Services/AttachmentUploads"
 import { Users } from "../Services/Users"
 import { BetterAuth } from "../Services/BetterAuth"
 import { Comments } from "../Services/Comments"
@@ -81,7 +81,7 @@ const dieInternal = <A, E, R>(
 // CurrentUser is intentionally absent — the dispatcher provides it per call
 // via `Effect.provideService`, so it shouldn't appear in the runtime's R.
 type Env =
-  | Attachments.Attachments
+  | AttachmentUploads.AttachmentUploads
   | Users
   | BetterAuth
   | Comments
@@ -346,52 +346,18 @@ const update_ticket = (
     return yield* tickets.update(orgSlug, current.id, projectSlug, id, payload)
   })
 
-const requireAttachmentTicket = Effect.fn("requireAttachmentTicket")(
-  function* (input: {
-    orgSlug: string
-    projectSlug: string
-    ticketId: TicketId
-  }) {
-    const current = yield* CurrentUser
-    const projects = yield* Projects.Projects
-    yield* projects.requireMember(input.orgSlug, current.id, input.projectSlug)
-    const docs = yield* TicketDocs.TicketDocs
-    yield* docs.read(input.orgSlug, input.projectSlug, input.ticketId)
-    return current
-  }
-)
-
 const prepare_ticket_attachment = Effect.fn("prepare_ticket_attachment")(
   function* (
     input: Schema.Schema.Type<typeof McpTools.prepare_ticket_attachment.input>
   ) {
-    const current = yield* requireAttachmentTicket(input)
-    const attachments = yield* Attachments.Attachments
+    const current = yield* CurrentUser
+    const uploads = yield* AttachmentUploads.AttachmentUploads
     const { orgSlug, projectSlug, ticketId, ...payload } = input
-    return yield* attachments.prepare(
-      orgSlug,
-      projectSlug,
-      ticketId,
+    return yield* uploads.prepare(
+      { orgSlug, projectSlug, ticketId },
       current.id,
       payload
     )
-  }
-)
-
-const commit_ticket_attachment = Effect.fn("commit_ticket_attachment")(
-  function* (
-    input: Schema.Schema.Type<typeof McpTools.commit_ticket_attachment.input>
-  ) {
-    const current = yield* requireAttachmentTicket(input)
-    const attachments = yield* Attachments.Attachments
-    const { id, url, filename, contentType } = yield* attachments.commit(
-      input.orgSlug,
-      input.projectSlug,
-      input.ticketId,
-      current.id,
-      input.attachmentId
-    )
-    return { id, url, filename, contentType }
   }
 )
 
@@ -567,7 +533,6 @@ export const handlers: HandlersMap<Env> = {
   create_ticket: (i) => dieInternal(create_ticket(i)),
   update_ticket: (i) => dieInternal(update_ticket(i)),
   prepare_ticket_attachment: (i) => dieInternal(prepare_ticket_attachment(i)),
-  commit_ticket_attachment: (i) => dieInternal(commit_ticket_attachment(i)),
   create_comment: (i) => dieInternal(create_comment(i)),
   attach_branch: (i) => dieInternal(attach_branch(i)),
   rebuild_ticket_index: (i) => dieInternal(rebuild_ticket_index(i)),

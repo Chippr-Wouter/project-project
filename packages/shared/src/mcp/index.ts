@@ -1,6 +1,5 @@
 import * as Schema from "effect/Schema"
 import {
-  AttachmentNotUploaded,
   AttachmentTooLarge,
   AttachmentTypeRejected,
   StorageConfigMissing,
@@ -21,8 +20,6 @@ import {
   Validation
 } from "../errors"
 import {
-  Attachment,
-  AttachmentId,
   PrepareAttachmentInput,
   PrepareAttachmentResult
 } from "../schemas/Attachment"
@@ -270,12 +267,16 @@ export const McpTools = {
       "Prepare an attachment upload for an existing ticket. Requires organization storage " +
       "and project membership. Accepts non-empty files up to 25 MiB: PNG, JPEG, GIF, " +
       "WebP, AVIF, PDF, ZIP, gzip, or tar. Supply filename, contentType, and exact byteSize. " +
-      "Upload the local file yourself: curl --fail --upload-file '/path/to/file' " +
-      "--header 'Content-Type: <contentType>' '<uploadUrl>'. The URL expires at expiresAt; " +
-      "prepare again if it expires. After a successful PUT, call commit_ticket_attachment " +
-      "with the returned id as attachmentId. Do not send file paths or base64 as file content. " +
-      "Does not modify the ticket description. If storage is not connected, connect it " +
-      "in organization settings and retry.",
+      "POST the local file to the returned uploadUrl: curl --fail-with-body --request POST " +
+      "--data-binary '@/path/to/file' --header 'Content-Type: <contentType>' '<uploadUrl>'. " +
+      "The HTTP response returns the committed id, permanent url, filename, and contentType; " +
+      "no separate commit call is needed. The uploadUrl is a temporary credential: " +
+      "use it only for the upload, and prepare again if it expires. Retrying a completed " +
+      "upload returns its metadata without replacing its bytes. After a successful upload, " +
+      "read the current ticket and use update_ticket to insert ![alt](url) for images or " +
+      "[filename](url) for files, preserving existing content. Never save uploadUrl in markdown. " +
+      "Does not modify the description automatically. Do not send file paths or base64 as " +
+      "file content. If storage is not connected, connect it in organization settings and retry.",
     input: Schema.Struct({
       orgSlug: Slug,
       projectSlug: Slug,
@@ -287,39 +288,6 @@ export const McpTools = {
       Unauthorized,
       NotFound,
       Forbidden,
-      AttachmentTooLarge,
-      AttachmentTypeRejected,
-      StorageNotConnected,
-      StorageConfigMissing,
-      StorageError
-    ] as const
-  },
-  commit_ticket_attachment: {
-    description:
-      "Commit a ticket attachment after uploading its bytes to the prepared uploadUrl. " +
-      "Use the same organization, project, and ticket as preparation. Calling before " +
-      "a successful PUT fails with AttachmentNotUploaded; finish the upload before retrying. " +
-      "A successful commit may be retried. Returns id, permanent url, filename, and contentType. " +
-      "Does not modify the ticket description. Read the current ticket and use update_ticket " +
-      "to insert ![alt](url) for images or [filename](url) for files, preserving existing content. " +
-      "Never use the temporary uploadUrl in markdown.",
-    input: Schema.Struct({
-      orgSlug: Slug,
-      projectSlug: Slug,
-      ticketId: TicketId,
-      attachmentId: AttachmentId
-    }),
-    output: Schema.Struct({
-      id: Attachment.fields.id,
-      url: Attachment.fields.url,
-      filename: Attachment.fields.filename,
-      contentType: Attachment.fields.contentType
-    }),
-    errors: [
-      Unauthorized,
-      NotFound,
-      Forbidden,
-      AttachmentNotUploaded,
       AttachmentTooLarge,
       AttachmentTypeRejected,
       StorageNotConnected,

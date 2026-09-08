@@ -62,6 +62,12 @@ export interface S3ObjectHead {
 }
 
 export interface S3StorageShape {
+  readonly putObject: (
+    connection: S3Connection,
+    key: string,
+    contentType: string,
+    bytes: Uint8Array
+  ) => Effect.Effect<void, S3Unavailable>
   readonly presignPut: (
     connection: S3Connection,
     key: string,

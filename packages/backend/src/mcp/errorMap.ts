@@ -69,7 +69,7 @@ export const mapToolError = (e: unknown): McpToolErrorResult => {
       )
     case "AttachmentNotUploaded":
       return text(
-        "AttachmentNotUploaded: The file has not been uploaded. Complete the PUT to uploadUrl, then retry commit_ticket_attachment. If the upload URL expired, prepare a new upload."
+        "AttachmentNotUploaded: The uploaded object could not be verified. Retry the POST to uploadUrl. If the upload URL expired, prepare a new upload."
       )
     case "AttachmentTooLarge":
       return text(
