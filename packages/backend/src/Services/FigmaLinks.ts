@@ -38,6 +38,8 @@ export const shouldBacklink = (ref: {
 
 export const FIGMA_THUMBNAIL_URL_PREFIX = "/api/figma-thumbnails"
 
+export const FIGMA_ORPHAN_GRACE_MS = 7 * 24 * 60 * 60 * 1000
+
 export const figmaThumbnailUrl = (orgSlug: string, linkId: string): string =>
   `${FIGMA_THUMBNAIL_URL_PREFIX}/${orgSlug}/${linkId}`
 
@@ -86,6 +88,11 @@ export interface FigmaLinksShape {
     | StorageConfigMissing
     | StorageError
   >
+  readonly orphanProject: (
+    orgSlug: string,
+    slug: string
+  ) => Effect.Effect<{ readonly orphaned: number }>
+  readonly reapOnce: () => Effect.Effect<{ readonly deleted: number }>
 }
 
 export class FigmaLinks extends Context.Service<FigmaLinks, FigmaLinksShape>()(

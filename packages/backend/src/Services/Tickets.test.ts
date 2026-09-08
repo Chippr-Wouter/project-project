@@ -211,6 +211,8 @@ const makeFakeFigmaLinks = (
     reconcileTicket: () => Effect.void,
     listForTicket: () => unexpected("FigmaLinks.listForTicket"),
     resolveThumbnailUrl: () => unexpected("FigmaLinks.resolveThumbnailUrl"),
+    orphanProject: () => unexpected("FigmaLinks.orphanProject"),
+    reapOnce: () => unexpected("FigmaLinks.reapOnce"),
     ...overrides
   } satisfies FigmaLinksShape)
 

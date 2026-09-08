@@ -16,6 +16,7 @@ import { CurrentOrg } from "../Services/CurrentOrg"
 import { GitHub } from "../Services/GitHub"
 import { GitHubIntegrations } from "../Services/GitHubIntegrations"
 import { EverhourIntegrations } from "../Services/EverhourIntegrations"
+import { FigmaLinks } from "../Services/FigmaLinks"
 import { Projects } from "../Services/Projects"
 import { Tickets } from "../Services/Tickets"
 
@@ -95,6 +96,8 @@ export const ProjectsHandlerLive = HttpApiBuilder.group(
           const org = yield* currentOrg.resolve(params.orgSlug, user.id)
           const projects = yield* Projects
           const attachments = yield* Attachments
+          const figmaLinks = yield* FigmaLinks
+          yield* figmaLinks.orphanProject(org.orgSlug, params.slug)
           yield* projects.remove(org.orgSlug, user.id, params.slug)
           yield* attachments.orphanProject(org.orgSlug, params.slug)
         }).pipe(Effect.catchTag("MarkdownError", (cause) => Effect.die(cause)))

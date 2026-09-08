@@ -772,6 +772,10 @@ export const figmaLinkIndex = pgTable(
     name: text("name"),
     fileName: text("file_name"),
     thumbnailKey: text("thumbnail_key"),
+    orphanedAt: timestamp("orphaned_at", {
+      withTimezone: true,
+      precision: 3
+    }),
     lastModified: timestamp("last_modified", { withTimezone: true }),
     fetchedAt: timestamp("fetched_at", { withTimezone: true }),
     lastCheckStatus: text("last_check_status", { enum: ["ok", "error"] }),
@@ -796,7 +800,9 @@ export const figmaReference = pgTable(
       .notNull()
       .references(() => figmaLinkIndex.id, { onDelete: "cascade" }),
     orgSlug: text("org_slug").notNull(),
-    projectSlug: text("project_slug").notNull(),
+    projectSlug: text("project_slug")
+      .notNull()
+      .references(() => projectIndex.slug, { onDelete: "cascade" }),
     ticketId: text("ticket_id").notNull(),
     devResourceId: text("dev_resource_id"),
     createdAt: timestamp("created_at", { withTimezone: true, precision: 3 })

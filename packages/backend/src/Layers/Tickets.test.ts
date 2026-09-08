@@ -145,7 +145,9 @@ const FakeAttachments = Layer.succeed(Attachments, {
 const FakeFigmaLinks = Layer.succeed(FigmaLinks, {
   reconcileTicket: () => Effect.void,
   listForTicket: () => unexpected("FigmaLinks.listForTicket"),
-  resolveThumbnailUrl: () => unexpected("FigmaLinks.resolveThumbnailUrl")
+  resolveThumbnailUrl: () => unexpected("FigmaLinks.resolveThumbnailUrl"),
+  orphanProject: () => unexpected("FigmaLinks.orphanProject"),
+  reapOnce: () => unexpected("FigmaLinks.reapOnce")
 } satisfies FigmaLinksShape)
 
 const FakeDb = Layer.succeed(Db, {

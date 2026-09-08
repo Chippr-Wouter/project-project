@@ -6,7 +6,8 @@ import {
   type FigmaLinkMetadata,
   type FigmaRef
 } from "@projectproject/shared"
-import { and, asc, eq, inArray, isNull } from "drizzle-orm"
+import { and, asc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm"
+import * as Clock from "effect/Clock"
 import * as Cause from "effect/Cause"
 import * as Config from "effect/Config"
 import * as Data from "effect/Data"
@@ -26,6 +27,7 @@ import { FigmaIntegrations } from "../Services/FigmaIntegrations"
 import {
   devResourceName,
   figmaThumbnailUrl,
+  FIGMA_ORPHAN_GRACE_MS,
   FigmaLinks,
   planFigmaReferences,
   shouldBacklink,
@@ -129,6 +131,23 @@ export const FigmaLinksLive = Layer.effect(
     const orgStorage = yield* OrgStorage
     const projects = yield* Projects
     const s3 = yield* S3Storage
+
+    const markOrphaned = (linkIds: ReadonlyArray<string>) =>
+      Effect.gen(function* () {
+        if (linkIds.length === 0) return []
+        const now = yield* DateTime.nowAsDate
+        const hasReference = sql`exists (select 1 from ${figmaReference} where ${figmaReference.linkId} = ${figmaLinkIndex.id})`
+        return yield* db
+          .update(figmaLinkIndex)
+          .set({ orphanedAt: now })
+          .where(
+            and(
+              inArray(figmaLinkIndex.id, [...linkIds]),
+              sql`not ${hasReference}`
+            )
+          )
+          .returning({ id: figmaLinkIndex.id })
+      })
 
     const uploadThumbnail = (
       connection: S3Connection,
@@ -385,6 +404,7 @@ export const FigmaLinksLive = Layer.effect(
                     eq(figmaReference.ticketId, ticketId)
                   )
                 )
+              yield* markOrphaned([entry.linkId])
             }).pipe(
               Effect.catchCause((cause) =>
                 Effect.logWarning(
@@ -544,6 +564,7 @@ export const FigmaLinksLive = Layer.effect(
                 inArray(figmaReference.linkId, removalsToDeleteNow)
               )
             )
+          yield* markOrphaned(removalsToDeleteNow)
         }
 
         const now = yield* DateTime.nowAsDate
@@ -601,6 +622,15 @@ export const FigmaLinksLive = Layer.effect(
                 }))
               )
               .onConflictDoNothing()
+            yield* db
+              .update(figmaLinkIndex)
+              .set({ orphanedAt: null })
+              .where(
+                inArray(
+                  figmaLinkIndex.id,
+                  added.map((entry) => entry.linkId)
+                )
+              )
           }
         }
 
@@ -758,10 +788,125 @@ export const FigmaLinksLive = Layer.effect(
           )
       })
 
+    const orphanProject: FigmaLinksShape["orphanProject"] = (orgSlug, slug) =>
+      Effect.gen(function* () {
+        const ownReferences = and(
+          eq(figmaReference.orgSlug, orgSlug),
+          eq(figmaReference.projectSlug, slug)
+        )
+        const references = yield* db
+          .select({ linkId: figmaReference.linkId })
+          .from(figmaReference)
+          .where(ownReferences)
+
+        yield* db.delete(figmaReference).where(ownReferences)
+
+        const orphaned = yield* markOrphaned(
+          references.map((reference) => reference.linkId)
+        )
+        return { orphaned: orphaned.length }
+      }).pipe(
+        Effect.catchCause((cause) =>
+          Effect.as(
+            Effect.logError("orphaning project figma links failed", cause),
+            { orphaned: 0 }
+          )
+        )
+      )
+
+    const reapOnce: FigmaLinksShape["reapOnce"] = () =>
+      Effect.gen(function* () {
+        const hasReference = sql`exists (select 1 from ${figmaReference} where ${figmaReference.linkId} = ${figmaLinkIndex.id})`
+        const nowDate = yield* DateTime.nowAsDate
+        yield* db
+          .update(figmaLinkIndex)
+          .set({ orphanedAt: nowDate })
+          .where(
+            and(isNull(figmaLinkIndex.orphanedAt), sql`not ${hasReference}`)
+          )
+
+        const rows = yield* db
+          .select({
+            id: figmaLinkIndex.id,
+            orgSlug: figmaLinkIndex.orgSlug,
+            thumbnailKey: figmaLinkIndex.thumbnailKey,
+            orphanedAt: figmaLinkIndex.orphanedAt
+          })
+          .from(figmaLinkIndex)
+          .where(isNotNull(figmaLinkIndex.orphanedAt))
+
+        const now = yield* Clock.currentTimeMillis
+        const expired = rows.filter(
+          (row): row is typeof row & { readonly orphanedAt: Date } =>
+            row.orphanedAt !== null &&
+            now - DateTime.toEpochMillis(DateTime.makeUnsafe(row.orphanedAt)) >
+              FIGMA_ORPHAN_GRACE_MS
+        )
+        let deleted = 0
+
+        for (const row of expired) {
+          const connection =
+            row.thumbnailKey === null
+              ? null
+              : yield* orgStorage
+                  .requireConnection(row.orgSlug)
+                  .pipe(Effect.result)
+          if (connection !== null && connection._tag === "Failure") {
+            yield* Effect.logError(
+              "figma link reap failed to resolve org storage",
+              { orgSlug: row.orgSlug, error: connection.failure }
+            )
+            continue
+          }
+
+          const claimed = yield* db
+            .delete(figmaLinkIndex)
+            .where(
+              and(
+                eq(figmaLinkIndex.id, row.id),
+                eq(figmaLinkIndex.orphanedAt, row.orphanedAt),
+                sql`not ${hasReference}`
+              )
+            )
+            .returning({ id: figmaLinkIndex.id })
+          if (claimed.length === 0) continue
+
+          if (row.thumbnailKey !== null && connection?._tag === "Success") {
+            const outcome = yield* s3
+              .deleteObject(connection.success, row.thumbnailKey)
+              .pipe(Effect.result)
+            if (outcome._tag === "Failure") {
+              yield* Effect.logError(
+                "figma link reap left an orphaned thumbnail in the bucket",
+                {
+                  linkId: row.id,
+                  objectKey: row.thumbnailKey,
+                  orgSlug: row.orgSlug,
+                  error: outcome.failure
+                }
+              )
+              continue
+            }
+          }
+          deleted += 1
+        }
+
+        return { deleted }
+      }).pipe(
+        Effect.catchCause((cause) =>
+          Effect.andThen(
+            Effect.logError("figma link reap failed", cause),
+            Effect.succeed({ deleted: 0 })
+          )
+        )
+      )
+
     return {
       reconcileTicket,
       listForTicket,
-      resolveThumbnailUrl
+      resolveThumbnailUrl,
+      orphanProject,
+      reapOnce
     } satisfies FigmaLinksShape
   })
 )

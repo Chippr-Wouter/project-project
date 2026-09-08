@@ -308,6 +308,7 @@ const harness = (input: {
   readonly storage?: Effect.Effect<unknown, FigmaError | StorageNotConnected>
   readonly currentOrg?: Effect.Effect<unknown, NotFound>
   readonly projectMember?: Effect.Effect<unknown, NotFound>
+  readonly s3?: Partial<Record<string, unknown>>
 }) =>
   FigmaLinksLive.pipe(
     Layer.provide(Layer.succeed(Db, input.db as never)),
@@ -345,7 +346,9 @@ const harness = (input: {
     Layer.provide(
       Layer.succeed(S3Storage, {
         presignPut: () => Effect.succeed("https://signed.example/put"),
-        presignGet: () => Effect.succeed("https://signed.example/get")
+        presignGet: () => Effect.succeed("https://signed.example/get"),
+        deleteObject: () => Effect.void,
+        ...input.s3
       } as never)
     )
   )
@@ -891,5 +894,119 @@ describe("resolveThumbnailUrl", () => {
           expect(exit.cause.toString()).toContain("StorageNotConnected")
         }
       })
+  )
+})
+
+describe("figma link lifecycle", () => {
+  it.effect("restores an orphaned link when a ticket references it again", () =>
+    Effect.gen(function* () {
+      const { calls, db } = recordingDb((sql) => {
+        if (sql.includes("project_index")) return [["org-1"]]
+        if (
+          sql.startsWith("select") &&
+          sql.includes('from "figma_link_index"')
+        ) {
+          return [["link-1", DateTime.toDate(DateTime.nowUnsafe()), "ok"]]
+        }
+        return []
+      })
+
+      yield* reconcile(harness({ db }), BODY)
+
+      expect(
+        calls.some(
+          (sql) =>
+            sql.startsWith('update "figma_link_index"') &&
+            sql.includes('"orphaned_at" = $1')
+        )
+      ).toBe(true)
+    })
+  )
+
+  it.live(
+    "marks a link orphaned when its last ticket reference is removed",
+    () =>
+      Effect.gen(function* () {
+        const { calls, db } = recordingDb((sql) =>
+          sql.includes(JOINED)
+            ? referencedLink({ fetchedAt: null, lastCheckStatus: null })
+            : []
+        )
+
+        yield* reconcile(harness({ db }), "")
+        yield* Effect.sleep("100 millis")
+
+        expect(
+          calls.some(
+            (sql) =>
+              sql.startsWith('update "figma_link_index"') &&
+              sql.includes('"orphaned_at"')
+          )
+        ).toBe(true)
+      })
+  )
+
+  it.effect("orphans links whose project is deleted", () =>
+    Effect.gen(function* () {
+      const { db } = proxyDb((sql) => {
+        if (
+          sql.startsWith("select") &&
+          sql.includes('from "figma_reference"')
+        ) {
+          return [["link-1"], ["link-2"]]
+        }
+        if (sql.startsWith('update "figma_link_index"')) {
+          return [["link-1"], ["link-2"]]
+        }
+        return []
+      })
+      const result = yield* FigmaLinks.pipe(
+        Effect.flatMap((links) => links.orphanProject("acme", "web")),
+        Effect.provide(harness({ db }))
+      )
+
+      expect(result).toEqual({ orphaned: 2 })
+    })
+  )
+
+  it.live("reaps an expired orphan and its cached thumbnail", () =>
+    Effect.gen(function* () {
+      const deleteObject = vi.fn(() => Effect.void)
+      const { db } = proxyDb((sql) => {
+        if (
+          sql.startsWith("select") &&
+          sql.includes('from "figma_link_index"')
+        ) {
+          return [
+            [
+              "link-1",
+              "acme",
+              "orgs/acme/figma/FILEKEY123/12-34.png",
+              DateTime.toDate(DateTime.makeUnsafe("2026-08-01T00:00:00.000Z"))
+            ]
+          ]
+        }
+        if (sql.startsWith('delete from "figma_link_index"')) {
+          return [["link-1"]]
+        }
+        return []
+      })
+      const result = yield* FigmaLinks.pipe(
+        Effect.flatMap((links) => links.reapOnce()),
+        Effect.provide(
+          harness({
+            db,
+            storage: Effect.succeed({ keyPrefix: null } as never),
+            s3: { deleteObject }
+          })
+        )
+      )
+
+      expect(result).toEqual({ deleted: 1 })
+      expect(deleteObject).toHaveBeenCalledWith(
+        expect.anything(),
+        "orgs/acme/figma/FILEKEY123/12-34.png"
+      )
+    })
   )
 })
