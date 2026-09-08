@@ -5,6 +5,7 @@ The ticket overview now supports checkpointed bootstrap and delta polling for th
 ## Behavior
 
 - Bootstrap returns active ticket metadata and an epoch/revision checkpoint.
+- Concurrent initial reads share a bootstrap. Its authenticated, generation-checked tickets become available before the IndexedDB write finishes; rows and checkpoint still commit atomically. A scoped FiberSet owns the background work, and reset cancels it.
 - Delta returns upserts, deleted IDs, the next checkpoint, a reset flag and a hasMore flag.
 - Poll every two seconds while the overview is mounted; also poll on window focus and online events. Overlapping triggers in a tab are coalesced while a request is running.
 - Persist changed ticket records and the checkpoint together in one IndexedDB transaction, then invalidate ticket atoms. Ordinary delta commits avoid reading or rewriting the complete stored collection; resolving a concurrent checkpoint change may rehydrate it.
@@ -96,7 +97,7 @@ Local database: PROTOTYPE-ticket-sync-v2. Its schema version 2 stores individual
 
 - No log retention/compaction or automatic epoch rotation. An operator replacing the log must change the epoch and bootstrap clients again.
 - The prototype serializes writes per project on one head row. Throughput and contention are unmeasured.
-- Bootstrap still inserts the complete collection before first display. Individual ticket records make incremental persistence cheap but increase this one-time write cost.
+- First display no longer waits for the complete bootstrap write. Reloading before it commits requires another bootstrap, and an immediate mutation's local catch-up can still wait behind that write. See [production bootstrap measurements](docs/benchmarks/t118-indexeddb-bootstrap.md).
 - Project scope remains restricted to the fixture. Account partitioning, logout cleanup, and confirmed project-access revocation are implemented; offline authenticated startup remains unresolved.
 - Only changes published to ticket_index are tracked. Project configuration that affects derived metadata, memberships, related entities, and live GitHub data require their own invalidation/sync treatment.
 - No offline mutation queue or complete optimistic-mutation reconciliation. This tests server mutations followed by local convergence.

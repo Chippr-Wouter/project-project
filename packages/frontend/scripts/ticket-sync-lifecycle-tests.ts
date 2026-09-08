@@ -419,6 +419,169 @@ export async function runTicketSyncLifecycleTests() {
       )
     })
   }
+  await test("bootstrap renders before persistence and catch-up preserves newer edits", async ({
+    create
+  }) => {
+    const runtime = create(respond)
+    const sync = await runtime.runPromise(TicketSync.TicketSync)
+    const account = await owner(runtime)
+    let checkpointWrites = 0
+    const restore = instrumentIndexedDb({
+      onPut: (store) => {
+        if (store.name === "snapshot") checkpointWrites++
+      }
+    })
+    try {
+      const reads = await Promise.all([
+        runtime.runPromise(sync.read(account, params)),
+        runtime.runPromise(sync.read(account, params)),
+        runtime.runPromise(sync.read(account, params))
+      ])
+      const items = reads[0]
+      check(
+        reads.every((value) => value === items),
+        "Concurrent reads did not share the bootstrap"
+      )
+      check(
+        items[0]?.title === "Original",
+        "Bootstrap did not return its tickets"
+      )
+      check(checkpointWrites === 0, "Read waited for the checkpoint write")
+      await runtime.runPromise(sync.poll(account, params))
+      check(
+        snapshotRevision(await readStore("snapshot")) === 2,
+        "Catch-up lost its checkpoint"
+      )
+      check(
+        (await runtime.runPromise(sync.read(account, params)))[0]?.title ===
+          "Updated",
+        "Bootstrap overwrote the newer delta"
+      )
+    } finally {
+      restore()
+    }
+  })
+  await test("failed background bootstrap leaves no partial replica and retries", async ({
+    create
+  }) => {
+    const runtime = create(respond)
+    const sync = await runtime.runPromise(TicketSync.TicketSync)
+    const account = await owner(runtime)
+    const restore = instrumentIndexedDb({
+      onPut: (store) => {
+        if (store.name === "snapshot") store.transaction.abort()
+      }
+    })
+    try {
+      check(
+        (await runtime.runPromise(sync.read(account, params)))[0]?.title ===
+          "Original",
+        "Persistence failure prevented first display"
+      )
+      check(
+        (await readStore("snapshot")).length === 0,
+        "Failed bootstrap persisted its checkpoint"
+      )
+      check(
+        (await readStore("ticket")).length === 0,
+        "Failed bootstrap left ticket rows"
+      )
+    } finally {
+      restore()
+    }
+    await runtime.runPromise(sync.poll(account, params))
+    check(
+      snapshotRevision(await readStore("snapshot")) === 1,
+      "Background retry did not rebuild the replica"
+    )
+  })
+  await test("closing the scope during bootstrap cancels persistence", async ({
+    create
+  }) => {
+    const first = create(respond)
+    const sync = await first.runPromise(TicketSync.TicketSync)
+    await first.runPromise(sync.read(await owner(first), params))
+    await first.dispose()
+    check(
+      (await readStore("snapshot")).length === 0,
+      "Interrupted bootstrap committed its checkpoint"
+    )
+    check(
+      (await readStore("ticket")).length === 0,
+      "Interrupted bootstrap left ticket rows"
+    )
+    const next = create(respond)
+    const nextSync = await next.runPromise(TicketSync.TicketSync)
+    await next.runPromise(nextSync.read(await owner(next), params))
+    check(
+      snapshotRevision(await readStore("snapshot")) === 1,
+      "Fresh runtime did not recover after interrupted bootstrap"
+    )
+  })
+  await test("revocation after first display removes the pending bootstrap", async ({
+    create
+  }) => {
+    const runtime = create(respond)
+    const sync = await runtime.runPromise(TicketSync.TicketSync)
+    const account = await owner(runtime)
+    await runtime.runPromise(sync.read(account, params))
+    await runtime.runPromise(
+      sync.clear({ generation: account.generation, owner: account })
+    )
+    check(
+      (await readStore("snapshot")).length === 0,
+      "Revoked bootstrap restored a checkpoint"
+    )
+    check(
+      (await readStore("ticket")).length === 0,
+      "Revoked bootstrap restored tickets"
+    )
+    check(
+      Exit.isFailure(await runtime.runPromiseExit(sync.read(account, params))),
+      "Revoked owner could read pending tickets"
+    )
+  })
+  await test("reset cancels a pending bootstrap and releases the replica lock", async ({
+    create
+  }) => {
+    const started = gate()
+    let aborted = false
+    let blocked = true
+    const runtime = create(async (input, init) => {
+      if (!blocked) return respond(input, init)
+      started.release()
+      const signal =
+        init?.signal ?? (input instanceof Request ? input.signal : undefined)
+      return await new Promise<Response>((_resolve, reject) => {
+        signal?.addEventListener(
+          "abort",
+          () => {
+            aborted = true
+            reject(new DOMException("Aborted", "AbortError"))
+          },
+          { once: true }
+        )
+      })
+    })
+    const sync = await runtime.runPromise(TicketSync.TicketSync)
+    const account = await owner(runtime)
+    const pending = runtime.runPromiseExit(sync.read(account, params))
+    await started.promise
+    await runtime.runPromise(sync.reset)
+    check(Exit.isFailure(await pending), "Reset left a pending read unresolved")
+    check(aborted, "Reset did not cancel the network request")
+    blocked = false
+    await runtime.runPromise(
+      sync.clear({ generation: account.generation, owner: account })
+    )
+    const nextOwner = await owner(runtime)
+    check(
+      (await runtime.runPromise(sync.read(nextOwner, params)))[0]?.title ===
+        "Original",
+      "A new session reused the cancelled bootstrap"
+    )
+    await readStore("snapshot")
+  })
   await test("stale authentication cannot reactivate after revocation", async ({
     create
   }) => {
@@ -447,6 +610,7 @@ export async function runTicketSyncLifecycleTests() {
       Exit.isFailure(await second.runPromiseExit(b.read(account, params))),
       "Another scope inherited active memory"
     )
+    await readStore("snapshot")
     await first.dispose()
     let fetches = 0
     const next = create(async (input, init) => {
@@ -525,6 +689,7 @@ export async function runTicketSyncLifecycleTests() {
         .length === 2,
       "Initial snapshot did not persist both tickets"
     )
+    await readStore("snapshot")
     await firstRuntime.dispose()
 
     const runtime = create(fetcher)
@@ -610,6 +775,7 @@ export async function runTicketSyncLifecycleTests() {
     const first = create(respond)
     const initialSync = await first.runPromise(TicketSync.TicketSync)
     await first.runPromise(initialSync.read(await owner(first), params))
+    await readStore("snapshot")
     await first.dispose()
     for (const checkpoint of [
       { epoch: "unexpected", revision: 2 },
@@ -764,6 +930,7 @@ export async function runTicketSyncLifecycleTests() {
           undefined,
       "Tombstone did not remove its ticket row"
     )
+    await readStore("snapshot")
     await first.dispose()
     let fetches = 0
     const second = create(async () => {

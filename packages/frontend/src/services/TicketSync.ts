@@ -1,5 +1,7 @@
 import * as Context from "effect/Context"
+import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
+import * as FiberSet from "effect/FiberSet"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
 import * as Scope from "effect/Scope"
@@ -464,7 +466,10 @@ export const make = Effect.gen(function* () {
           readonly kind: "delta"
           readonly value: Delta
           readonly base: Snapshot["checkpoint"]
-        }
+        },
+    onSnapshot?: (
+      snapshot: Snapshot
+    ) => Effect.Effect<void, Unauthorized | NotFound>
   ) {
     const db = yield* storage.database
     if (
@@ -501,6 +506,7 @@ export const make = Effect.gen(function* () {
             ? applyTicketDeltaPrototype(lease.snapshot, change.value)
             : undefined
       if (change.kind === "snapshot") {
+        if (onSnapshot) yield* onSnapshot(change.value)
         yield* db.from("ticket").delete("byProject").equals(lease.id)
         yield* persistTickets(owner, lease.id, change.value.items)
       } else {
@@ -535,25 +541,107 @@ export const make = Effect.gen(function* () {
     else memory.delete(lease.id)
     return committed
   })
-  const readTicketSyncPrototype = Effect.fn("readTicketSyncPrototype")(
+  const readAndPersist = Effect.fn("readAndPersistTicketSyncSnapshot")(
     function* (
       owner: TicketSyncOwnerPrototype,
-      params: TicketSyncParamsPrototype
+      params: TicketSyncParamsPrototype,
+      onReady: (items: Snapshot["items"]) => Effect.Effect<void>
     ) {
       const lease = yield* prepareProject(owner, params, true)
       if (lease.snapshot) return lease.snapshot.items
       const incoming = yield* client.tickets
         .prototypeSyncSnapshot({ params })
         .pipe(handleDenied(owner, lease))
-      const committed = yield* commit(owner, lease, {
-        kind: "snapshot",
-        value: incoming
-      }).pipe(handleDenied(owner, lease))
+      const committed = yield* commit(
+        owner,
+        lease,
+        { kind: "snapshot", value: incoming },
+        Effect.fn("publishTicketSyncBootstrap")(function* (snapshot: Snapshot) {
+          if (!sameOwner(activeOwner, owner)) return yield* new Unauthorized()
+          if (projectVersions.get(lease.id) !== lease.generation)
+            return yield* new NotFound()
+          memory.set(lease.id, { generation: lease.generation, snapshot })
+          yield* onReady(snapshot.items)
+          return undefined
+        })
+      ).pipe(
+        handleDenied(owner, lease),
+        Effect.onExit((exit) =>
+          Effect.sync(() => {
+            if (
+              exit._tag === "Failure" &&
+              memory.get(lease.id)?.snapshot === incoming
+            )
+              memory.delete(lease.id)
+          })
+        )
+      )
       if (!committed.snapshot)
         return yield* Effect.die("Bootstrap committed without ticket data")
       return committed.snapshot.items
     },
     replicaLock.withPermits(1)
+  )
+
+  const reads = yield* FiberSet.make<
+    Snapshot["items"],
+    Effect.Error<ReturnType<typeof readAndPersist>>
+  >()
+  const pendingReads = new Map<
+    string,
+    {
+      readonly owner: TicketSyncOwnerPrototype
+      readonly ready: Deferred.Deferred<
+        Snapshot["items"],
+        Effect.Error<ReturnType<typeof readAndPersist>>
+      >
+    }
+  >()
+  const startRead = Effect.fn("startTicketSyncRead")(function* (
+    owner: TicketSyncOwnerPrototype,
+    params: TicketSyncParamsPrototype
+  ) {
+    if (!isFixture(params)) return yield* new NotFound()
+    if (!sameOwner(activeOwner, owner)) return yield* new Unauthorized()
+    const id = projectKey(owner, params)
+    const pending = pendingReads.get(id)
+    if (pending && sameOwner(pending.owner, owner)) return pending.ready
+    const ready = yield* Deferred.make<
+      Snapshot["items"],
+      Effect.Error<ReturnType<typeof readAndPersist>>
+    >()
+    const entry = { owner, ready }
+    pendingReads.set(id, entry)
+    yield* readAndPersist(
+      owner,
+      params,
+      Effect.fn("completeTicketSyncBootstrapRead")(function* (
+        items: Snapshot["items"]
+      ) {
+        if (pendingReads.get(id) === entry) pendingReads.delete(id)
+        yield* Deferred.succeed(ready, items)
+      })
+    ).pipe(
+      Effect.onExit((exit) =>
+        Effect.gen(function* () {
+          if (pendingReads.get(id) === entry) pendingReads.delete(id)
+          yield* Deferred.done(ready, exit)
+        })
+      ),
+      Effect.tapError((error) =>
+        Effect.logWarning("Ticket bootstrap failed", error)
+      ),
+      FiberSet.run(reads)
+    )
+    return ready
+  }, Effect.uninterruptible)
+  const readTicketSyncPrototype = Effect.fn("readTicketSyncPrototype")(
+    function* (
+      owner: TicketSyncOwnerPrototype,
+      params: TicketSyncParamsPrototype
+    ) {
+      return yield* Deferred.await(yield* startRead(owner, params))
+    }
   )
 
   const pollTicketSyncPrototype = Effect.fn("pollTicketSyncPrototype")(
@@ -595,11 +683,13 @@ export const make = Effect.gen(function* () {
     replicaLock.withPermits(1)
   )
 
-  const reset = Effect.sync(() => {
+  const reset = Effect.gen(function* () {
     activeOwner = undefined
     memory.clear()
     projectVersions.clear()
     localGeneration += 1
+    pendingReads.clear()
+    yield* FiberSet.clear(reads)
   })
   return {
     capture: captureTicketSyncAuth,

@@ -4,7 +4,7 @@ This slice adds account ownership and cleanup to the checkpointed ticket replica
 
 The cache belongs to a server, authenticated user, and project. A network failure preserves cached tickets. Confirmed logout, account switching, or lost project access revokes the corresponding cache ownership and removes its ticket data.
 
-Revocation must also reject work already in flight. The owner generation, changed ticket records, and checkpoint are checked/written in one IndexedDB transaction, so a delayed response cannot recreate data after another tab has cleared it. In-memory results are published only after that transaction commits.
+Revocation must also reject work already in flight. The owner generation, changed ticket records, and checkpoint are checked/written in one IndexedDB transaction, so a delayed response cannot recreate data after another tab has cleared it. Ordinary delta results publish after commit. Initial bootstrap tickets may publish earlier, after ownership/generation validation; their provisional memory is removed on failure, and reset cancels the scoped background work.
 
 Authentication is part of this boundary: a delayed identity response must not reactivate an owner revoked since the request started. The UI must also discard previous successful atom values when identity changes, because normal background refresh intentionally retains them.
 
