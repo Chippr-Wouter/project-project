@@ -39,6 +39,7 @@ const serveFigmaThumbnail = Effect.gen(function* () {
 }).pipe(
   Effect.catchTags({
     NotFound: () => notFound,
+    Forbidden: () => notFound,
     StorageNotConnected: () => notFound,
     StorageConfigMissing: () =>
       HttpServerResponse.text("Storage unavailable", { status: 503 }),

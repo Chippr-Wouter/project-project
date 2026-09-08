@@ -145,6 +145,38 @@ const getFile = (
     }
   )
 
+const findExistingDevResourceId = (
+  credential: FigmaCredential,
+  fileKey: string,
+  nodeId: string,
+  url: string
+): Effect.Effect<string | null, never> =>
+  request(
+    credential,
+    "GET",
+    `/v1/files/${encodeURIComponent(fileKey)}/dev_resources?node_ids=${encodeURIComponent(nodeId)}`,
+    undefined,
+    fileKey,
+    (raw) => raw
+  ).pipe(
+    Effect.map((payload) => {
+      const record = isRecord(payload) ? payload : {}
+      const resources = Array.isArray(record.dev_resources)
+        ? record.dev_resources
+        : []
+      const match = resources.find(
+        (resource) => isRecord(resource) && resource.url === url
+      )
+      const id = isRecord(match) ? match.id : null
+      return typeof id === "string"
+        ? id
+        : typeof id === "number"
+          ? String(id)
+          : null
+    }),
+    Effect.catchAll(() => Effect.succeed(null))
+  )
+
 export const FigmaLive = Layer.succeed(Figma, {
   getMe: (credential) =>
     request(credential, "GET", "/v1/me", undefined, null, (payload) => {
@@ -235,11 +267,22 @@ export const FigmaLive = Layer.succeed(Figma, {
             ? firstError.error
             : null
         if (errorText !== null) {
-          return Effect.logDebug(
-            "Figma dev resource create skipped by the API"
+          return findExistingDevResourceId(
+            credential,
+            input.fileKey,
+            input.nodeId,
+            input.url
           ).pipe(
-            Effect.annotateLogs({ reason: errorText }),
-            Effect.as(null)
+            Effect.flatMap((existingId) =>
+              existingId !== null
+                ? Effect.succeed(existingId)
+                : Effect.logDebug(
+                    "Figma dev resource create skipped by the API"
+                  ).pipe(
+                    Effect.annotateLogs({ reason: errorText }),
+                    Effect.as(null)
+                  )
+            )
           )
         }
         const linksCreated = Array.isArray(record.links_created)

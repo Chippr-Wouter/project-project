@@ -14,7 +14,7 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import { ulid } from "ulid"
 import { figmaLinkIndex, figmaReference, projectIndex } from "../db/schema"
-import { CurrentOrg } from "../Services/CurrentOrg"
+import { CurrentOrg, requireOrgAdmin } from "../Services/CurrentOrg"
 import { Db } from "../Services/Db"
 import {
   Figma,
@@ -701,22 +701,40 @@ export const FigmaLinksLive = Layer.effect(
       linkId
     ) =>
       Effect.gen(function* () {
-        yield* currentOrg.resolve(orgSlug, userId)
-
         const rows = yield* db
-          .select({ thumbnailKey: figmaLinkIndex.thumbnailKey })
+          .select({
+            thumbnailKey: figmaLinkIndex.thumbnailKey,
+            projectSlug: figmaReference.projectSlug
+          })
           .from(figmaLinkIndex)
+          .innerJoin(
+            figmaReference,
+            eq(figmaReference.linkId, figmaLinkIndex.id)
+          )
           .where(
             and(
               eq(figmaLinkIndex.id, linkId),
               eq(figmaLinkIndex.orgSlug, orgSlug)
             )
           )
-          .limit(1)
           .pipe(Effect.orDie)
 
-        const row = rows[0]
-        if (row === undefined || row.thumbnailKey === null) {
+        if (rows.length === 0) {
+          return yield* new NotFound()
+        }
+
+        yield* Effect.firstSuccessOf(
+          rows.map((row) =>
+            projects.requireMember(orgSlug, userId, row.projectSlug)
+          )
+        ).pipe(
+          Effect.catchTag("NotFound", () =>
+            requireOrgAdmin(currentOrg, orgSlug, userId)
+          )
+        )
+
+        const thumbnailKey = rows[0].thumbnailKey
+        if (thumbnailKey === null) {
           return yield* new NotFound()
         }
 
@@ -725,7 +743,7 @@ export const FigmaLinksLive = Layer.effect(
         return yield* s3
           .presignGet(
             connection,
-            row.thumbnailKey,
+            thumbnailKey,
             "thumbnail.png",
             true,
             THUMBNAIL_VIEW_TTL_SECONDS

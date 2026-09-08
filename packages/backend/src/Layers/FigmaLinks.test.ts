@@ -296,6 +296,7 @@ const harness = (input: {
   readonly figma?: Partial<Record<string, unknown>>
   readonly storage?: Effect.Effect<unknown, FigmaError | StorageNotConnected>
   readonly currentOrg?: Effect.Effect<unknown, NotFound>
+  readonly projectMember?: Effect.Effect<unknown, NotFound>
 }) =>
   FigmaLinksLive.pipe(
     Layer.provide(Layer.succeed(Db, input.db as never)),
@@ -327,7 +328,7 @@ const harness = (input: {
     ),
     Layer.provide(
       Layer.succeed(Projects, {
-        requireMember: () => Effect.fail(new NotFound())
+        requireMember: () => input.projectMember ?? Effect.fail(new NotFound())
       } as never)
     ),
     Layer.provide(
@@ -730,6 +731,44 @@ describe("reconcileTicket dev mode backlink", () => {
         expect(order).toEqual(["figma-delete", "db-delete"])
       })
   )
+
+  it.live(
+    "issues the DELETE for a reference whose dev resource id came from adopting an existing Figma resource",
+    () =>
+      Effect.gen(function* () {
+        const order: Array<string> = []
+        const deleteDevResource = vi.fn(() => {
+          order.push("figma-delete")
+          return Effect.void
+        })
+        const { db } = recordingDb((sql) => {
+          if (sql.includes(JOINED)) {
+            return referencedLink({
+              fetchedAt: null,
+              lastCheckStatus: null,
+              devResourceId: "adopted-existing-dev-resource"
+            })
+          }
+          if (sql.startsWith('delete from "figma_reference"')) {
+            order.push("db-delete")
+          }
+          return []
+        })
+        const exit = yield* reconcile(
+          harness({ db, figma: { deleteDevResource } }),
+          ""
+        )
+        yield* Effect.sleep("100 millis")
+
+        expect(exit._tag).toBe("Success")
+        expect(deleteDevResource).toHaveBeenCalledWith(
+          expect.anything(),
+          "FILEKEY123",
+          "adopted-existing-dev-resource"
+        )
+        expect(order).toEqual(["figma-delete", "db-delete"])
+      })
+  )
 })
 
 describe("resolveThumbnailUrl", () => {
@@ -741,21 +780,17 @@ describe("resolveThumbnailUrl", () => {
       Effect.provide(layer)
     )
 
-  it.effect("gives a member a freshly signed thumbnail URL", () =>
+  it.effect("gives a project member a freshly signed thumbnail URL", () =>
     Effect.gen(function* () {
       const { db } = proxyDb((sql) =>
         sql.includes('from "figma_link_index"')
-          ? [["thumb-key.png"]]
+          ? [["thumb-key.png", "web"]]
           : []
       )
       const exit = yield* resolve(
         harness({
           db,
-          currentOrg: Effect.succeed({
-            organizationId: "org-1",
-            orgSlug: "acme",
-            role: "member"
-          }),
+          projectMember: Effect.succeed({} as never),
           storage: Effect.succeed({} as never)
         })
       )
@@ -766,15 +801,46 @@ describe("resolveThumbnailUrl", () => {
     })
   )
 
-  it.effect("refuses a user who is not a member of the org", () =>
+  it.effect(
+    "refuses an org member who is not a member of the referencing project",
+    () =>
+      Effect.gen(function* () {
+        const { db } = proxyDb((sql) =>
+          sql.includes('from "figma_link_index"')
+            ? [["thumb-key.png", "web"]]
+            : []
+        )
+        const exit = yield* resolve(
+          harness({
+            db,
+            projectMember: Effect.fail(new NotFound()),
+            currentOrg: Effect.succeed({
+              organizationId: "org-1",
+              orgSlug: "acme",
+              role: "member"
+            })
+          })
+        )
+        expect(exit._tag).toBe("Failure")
+        if (exit._tag === "Failure") {
+          expect(exit.cause.toString()).toContain("Forbidden")
+        }
+      })
+  )
+
+  it.effect("refuses a user who is not a member of the org at all", () =>
     Effect.gen(function* () {
       const { db } = proxyDb((sql) =>
         sql.includes('from "figma_link_index"')
-          ? [["thumb-key.png"]]
+          ? [["thumb-key.png", "web"]]
           : []
       )
       const exit = yield* resolve(
-        harness({ db, currentOrg: Effect.fail(new NotFound()) })
+        harness({
+          db,
+          projectMember: Effect.fail(new NotFound()),
+          currentOrg: Effect.fail(new NotFound())
+        })
       )
       expect(exit._tag).toBe("Failure")
       if (exit._tag === "Failure") {
@@ -786,17 +852,10 @@ describe("resolveThumbnailUrl", () => {
   it.effect("404s cleanly when the link has no cached thumbnail yet", () =>
     Effect.gen(function* () {
       const { db } = proxyDb((sql) =>
-        sql.includes('from "figma_link_index"') ? [[null]] : []
+        sql.includes('from "figma_link_index"') ? [[null, "web"]] : []
       )
       const exit = yield* resolve(
-        harness({
-          db,
-          currentOrg: Effect.succeed({
-            organizationId: "org-1",
-            orgSlug: "acme",
-            role: "member"
-          })
-        })
+        harness({ db, projectMember: Effect.succeed({} as never) })
       )
       expect(exit._tag).toBe("Failure")
       if (exit._tag === "Failure") {
@@ -811,17 +870,13 @@ describe("resolveThumbnailUrl", () => {
       Effect.gen(function* () {
         const { db } = proxyDb((sql) =>
           sql.includes('from "figma_link_index"')
-            ? [["thumb-key.png"]]
+            ? [["thumb-key.png", "web"]]
             : []
         )
         const exit = yield* resolve(
           harness({
             db,
-            currentOrg: Effect.succeed({
-              organizationId: "org-1",
-              orgSlug: "acme",
-              role: "member"
-            }),
+            projectMember: Effect.succeed({} as never),
             storage: Effect.fail(new StorageNotConnected())
           })
         )

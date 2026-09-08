@@ -80,7 +80,11 @@ export interface FigmaLinksShape {
     linkId: string
   ) => Effect.Effect<
     string,
-    NotFound | StorageNotConnected | StorageConfigMissing | StorageError
+    | NotFound
+    | Forbidden
+    | StorageNotConnected
+    | StorageConfigMissing
+    | StorageError
   >
 }
 

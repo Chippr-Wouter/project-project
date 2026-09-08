@@ -218,6 +218,80 @@ describe("FigmaLive subtle behaviours", () => {
       }).pipe(Effect.provide(FigmaLive))
   )
 
+  it.effect(
+    "adopts the existing dev resource's id when Figma rejects a duplicate url",
+    () =>
+      Effect.gen(function* () {
+        const fetchMock = vi.fn(async (input: string | URL) => {
+          const url = String(input)
+          if (url.includes("/v1/dev_resources") && !url.includes("/v1/files")) {
+            return jsonResponse(200, {
+              errors: [
+                {
+                  file_key: "abc123",
+                  node_id: "1:2",
+                  error: "url already exists on node"
+                }
+              ]
+            })
+          }
+          return jsonResponse(200, {
+            dev_resources: [
+              { id: "existing-dev-resource", url: "https://example.com/spec" }
+            ]
+          })
+        })
+        vi.stubGlobal("fetch", fetchMock)
+        const figma = yield* Figma
+        const result = yield* figma.createDevResource(credential, {
+          fileKey: "abc123",
+          nodeId: "1:2",
+          name: "Spec",
+          url: "https://example.com/spec"
+        })
+        expect(result).toBe("existing-dev-resource")
+        const lookup = fetchMock.mock.calls.find(([call]) =>
+          String(call).includes("/dev_resources?node_ids=")
+        )
+        expect(lookup).toBeDefined()
+      }).pipe(Effect.provide(FigmaLive))
+  )
+
+  it.effect(
+    "still returns null when the duplicate lookup finds no matching url",
+    () =>
+      Effect.gen(function* () {
+        const fetchMock = vi.fn(async (input: string | URL) => {
+          const url = String(input)
+          if (url.includes("/v1/dev_resources") && !url.includes("/v1/files")) {
+            return jsonResponse(200, {
+              errors: [
+                {
+                  file_key: "abc123",
+                  node_id: "1:2",
+                  error: "url already exists on node"
+                }
+              ]
+            })
+          }
+          return jsonResponse(200, {
+            dev_resources: [
+              { id: "unrelated", url: "https://example.com/other" }
+            ]
+          })
+        })
+        vi.stubGlobal("fetch", fetchMock)
+        const figma = yield* Figma
+        const result = yield* figma.createDevResource(credential, {
+          fileKey: "abc123",
+          nodeId: "1:2",
+          name: "Spec",
+          url: "https://example.com/spec"
+        })
+        expect(result).toBeNull()
+      }).pipe(Effect.provide(FigmaLive))
+  )
+
   it.effect("returns the created dev resource id on success", () =>
     Effect.gen(function* () {
       vi.stubGlobal(
