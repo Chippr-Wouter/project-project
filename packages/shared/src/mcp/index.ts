@@ -21,6 +21,7 @@ import {
 } from "../errors"
 import {
   ATTACHMENT_MAX_BYTES,
+  OrgStorageStatus,
   PrepareAttachmentInput,
   PrepareAttachmentResult
 } from "../schemas/Attachment"
@@ -81,9 +82,20 @@ export const McpTools = {
     errors: [Unauthorized] as const
   },
   get_org: {
-    description: "Fetch one organization by slug.",
+    description:
+      "Fetch one organization by slug, including attachment storage status: " +
+      "not_connected, active, or broken, and lastCheckedAt (null when never checked). " +
+      "This is the stored connection status, not a live connectivity check. " +
+      "Upload preparation and file transfer still validate storage independently. " +
+      "If storage is not connected or broken, check organization storage settings.",
     input: Schema.Struct({ orgSlug: Slug }),
-    output: Org,
+    output: Schema.Struct({
+      ...Org.fields,
+      storage: Schema.Struct({
+        status: OrgStorageStatus.fields.status,
+        lastCheckedAt: OrgStorageStatus.fields.lastCheckedAt
+      })
+    }),
     errors: [Unauthorized, NotFound] as const
   },
   list_projects: {
