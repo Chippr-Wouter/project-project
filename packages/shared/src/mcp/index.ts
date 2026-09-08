@@ -20,6 +20,7 @@ import {
   Validation
 } from "../errors"
 import {
+  ATTACHMENT_MAX_BYTES,
   PrepareAttachmentInput,
   PrepareAttachmentResult
 } from "../schemas/Attachment"
@@ -265,7 +266,7 @@ export const McpTools = {
   prepare_ticket_attachment: {
     description:
       "Prepare an attachment upload for an existing ticket. Requires organization storage " +
-      "and project membership. Accepts non-empty files up to 25 MiB: PNG, JPEG, GIF, " +
+      `and project membership. Accepts non-empty files up to ${ATTACHMENT_MAX_BYTES / (1024 * 1024)} MiB: PNG, JPEG, GIF, ` +
       "WebP, AVIF, PDF, ZIP, gzip, or tar. Supply filename and contentType; the server measures the file size. " +
       "POST the local file to the returned uploadUrl: curl --fail-with-body --request POST " +
       "--data-binary '@/path/to/file' --header 'Content-Type: <contentType>' '<uploadUrl>'. " +

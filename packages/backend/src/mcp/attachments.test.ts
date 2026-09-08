@@ -23,6 +23,7 @@ import * as TestClock from "effect/testing/TestClock"
 import * as SqlClient from "effect/unstable/sql/SqlClient"
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import {
+  AttachmentTooLarge,
   CurrentUser,
   McpTools,
   NotFound,
@@ -223,10 +224,16 @@ const fixture = Effect.fn("attachmentFixture")(function* (
       Layer.mock(TicketIndex.TicketIndex, {})
     )
   )
-  const prepare = (input = upload) =>
-    handlers
-      .prepare_ticket_attachment({ ...scope, ...input })
+  const prepare = Effect.fn("attachmentFixture.prepare")(function* (
+    input = upload
+  ) {
+    const decoded = yield* Schema.decodeEffect(
+      McpTools.prepare_ticket_attachment.input
+    )({ ...scope, ...input })
+    return yield* handlers
+      .prepare_ticket_attachment(decoded)
       .pipe(Effect.provide(context))
+  })
   const post = (url: string, body = bytes, contentType = upload.contentType) =>
     attachmentUploadRoute.pipe(
       Effect.provide(context),
@@ -319,9 +326,29 @@ describe.skipIf(!databaseUrl)("MCP attachment upload with Postgres", () => {
         const retry = yield* f.post(prepared.uploadUrl, new Uint8Array([1, 2]))
         expect(yield* Effect.promise(() => retry.json())).toEqual(committed)
         expect(f.writes).toHaveLength(1)
-        expect([...f.objects.values()].map((value) => [...value])).toEqual([
-          [...bytes]
-        ])
+        expect(
+          [...f.objects.values()].map((value) => Array.from(value))
+        ).toEqual([[...bytes]])
+      }).pipe(Effect.scoped, Effect.provide(dbLayer))
+  )
+
+  it.effect.each(["orgSlug", "projectSlug", "ticketId", "uploadedBy"] as const)(
+    "rejects an attachment outside the grant's %s before reading bytes",
+    (field) =>
+      Effect.gen(function* () {
+        const f = yield* fixture()
+        const prepared = yield* f.prepare()
+        const db = yield* Db.Db
+        yield* db
+          .update(attachmentIndex)
+          .set({ [field]: "foreign-scope" })
+          .where(eq(attachmentIndex.id, prepared.id))
+        expect(
+          (yield* Effect.flip(
+            f.receive(prepared.uploadUrl, Stream.die("must not read body"))
+          ))._tag
+        ).toBe("NotFound")
+        expect(f.writes).toHaveLength(0)
       }).pipe(Effect.scoped, Effect.provide(dbLayer))
   )
 
@@ -603,6 +630,14 @@ describe("MCP attachment contracts", () => {
         ticketId: "bad"
       })
     ).toBe(false)
+  })
+  it("reports the actual size limit without requesting a prepared byte size", () => {
+    const result = mapToolError(
+      new AttachmentTooLarge({ maxBytes: 1536 * 1024 })
+    )
+    expect(result.content[0].text).toBe(
+      "AttachmentTooLarge: The file must be non-empty and at most 1.5 MiB."
+    )
   })
   it.each([
     new StorageNotConnected(),

@@ -71,10 +71,17 @@ export const mapToolError = (e: unknown): McpToolErrorResult => {
       return text(
         "AttachmentNotUploaded: The uploaded object could not be verified. Retry the POST to uploadUrl. If the upload URL expired, prepare a new upload."
       )
-    case "AttachmentTooLarge":
+    case "AttachmentTooLarge": {
+      const limit =
+        "maxBytes" in e &&
+        typeof e.maxBytes === "number" &&
+        Number.isFinite(e.maxBytes)
+          ? `${e.maxBytes / (1024 * 1024)} MiB`
+          : "the server limit"
       return text(
-        "AttachmentTooLarge: The file must be non-empty, at most 25 MiB, and match the byteSize supplied during preparation."
+        `AttachmentTooLarge: The file must be non-empty and at most ${limit}.`
       )
+    }
     case "AttachmentTypeRejected":
       return text(
         "AttachmentTypeRejected: Use PNG, JPEG, GIF, WebP, AVIF, PDF, ZIP, gzip, or tar."
