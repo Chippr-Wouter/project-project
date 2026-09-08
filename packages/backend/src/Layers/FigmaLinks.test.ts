@@ -4,7 +4,8 @@ import {
   FigmaAuthInvalid,
   FigmaError,
   FigmaNotConnected,
-  NotFound
+  NotFound,
+  StorageNotConnected
 } from "@projectproject/shared"
 import { drizzle } from "drizzle-orm/pg-proxy"
 import * as DateTime from "effect/DateTime"
@@ -12,6 +13,7 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import { describe, expect, vi } from "vitest"
 import * as schema from "../db/schema"
+import { CurrentOrg } from "../Services/CurrentOrg"
 import { Db } from "../Services/Db"
 import { Figma } from "../Services/Figma"
 import { FigmaIntegrations } from "../Services/FigmaIntegrations"
@@ -292,10 +294,16 @@ const harness = (input: {
     FigmaAuthInvalid | FigmaNotConnected
   >
   readonly figma?: Partial<Record<string, unknown>>
-  readonly storage?: Effect.Effect<never, FigmaError>
+  readonly storage?: Effect.Effect<unknown, FigmaError | StorageNotConnected>
+  readonly currentOrg?: Effect.Effect<unknown, NotFound>
 }) =>
   FigmaLinksLive.pipe(
     Layer.provide(Layer.succeed(Db, input.db as never)),
+    Layer.provide(
+      Layer.succeed(CurrentOrg, {
+        resolve: () => input.currentOrg ?? Effect.fail(new NotFound())
+      } as never)
+    ),
     Layer.provide(
       Layer.succeed(FigmaIntegrations, {
         credentialFor: () =>
@@ -720,6 +728,107 @@ describe("reconcileTicket dev mode backlink", () => {
           "dev-1"
         )
         expect(order).toEqual(["figma-delete", "db-delete"])
+      })
+  )
+})
+
+describe("resolveThumbnailUrl", () => {
+  const resolve = (layer: Layer.Layer<FigmaLinks>) =>
+    FigmaLinks.pipe(
+      Effect.flatMap((links) =>
+        Effect.exit(links.resolveThumbnailUrl("acme", "user-1", "link-1"))
+      ),
+      Effect.provide(layer)
+    )
+
+  it.effect("gives a member a freshly signed thumbnail URL", () =>
+    Effect.gen(function* () {
+      const { db } = proxyDb((sql) =>
+        sql.includes('from "figma_link_index"')
+          ? [["thumb-key.png"]]
+          : []
+      )
+      const exit = yield* resolve(
+        harness({
+          db,
+          currentOrg: Effect.succeed({
+            organizationId: "org-1",
+            orgSlug: "acme",
+            role: "member"
+          }),
+          storage: Effect.succeed({} as never)
+        })
+      )
+      expect(exit._tag).toBe("Success")
+      if (exit._tag === "Success") {
+        expect(exit.value).toBe("https://signed.example/get")
+      }
+    })
+  )
+
+  it.effect("refuses a user who is not a member of the org", () =>
+    Effect.gen(function* () {
+      const { db } = proxyDb((sql) =>
+        sql.includes('from "figma_link_index"')
+          ? [["thumb-key.png"]]
+          : []
+      )
+      const exit = yield* resolve(
+        harness({ db, currentOrg: Effect.fail(new NotFound()) })
+      )
+      expect(exit._tag).toBe("Failure")
+      if (exit._tag === "Failure") {
+        expect(exit.cause.toString()).toContain("NotFound")
+      }
+    })
+  )
+
+  it.effect("404s cleanly when the link has no cached thumbnail yet", () =>
+    Effect.gen(function* () {
+      const { db } = proxyDb((sql) =>
+        sql.includes('from "figma_link_index"') ? [[null]] : []
+      )
+      const exit = yield* resolve(
+        harness({
+          db,
+          currentOrg: Effect.succeed({
+            organizationId: "org-1",
+            orgSlug: "acme",
+            role: "member"
+          })
+        })
+      )
+      expect(exit._tag).toBe("Failure")
+      if (exit._tag === "Failure") {
+        expect(exit.cause.toString()).toContain("NotFound")
+      }
+    })
+  )
+
+  it.effect(
+    "treats a disconnected org storage as a normal state, not a server error",
+    () =>
+      Effect.gen(function* () {
+        const { db } = proxyDb((sql) =>
+          sql.includes('from "figma_link_index"')
+            ? [["thumb-key.png"]]
+            : []
+        )
+        const exit = yield* resolve(
+          harness({
+            db,
+            currentOrg: Effect.succeed({
+              organizationId: "org-1",
+              orgSlug: "acme",
+              role: "member"
+            }),
+            storage: Effect.fail(new StorageNotConnected())
+          })
+        )
+        expect(exit._tag).toBe("Failure")
+        if (exit._tag === "Failure") {
+          expect(exit.cause.toString()).toContain("StorageNotConnected")
+        }
       })
   )
 })

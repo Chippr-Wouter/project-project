@@ -2,6 +2,7 @@ import {
   extractFigmaRefs,
   figmaRefKey,
   NotFound,
+  StorageError,
   type FigmaLinkMetadata,
   type FigmaRef
 } from "@projectproject/shared"
@@ -13,6 +14,7 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import { ulid } from "ulid"
 import { figmaLinkIndex, figmaReference, projectIndex } from "../db/schema"
+import { CurrentOrg } from "../Services/CurrentOrg"
 import { Db } from "../Services/Db"
 import {
   Figma,
@@ -22,6 +24,7 @@ import {
 import { FigmaIntegrations } from "../Services/FigmaIntegrations"
 import {
   devResourceName,
+  figmaThumbnailUrl,
   FigmaLinks,
   planFigmaReferences,
   shouldBacklink,
@@ -120,6 +123,7 @@ export const figmaLinkMetadata = (input: {
 export const FigmaLinksLive = Layer.effect(
   FigmaLinks,
   Effect.gen(function* () {
+    const currentOrg = yield* CurrentOrg
     const db = yield* Db
     const figma = yield* Figma
     const integrations = yield* FigmaIntegrations
@@ -646,22 +650,6 @@ export const FigmaLinksLive = Layer.effect(
         Effect.asVoid
       )
 
-    const thumbnailUrlFor = (
-      connection: S3Connection | null,
-      thumbnailKey: string | null
-    ) =>
-      connection === null || thumbnailKey === null
-        ? Effect.succeed(null)
-        : s3
-            .presignGet(
-              connection,
-              thumbnailKey,
-              "thumbnail.png",
-              true,
-              THUMBNAIL_VIEW_TTL_SECONDS
-            )
-            .pipe(Effect.catchAll(() => Effect.succeed(null)))
-
     const listForTicket: FigmaLinksShape["listForTicket"] = (
       orgSlug,
       userId,
@@ -673,6 +661,7 @@ export const FigmaLinksLive = Layer.effect(
 
         const rows = yield* db
           .select({
+            linkId: figmaLinkIndex.id,
             fileKey: figmaLinkIndex.fileKey,
             nodeId: figmaLinkIndex.nodeId,
             name: figmaLinkIndex.name,
@@ -695,19 +684,63 @@ export const FigmaLinksLive = Layer.effect(
           .orderBy(asc(figmaReference.createdAt))
           .pipe(Effect.orDie)
 
-        const connection = yield* orgStorage
-          .requireConnection(orgSlug)
-          .pipe(Effect.catchAll(() => Effect.succeed(null)))
-
-        return yield* Effect.forEach(rows, (row) =>
-          thumbnailUrlFor(connection, row.thumbnailKey).pipe(
-            Effect.map((thumbnailUrl) =>
-              figmaLinkMetadata({ ...row, thumbnailUrl })
-            )
-          )
+        return rows.map((row) =>
+          figmaLinkMetadata({
+            ...row,
+            thumbnailUrl:
+              row.thumbnailKey === null
+                ? null
+                : figmaThumbnailUrl(orgSlug, row.linkId)
+          })
         )
       })
 
-    return { reconcileTicket, listForTicket } satisfies FigmaLinksShape
+    const resolveThumbnailUrl: FigmaLinksShape["resolveThumbnailUrl"] = (
+      orgSlug,
+      userId,
+      linkId
+    ) =>
+      Effect.gen(function* () {
+        yield* currentOrg.resolve(orgSlug, userId)
+
+        const rows = yield* db
+          .select({ thumbnailKey: figmaLinkIndex.thumbnailKey })
+          .from(figmaLinkIndex)
+          .where(
+            and(
+              eq(figmaLinkIndex.id, linkId),
+              eq(figmaLinkIndex.orgSlug, orgSlug)
+            )
+          )
+          .limit(1)
+          .pipe(Effect.orDie)
+
+        const row = rows[0]
+        if (row === undefined || row.thumbnailKey === null) {
+          return yield* new NotFound()
+        }
+
+        const connection = yield* orgStorage.requireConnection(orgSlug)
+
+        return yield* s3
+          .presignGet(
+            connection,
+            row.thumbnailKey,
+            "thumbnail.png",
+            true,
+            THUMBNAIL_VIEW_TTL_SECONDS
+          )
+          .pipe(
+            Effect.catchTag("S3Unavailable", (error) =>
+              Effect.fail(new StorageError({ reason: error.reason }))
+            )
+          )
+      })
+
+    return {
+      reconcileTicket,
+      listForTicket,
+      resolveThumbnailUrl
+    } satisfies FigmaLinksShape
   })
 )

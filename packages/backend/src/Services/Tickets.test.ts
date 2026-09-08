@@ -210,6 +210,7 @@ const makeFakeFigmaLinks = (
   Layer.succeed(FigmaLinks, {
     reconcileTicket: () => Effect.void,
     listForTicket: () => unexpected("FigmaLinks.listForTicket"),
+    resolveThumbnailUrl: () => unexpected("FigmaLinks.resolveThumbnailUrl"),
     ...overrides
   } satisfies FigmaLinksShape)
 
