@@ -32,5 +32,6 @@ RUN bun run --cwd packages/frontend build
 FROM nginx:1.27-alpine AS runtime
 COPY --from=build /app/packages/frontend/dist /usr/share/nginx/html
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+COPY docker/nginx.locations /etc/nginx/app.locations
 
 EXPOSE 80

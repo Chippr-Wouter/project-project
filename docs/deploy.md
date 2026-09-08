@@ -228,3 +228,51 @@ be `<BETTER_AUTH_URL>/api/auth/callback/github`.
 **Migrations keep running on every redeploy.**
 That's intended — Drizzle's `migrate` is idempotent. Each migration is
 applied once based on its name; subsequent runs no-op.
+
+## IGNE deployment: TLS and image-owned routes
+
+`pp.igne.nl` terminates origin TLS in the frontend container. Its host-mounted
+`/srv/projectproject/nginx/default.conf` defines the HTTP redirect and HTTPS
+server, loads certificates from `/etc/nginx/certs`, sets the static root to
+`/usr/share/nginx/html`, and includes `/etc/nginx/app.locations` inside the HTTPS
+server block.
+
+Application routes belong to the image: `docker/nginx.locations` is copied to
+`/etc/nginx/app.locations`. Both the default HTTP server and the IGNE HTTPS
+server use that include. Do not mount a host copy of `app.locations`; it would
+hide routing changes shipped in later images, including OAuth discovery routes.
+
+### One-time migration of existing IGNE containers
+
+Only perform this after an image containing `docker/nginx.locations` has been
+published. The old image does not provide the include on its own.
+
+1. Back up `/srv/projectproject/compose.override.yaml` and
+   `/srv/projectproject/nginx/`.
+2. Pull the new web image and verify it contains `/etc/nginx/app.locations`.
+3. Remove this volume from the host's `compose.override.yaml`:
+
+   ```yaml
+   - /srv/projectproject/nginx/app.locations:/etc/nginx/app.locations:ro
+   ```
+
+   Keep the TLS `default.conf` and certificate mounts. The host's `default.conf`
+   must still include `/etc/nginx/app.locations` inside its HTTPS server block.
+4. Validate the merged configuration using the new image and recreate only web:
+
+   ```sh
+   cd /srv/projectproject
+   docker compose pull web
+   docker compose run --rm --no-deps web nginx -t
+   docker compose up -d --no-deps web
+   docker compose exec web nginx -t
+   ```
+
+5. Verify `https://pp.igne.nl/.well-known/oauth-protected-resource/mcp` returns
+   `application/json` with resource `https://pp.igne.nl/mcp`, authorization-server
+   discovery returns JSON, `/mcp` returns an authentication challenge without a
+   token, and the frontend still loads.
+
+Watchtower updates images, not host-mounted configuration. This one-time mount
+removal allows future route updates to travel with the image. To roll back to an
+older image without the include, restore the backed-up volume mount as well.
