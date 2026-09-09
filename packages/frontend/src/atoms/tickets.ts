@@ -502,20 +502,20 @@ export const updateTicketAtom = Atom.family((key: string) => {
         const contentOnly = Object.keys(payload).every(
           (field) => field === "title" || field === "body"
         )
-        yield* Reactivity.invalidate(
-          contentOnly
-            ? [
-                `ticket-updated-query/${orgSlug}/${slug}`,
-                ...(payload.title !== undefined
-                  ? [
-                      `ticket-content/${orgSlug}/${slug}`,
-                      `ticket-content/${orgSlug}/${slug}/${id}`,
-                      `ticket-title-query/${orgSlug}/${slug}`
-                    ]
-                  : [])
-              ]
-            : [`ticket-lists/${orgSlug}/${slug}`]
-        )
+        const invalidationKeys: string[] = []
+        if (contentOnly) {
+          invalidationKeys.push(`ticket-updated-query/${orgSlug}/${slug}`)
+          if (payload.title !== undefined) {
+            invalidationKeys.push(
+              `ticket-content/${orgSlug}/${slug}`,
+              `ticket-content/${orgSlug}/${slug}/${id}`,
+              `ticket-title-query/${orgSlug}/${slug}`
+            )
+          }
+        } else {
+          invalidationKeys.push(`ticket-lists/${orgSlug}/${slug}`)
+        }
+        yield* Reactivity.invalidate(invalidationKeys)
         yield* get
           .result(remote, { suspendOnWaiting: true })
           .pipe(Effect.ignore)
