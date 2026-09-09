@@ -5,7 +5,8 @@ import {
   Link,
   Navigate,
   Outlet,
-  useLocation
+  useLocation,
+  useParams
 } from "@tanstack/react-router"
 import {
   FolderKanban,
@@ -120,7 +121,8 @@ function Sidebar({ user }: { user: User }) {
 }
 
 function SidebarContent({ user }: { user: User }) {
-  const orgSlug = user.activeOrgSlug
+  const { orgSlug: routeOrgSlug } = useParams({ strict: false })
+  const orgSlug = routeOrgSlug ?? user.activeOrgSlug
   const slot = useSidebarSlotContent()
   const section = useSidebarSectionContent()
   const reduceMotion = useReducedMotion()
