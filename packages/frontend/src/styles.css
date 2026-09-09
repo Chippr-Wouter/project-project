@@ -644,17 +644,46 @@ html.dark .prose-md .token.coord {
 .prose-md table {
   border-collapse: collapse;
   width: 100%;
-  font-size: 0.9em;
+  font-size: 0.8125rem;
+  line-height: 1.5;
 }
 .prose-md th,
 .prose-md td {
-  border: 1px solid var(--border);
-  padding: 0.4em 0.7em;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 0.625rem 0.75rem;
   text-align: left;
+  vertical-align: top;
+}
+.prose-md :is(th, td):first-child {
+  padding-left: 0;
+}
+.prose-md :is(th, td):last-child {
+  padding-right: 0;
+}
+.prose-md :is(th, td)[align="center"] {
+  text-align: center;
+}
+.prose-md :is(th, td)[align="right"] {
+  text-align: right;
 }
 .prose-md th {
-  background: var(--muted);
-  font-weight: 600;
+  color: var(--muted-foreground);
+  background: transparent;
+  font-weight: 500;
+}
+.lexical-table-scroll {
+  overflow-x: auto;
+  margin-block: 1.25rem;
+}
+.prose-md :is(th, td) > p {
+  margin: 0;
+}
+.prose-md .lexical-table-cell-selected {
+  background: var(--selected);
+}
+.lexical-table-selection ::selection {
+  background: transparent;
 }
 .prose-md input[type="checkbox"] {
   margin-right: 0.5em;

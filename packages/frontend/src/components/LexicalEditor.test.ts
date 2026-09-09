@@ -1,3 +1,4 @@
+import { TableNode, TableRowNode, TableCellNode } from "@lexical/table"
 import {
   $convertFromMarkdownString,
   $convertToMarkdownString
@@ -40,6 +41,9 @@ function roundTripMarkdown(markdown: string) {
   const editor = createEditor({
     namespace: "lexical-editor-test",
     nodes: [
+      TableNode,
+      TableRowNode,
+      TableCellNode,
       CodeNode,
       FigmaNode,
       HeadingNode,
@@ -88,6 +92,9 @@ function inAttachmentEditor<A>(
   const editor = createEditor({
     namespace: "lexical-editor-test",
     nodes: [
+      TableNode,
+      TableRowNode,
+      TableCellNode,
       AttachmentNode,
       CodeNode,
       HeadingNode,
@@ -123,6 +130,9 @@ function roundTripAttachmentMarkdown(markdown: string) {
   const editor = createEditor({
     namespace: "lexical-editor-test",
     nodes: [
+      TableNode,
+      TableRowNode,
+      TableCellNode,
       AttachmentNode,
       CodeNode,
       FigmaNode,
@@ -163,6 +173,9 @@ function markdownNodeTypes(
   const editor = createEditor({
     namespace: "lexical-editor-test",
     nodes: [
+      TableNode,
+      TableRowNode,
+      TableCellNode,
       AttachmentNode,
       CodeNode,
       FigmaNode,
@@ -473,4 +486,31 @@ describe("description editor attachment transformers", () => {
   it("keeps attachment markdown out of the transformer list for callsites without attachments", () => {
     expect(transformersForAttachments(undefined)).toBe(MARKDOWN_TRANSFORMERS)
   })
+})
+
+it("preserves mentions and fenced examples alongside an editable table", () => {
+  const markdown =
+    "| Owner | Example |\n| --- | --- |\n| [Ticket](mention:ticket/T-157) | `a\\|b` |\n\n```md\n| literal | table |\n| --- | --- |\n```"
+  expect(roundTripMarkdown(markdown)).toBe(markdown)
+})
+
+it.each(["---", "***", "___"])(
+  "keeps %s after a table as a separate horizontal rule",
+  (rule) => {
+    const table = "| A | B |\n| --- | --- |\n| one | two |"
+    expect(roundTripMarkdown(`${table}\n${rule}\nAfter`)).toBe(
+      `${table}\n\n---\n\nAfter`
+    )
+  }
+)
+
+it("loads image and file attachments inside table cells and preserves their display settings", () => {
+  const markdown = `| Preview | File |\n| --- | --- |\n| ![shot](${ATTACHMENT_URL}?w=240) | [report.pdf](${ATTACHMENT_URL}?d=compact) |`
+  const transformers = transformersForAttachments(descriptionAttachments(true))
+  expect(
+    markdownNodeTypes(markdown, transformers).filter(
+      (type) => type === "attachment"
+    )
+  ).toHaveLength(2)
+  expect(roundTripAttachmentMarkdown(markdown)).toBe(markdown)
 })

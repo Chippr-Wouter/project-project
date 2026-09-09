@@ -1,3 +1,4 @@
+import { TableNode, TableRowNode, TableCellNode } from "@lexical/table"
 import { CodeNode, $createCodeNode } from "@lexical/code"
 import { createEmptyHistoryState, registerHistory } from "@lexical/history"
 import {
@@ -61,6 +62,9 @@ function pasteEvent(text: string, html = "", files: File[] = []) {
 function createPasteEditor(text = "", code = false) {
   const editor = createEditor({
     nodes: [
+      TableNode,
+      TableRowNode,
+      TableCellNode,
       CodeNode,
       HeadingNode,
       QuoteNode,
@@ -119,6 +123,7 @@ describe("Markdown paste", () => {
   })
 
   it.each([
+    "| Name | Value |\n| --- | ---: |\n| **One** | 2 |",
     "intro\n# Heading\nend",
     "hello\nworld",
     "- one\n  continuation\n- two",
