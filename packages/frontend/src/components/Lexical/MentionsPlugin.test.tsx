@@ -116,25 +116,21 @@ it("debounces mention queries, aborts superseded requests, and rejects late resu
       updatedAt: "2026-01-01T00:00:00.000Z"
     })
     await act(async () =>
-      requests
-        .get("latest")
-        ?.resolve(
-          Response.json({
-            items: [ticket("T-2", "Latest result")],
-            nextCursor: null
-          })
-        )
+      requests.get("latest")?.resolve(
+        Response.json({
+          items: [ticket("T-2", "Latest result")],
+          nextCursor: null
+        })
+      )
     )
     await screen.findByText("ticket:T-2")
     await act(async () =>
-      requests
-        .get("early")
-        ?.resolve(
-          Response.json({
-            items: [ticket("T-1", "Early result")],
-            nextCursor: null
-          })
-        )
+      requests.get("early")?.resolve(
+        Response.json({
+          items: [ticket("T-1", "Early result")],
+          nextCursor: null
+        })
+      )
     )
     expect(screen.queryByText("ticket:T-1")).toBeNull()
     expect(screen.getByText("ticket:T-2")).toBeTruthy()
