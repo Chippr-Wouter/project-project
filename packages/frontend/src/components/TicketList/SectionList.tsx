@@ -122,105 +122,102 @@ export function SectionList({
         }
       />
 
-      <AnimatePresence initial={false}>
-        {!collapsed && (
-          <motion.div
-            key="content"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{
-              duration: reducedMotion ? 0 : 0.15,
-              ease: "easeInOut"
-            }}
-            className="overflow-hidden"
-          >
-            <div className="flex flex-col gap-1 pt-1">
-              {items.length === 0 ? (
-                <div className="px-3 py-4 text-center text-xs text-muted-foreground">
-                  —
-                </div>
-              ) : (
-                <ul
-                  className={gridCols}
-                  style={{
-                    contentVisibility: "auto",
-                    containIntrinsicBlockSize: `auto ${Math.max(0, items.length * 56 - 4)}px`
-                  }}
-                >
-                  <AnimatePresence initial={false}>
-                    {items.map(({ ticket, key, pending }) => (
-                      <motion.li
-                        key={key}
-                        inert={pending}
-                        aria-busy={pending}
-                        initial={
-                          pending && !reducedMotion ? { opacity: 0 } : false
-                        }
-                        animate={{ opacity: 1 }}
-                        transition={transitions.presence}
-                        className={cn(
-                          "col-span-full grid grid-cols-subgrid",
-                          pending && "pointer-events-none animate-pulse",
-                          pendingStatusChanges.has(ticket.id) && "animate-pulse"
-                        )}
-                      >
-                        <Row
-                          orgSlug={orgSlug}
-                          slug={slug}
-                          ticket={ticket}
-                          query={query}
-                          members={members}
-                          showSprintCol={showSprintCol}
-                          showExtraActionsCol={showExtraActionsCol}
-                          sprintMembership={
-                            sprintMembership?.get(ticket.id) ?? null
-                          }
-                          extraRowActions={extraRowActions}
-                          pending={pending}
-                          previewOpen={activePreviewId === ticket.id}
-                          onPreviewPointerEnter={onPreviewPointerEnter}
-                          onPreviewOpenChange={onPreviewOpenChange}
-                        />
-                      </motion.li>
-                    ))}
-                  </AnimatePresence>
-                </ul>
-              )}
-
-              {Result.matchWithError(loadMoreState, {
-                onInitial: () => null,
-                onError: (error) => <ErrorPage error={error} contained />,
-                onDefect: (defect) => <ErrorPage error={defect} contained />,
-                onSuccess: () => null
-              })}
-              {nextCursor !== null && (
-                <div className="flex justify-center py-2">
-                  <Button
-                    type="button"
-                    variant="tertiary"
-                    size="sm"
-                    onClick={() => loadMore()}
-                    disabled={loadingMore}
-                  >
-                    {loadingMore ? (
-                      <>
-                        <Loader2
-                          className="size-4 animate-spin"
-                          strokeWidth={1.75}
-                        />
-                        {m.tickets_load_more_loading()}
-                      </>
-                    ) : (
-                      m.tickets_section_load_more_button({ remaining })
-                    )}
-                  </Button>
-                </div>
-              )}
-            </div>
-          </motion.div>
+      <div
+        aria-hidden={collapsed || undefined}
+        inert={collapsed ? true : undefined}
+        className={cn(
+          "grid duration-150 transition-[grid-template-rows,opacity] ease-[cubic-bezier(0.65,0,0.35,1)] motion-reduce:transition-none",
+          collapsed
+            ? "grid-rows-[0fr] opacity-0"
+            : "grid-rows-[1fr] opacity-100"
         )}
-      </AnimatePresence>
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div className="flex flex-col gap-1 pt-1">
+            {items.length === 0 ? (
+              <div className="px-3 py-4 text-center text-xs text-muted-foreground">
+                —
+              </div>
+            ) : (
+              <ul
+                className={gridCols}
+                style={{
+                  contentVisibility: "auto",
+                  containIntrinsicBlockSize: `auto ${Math.max(0, items.length * 56 - 4)}px`
+                }}
+              >
+                <AnimatePresence initial={false}>
+                  {items.map(({ ticket, key, pending }) => (
+                    <motion.li
+                      key={key}
+                      inert={pending}
+                      aria-busy={pending}
+                      initial={
+                        pending && !reducedMotion ? { opacity: 0 } : false
+                      }
+                      animate={{ opacity: 1 }}
+                      transition={transitions.presence}
+                      className={cn(
+                        "col-span-full grid grid-cols-subgrid",
+                        pending && "pointer-events-none animate-pulse",
+                        pendingStatusChanges.has(ticket.id) && "animate-pulse"
+                      )}
+                    >
+                      <Row
+                        orgSlug={orgSlug}
+                        slug={slug}
+                        ticket={ticket}
+                        query={query}
+                        members={members}
+                        showSprintCol={showSprintCol}
+                        showExtraActionsCol={showExtraActionsCol}
+                        sprintMembership={
+                          sprintMembership?.get(ticket.id) ?? null
+                        }
+                        extraRowActions={extraRowActions}
+                        pending={pending}
+                        previewOpen={activePreviewId === ticket.id}
+                        onPreviewPointerEnter={onPreviewPointerEnter}
+                        onPreviewOpenChange={onPreviewOpenChange}
+                      />
+                    </motion.li>
+                  ))}
+                </AnimatePresence>
+              </ul>
+            )}
+
+            {Result.matchWithError(loadMoreState, {
+              onInitial: () => null,
+              onError: (error) => <ErrorPage error={error} contained />,
+              onDefect: (defect) => <ErrorPage error={defect} contained />,
+              onSuccess: () => null
+            })}
+            {nextCursor !== null && (
+              <div className="flex justify-center py-2">
+                <Button
+                  type="button"
+                  variant="tertiary"
+                  size="sm"
+                  onClick={() => loadMore()}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? (
+                    <>
+                      <Loader2
+                        className="size-4 animate-spin"
+                        strokeWidth={1.75}
+                      />
+                      {m.tickets_load_more_loading()}
+                    </>
+                  ) : (
+                    m.tickets_section_load_more_button({ remaining })
+                  )}
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
