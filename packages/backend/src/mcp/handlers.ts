@@ -22,6 +22,7 @@ import {
   type UpdateTicketInput
 } from "@projectproject/shared"
 import * as AttachmentUploads from "../Services/AttachmentUploads"
+import * as OrgStorage from "../Services/OrgStorage"
 import { Users } from "../Services/Users"
 import { BetterAuth } from "../Services/BetterAuth"
 import { Comments } from "../Services/Comments"
@@ -82,6 +83,7 @@ const dieInternal = <A, E, R>(
 // via `Effect.provideService`, so it shouldn't appear in the runtime's R.
 type Env =
   | AttachmentUploads.AttachmentUploads
+  | OrgStorage.OrgStorage
   | Users
   | BetterAuth
   | Comments
@@ -119,12 +121,17 @@ const list_orgs = (input: Pagination) =>
     )
   })
 
-const get_org = (input: { orgSlug: string }) =>
-  Effect.gen(function* () {
-    const current = yield* CurrentUser
-    const betterAuth = yield* BetterAuth
-    return yield* betterAuth.getOrganization(current.id, input.orgSlug)
-  })
+const get_org = Effect.fn("get_org")(function* (input: { orgSlug: string }) {
+  const current = yield* CurrentUser
+  const betterAuth = yield* BetterAuth
+  const org = yield* betterAuth.getOrganization(current.id, input.orgSlug)
+  const orgStorage = yield* OrgStorage.OrgStorage
+  const { status, lastCheckedAt } = yield* orgStorage.getStatus(
+    input.orgSlug,
+    current.id
+  )
+  return { ...org, storage: { status, lastCheckedAt } }
+})
 
 const list_projects = (input: { orgSlug: string } & Pagination) =>
   Effect.gen(function* () {
