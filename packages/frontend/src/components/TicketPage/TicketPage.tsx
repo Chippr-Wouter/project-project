@@ -20,6 +20,7 @@ import { TicketGitPanel } from "@/components/TicketGit"
 import { TicketTimeSection } from "@/components/time/TicketTimePanel"
 import { DescriptionField } from "@/components/TicketPage/DescriptionField"
 import { MetaRow } from "@/components/TicketPage/MetaRow"
+import { TicketDesignLinks } from "@/components/TicketPage/TicketDesignLinks"
 import { TitleField } from "@/components/TicketPage/TitleField"
 import { useProjectRole } from "@/lib/projectRole"
 import { m } from "@/paraglide/messages"
@@ -175,6 +176,7 @@ export function TicketPage({
               />
             </MetaRow>
           )}
+          <TicketDesignLinks orgSlug={orgSlug} slug={slug} ticket={ticket} />
           <TicketTimeSection orgSlug={orgSlug} slug={slug} ticket={ticket} />
           <MetaRow label={m.tickets_page_meta_created()}>
             <time

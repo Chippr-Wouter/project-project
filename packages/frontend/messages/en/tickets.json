@@ -58,6 +58,7 @@
   "tickets_not_found_title": "Ticket not found",
   "tickets_page_meta_assignees": "assignees",
   "tickets_page_meta_created": "created",
+  "tickets_page_meta_designs": "designs",
   "tickets_page_meta_git": "git",
   "tickets_page_meta_priority": "priority",
   "tickets_page_meta_sprint": "sprint",
