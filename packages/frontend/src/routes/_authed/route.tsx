@@ -65,6 +65,7 @@ export const Route = createFileRoute("/_authed")({ component: AuthedLayout })
 function AuthedLayout() {
   const me = useAtomValue(meAtom)
   const { pathname } = useLocation()
+  const { orgSlug } = useParams({ strict: false })
 
   return Result.matchWithError(me, {
     onInitial: () => <LoaderOverlay active />,
@@ -79,8 +80,10 @@ function AuthedLayout() {
         return <Navigate to="/orgs/$orgSlug" params={redirect.params} replace />
       }
       return (
-        <SidebarSlotProvider>
-          <Shell user={value} />
+        <SidebarSlotProvider key={orgSlug ?? value.activeOrgSlug}>
+          <Shell
+            user={{ ...value, activeOrgSlug: orgSlug ?? value.activeOrgSlug }}
+          />
         </SidebarSlotProvider>
       )
     }
