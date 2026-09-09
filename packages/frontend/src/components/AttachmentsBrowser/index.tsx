@@ -2,11 +2,10 @@ import * as Result from "effect/unstable/reactivity/AsyncResult"
 import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as Cause from "effect/Cause"
 import * as Exit from "effect/Exit"
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import type {
   AttachmentRow as AttachmentRowData,
-  AttachmentSort,
-  OrgStorageStatus
+  AttachmentSort
 } from "@projectproject/shared"
 import {
   deleteOrgAttachmentsAtom,
@@ -15,6 +14,7 @@ import {
   orgAttachmentsSummaryAtom
 } from "@/atoms/attachments"
 import { orgAttachmentsKey } from "@/atoms/orgAttachmentsKey"
+import { orgStorageAtom } from "@/atoms/storage"
 import { projectsListAtom } from "@/atoms/projects"
 import { ErrorPage } from "@/components/ErrorPage"
 import { Button } from "@/components/ui/button"
@@ -61,13 +61,7 @@ const deletePrompt = (input: {
       })
 }
 
-export function AttachmentsBrowser({
-  orgSlug,
-  storage
-}: {
-  orgSlug: string
-  storage: OrgStorageStatus
-}) {
+export function AttachmentsBrowser({ orgSlug }: { orgSlug: string }) {
   const [status, setStatus] = useState<StatusFilter>("all")
   const [projectSlug, setProjectSlug] = useState<string | null>(null)
   const [sort, setSort] = useState<AttachmentSort>("created_desc")
@@ -101,21 +95,8 @@ export function AttachmentsBrowser({
     setSelected(new Set())
   }
 
-  if (storage.status === "not_connected") {
-    return (
-      <Empty variant="inline" className="border border-dashed border-border">
-        <EmptyTitle className="text-sm font-medium">
-          {m.attachments_empty_no_storage_title()}
-        </EmptyTitle>
-        <EmptyDescription className="max-w-sm text-xs">
-          {m.attachments_empty_no_storage_body()}
-        </EmptyDescription>
-      </Empty>
-    )
-  }
-
   return (
-    <TooltipProvider>
+    <AttachmentStorageGate orgSlug={orgSlug}>
       <div className="flex w-full flex-col gap-4">
         {Result.matchWithError(summaryResult, {
           onInitial: () => (
@@ -184,8 +165,36 @@ export function AttachmentsBrowser({
           )
         })}
       </div>
-    </TooltipProvider>
+    </AttachmentStorageGate>
   )
+}
+
+function AttachmentStorageGate({
+  orgSlug,
+  children
+}: {
+  orgSlug: string
+  children: ReactNode
+}) {
+  const storage = useAtomValue(orgStorageAtom(orgSlug))
+  return Result.matchWithError(storage, {
+    onInitial: () => <TableSkeleton />,
+    onError: (error) => <ErrorPage error={error} contained />,
+    onDefect: (defect) => <ErrorPage error={defect} contained />,
+    onSuccess: ({ value }) =>
+      value.status === "not_connected" ? (
+        <Empty variant="inline" className="border border-dashed border-border">
+          <EmptyTitle className="text-sm font-medium">
+            {m.attachments_empty_no_storage_title()}
+          </EmptyTitle>
+          <EmptyDescription className="max-w-sm text-xs">
+            {m.attachments_empty_no_storage_body()}
+          </EmptyDescription>
+        </Empty>
+      ) : (
+        <TooltipProvider>{children}</TooltipProvider>
+      )
+  })
 }
 
 function AttachmentsTable({

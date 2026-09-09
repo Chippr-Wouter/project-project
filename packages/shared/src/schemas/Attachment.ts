@@ -157,7 +157,7 @@ export type AttachmentTicketRef = typeof AttachmentTicketRef.Type
 export const AttachmentRow = Schema.Struct({
   ...Attachment.fields,
   projectSlug: Schema.String,
-  ticketId: Schema.String,
+  ticketId: Schema.NullOr(Schema.String),
   tickets: Schema.Array(AttachmentTicketRef)
 })
 export type AttachmentRow = typeof AttachmentRow.Type

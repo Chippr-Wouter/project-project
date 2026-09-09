@@ -1,4 +1,5 @@
 import * as Result from "effect/unstable/reactivity/AsyncResult"
+import * as Atom from "effect/unstable/reactivity/Atom"
 import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as Cause from "effect/Cause"
 import * as Exit from "effect/Exit"
@@ -37,11 +38,17 @@ type Props = {
 const VALID = /^[a-z0-9][a-z0-9 -]{0,30}$/
 const NEUTRAL = "#94a3b8"
 const makeTagName = Schema.decodeUnknownSync(TagName)
+const idleUsageCountsAtom = Atom.make(Result.initial<Record<string, number>>())
 
 export function TagEditor({ orgSlug, slug, ticket, canManageTags }: Props) {
   const key = tagsKey(orgSlug, slug)
   const tagsResult = useAtomValue(tagsAtom(key))
-  const usageResult = useAtomValue(tagUsageCountsAtom(key))
+  const [managedTag, setManagedTag] = useState<string | null>(null)
+  const usageResult = useAtomValue(
+    canManageTags && managedTag !== null
+      ? tagUsageCountsAtom(key)
+      : idleUsageCountsAtom
+  )
   const updateTicket = useAtomSet(
     updateTicketAtom(ticketKey(orgSlug, slug, ticket.id))
   )
@@ -184,6 +191,11 @@ export function TagEditor({ orgSlug, slug, ticket, canManageTags }: Props) {
             onPatch={(patch) => handlePatch(name, patch)}
             onDelete={() => handleDelete(name)}
             onRemove={() => removeFromTicket(name)}
+            onManagementOpenChange={(open) =>
+              setManagedTag((current) =>
+                open ? name : current === name ? null : current
+              )
+            }
           />
         )
       })}
@@ -312,7 +324,8 @@ function AppliedTagChip({
   usageCount,
   onPatch,
   onDelete,
-  onRemove
+  onRemove,
+  onManagementOpenChange
 }: {
   name: string
   tag: Tag | undefined
@@ -323,6 +336,7 @@ function AppliedTagChip({
   onPatch: (patch: { nextName?: TagName; color?: Tag["color"] }) => void
   onDelete: () => Promise<void> | void
   onRemove: () => void
+  onManagementOpenChange: (open: boolean) => void
 }) {
   const hex = color ?? NEUTRAL
   const wrapperClass = cn(
@@ -368,6 +382,7 @@ function AppliedTagChip({
         usageCount={usageCount}
         onPatch={onPatch}
         onDelete={onDelete}
+        onOpenChange={onManagementOpenChange}
       >
         <button
           type="button"

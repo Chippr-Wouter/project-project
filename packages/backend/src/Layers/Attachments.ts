@@ -23,13 +23,18 @@ import {
   extractAttachmentRefs,
   Forbidden,
   isAttachmentDeletable,
+  isRasterImageContentType,
   NotFound,
   StorageError,
   type Attachment,
   type AttachmentRow,
   type AttachmentTicketRef
 } from "@projectproject/shared"
-import { attachmentIndex, attachmentReference } from "../db/schema"
+import {
+  attachmentIndex,
+  attachmentReference,
+  projectImageReference
+} from "../db/schema"
 import { CurrentOrg, requireOrgAdmin } from "../Services/CurrentOrg"
 import { Db } from "../Services/Db"
 import { OrgStorage } from "../Services/OrgStorage"
@@ -116,6 +121,14 @@ export const AttachmentsLive = Layer.effect(
       Effect.gen(function* () {
         const { organizationId } = yield* requireProject(orgSlug, userId, slug)
 
+        if (ticketId === null) {
+          yield* projects.requireRole(orgSlug, userId, slug, ["owner", "admin"])
+          if (!isRasterImageContentType(input.contentType))
+            return yield* new AttachmentTypeRejected({
+              contentType: input.contentType
+            })
+        }
+
         const invalid = validateUploadRequest(input)
         if (invalid) {
           if (invalid.kind === "type") {
@@ -185,6 +198,8 @@ export const AttachmentsLive = Layer.effect(
     ) =>
       Effect.gen(function* () {
         yield* requireProject(orgSlug, userId, slug)
+        if (ticketId === null)
+          yield* projects.requireRole(orgSlug, userId, slug, ["owner", "admin"])
 
         const rows = yield* db
           .select()
@@ -194,7 +209,9 @@ export const AttachmentsLive = Layer.effect(
               eq(attachmentIndex.id, attachmentId),
               eq(attachmentIndex.orgSlug, orgSlug),
               eq(attachmentIndex.projectSlug, slug),
-              eq(attachmentIndex.ticketId, ticketId)
+              ticketId === null
+                ? isNull(attachmentIndex.ticketId)
+                : eq(attachmentIndex.ticketId, ticketId)
             )
           )
           .limit(1)
@@ -222,10 +239,13 @@ export const AttachmentsLive = Layer.effect(
         }
 
         const observedContentType = head.contentType ?? row.contentType
-        const invalid = validateUploadRequest({
-          contentType: observedContentType,
-          byteSize: head.byteSize
-        })
+        const invalid =
+          ticketId === null && !isRasterImageContentType(observedContentType)
+            ? { kind: "type" as const, contentType: observedContentType }
+            : validateUploadRequest({
+                contentType: observedContentType,
+                byteSize: head.byteSize
+              })
 
         const sizeMismatch = head.byteSize !== row.byteSize
 
@@ -286,7 +306,8 @@ export const AttachmentsLive = Layer.effect(
         const [updated] = yield* db
           .update(attachmentIndex)
           .set({
-            status: "live",
+            status: ticketId === null ? "orphaned" : "live",
+            orphanedAt: ticketId === null ? now : null,
             committedAt: now,
             contentType: observedContentType,
             byteSize: head.byteSize,
@@ -503,6 +524,13 @@ export const AttachmentsLive = Layer.effect(
         const row = rows[0]
         if (!row) return yield* new NotFound()
         if (!isAttachmentDeletable(row)) return yield* new Forbidden()
+        const bannerRefs = yield* db
+          .select()
+          .from(projectImageReference)
+          .where(eq(projectImageReference.attachmentId, row.id))
+          .limit(1)
+          .pipe(Effect.orDie)
+        if (bannerRefs.length > 0) return yield* new Forbidden()
 
         const connection = yield* orgStorage.requireConnection(orgSlug)
 
@@ -627,7 +655,7 @@ export const AttachmentsLive = Layer.effect(
 
         const now = yield* DateTime.nowAsDate
 
-        const hasReference = sql`exists (select 1 from ${attachmentReference} where ${attachmentReference.attachmentId} = ${attachmentIndex.id})`
+        const hasReference = sql`(exists (select 1 from ${attachmentReference} where ${attachmentReference.attachmentId} = ${attachmentIndex.id}) or exists (select 1 from ${projectImageReference} where ${projectImageReference.attachmentId} = ${attachmentIndex.id}))`
 
         if (statuses.toOrphan.length > 0) {
           yield* db
@@ -688,7 +716,7 @@ export const AttachmentsLive = Layer.effect(
             : uploadedHere
 
         const now = yield* DateTime.nowAsDate
-        const hasReference = sql`exists (select 1 from ${attachmentReference} where ${attachmentReference.attachmentId} = ${attachmentIndex.id})`
+        const hasReference = sql`(exists (select 1 from ${attachmentReference} where ${attachmentReference.attachmentId} = ${attachmentIndex.id}) or exists (select 1 from ${projectImageReference} where ${projectImageReference.attachmentId} = ${attachmentIndex.id}))`
 
         const orphaned = yield* db
           .update(attachmentIndex)
@@ -770,7 +798,8 @@ export const AttachmentsLive = Layer.effect(
               .where(
                 and(
                   eq(attachmentIndex.id, row.id),
-                  eq(attachmentIndex.status, row.status)
+                  eq(attachmentIndex.status, row.status),
+                  sql`not exists (select 1 from ${projectImageReference} where ${projectImageReference.attachmentId} = ${attachmentIndex.id})`
                 )
               )
               .returning({ id: attachmentIndex.id })

@@ -119,11 +119,9 @@ export const meAtom = runtime.atom(
   })
 )
 
-// Sign out, then refresh meAtom so the gate flips to redirect on the next render.
 export const logoutAtom = runtime.fn(
-  Effect.fn(function* (_: void, get) {
-    yield* Effect.tryPromise(() => authClient.signOut())
-    get.refresh(meAtom)
+  Effect.fn(function* (_: void) {
+    yield* Effect.tryPromise(() => authData(authClient.signOut()))
   })
 )
 

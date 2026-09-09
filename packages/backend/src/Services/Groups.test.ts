@@ -255,6 +255,7 @@ function makeFakeDocs(initial?: {
 
 function makeProjectDetail(role: Role): ProjectDetail {
   return {
+    banner: null,
     org: "org",
     slug: "p",
     key: projectKey("FOO"),

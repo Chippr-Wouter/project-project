@@ -50,14 +50,15 @@ export interface AttachmentKeyInput {
   readonly keyPrefix: string | null
   readonly orgSlug: string
   readonly projectSlug: string
-  readonly ticketId: string
+  readonly ticketId: string | null
   readonly attachmentId: string
   readonly filename: string
 }
 
 export const attachmentObjectKey = (input: AttachmentKeyInput): string => {
   const prefix = (input.keyPrefix ?? "").replace(/^\/+|\/+$/g, "")
-  const tail = `orgs/${input.orgSlug}/projects/${input.projectSlug}/tickets/${input.ticketId}/${input.attachmentId}-${sanitizeFilename(input.filename)}`
+  const scope = input.ticketId === null ? "images" : `tickets/${input.ticketId}`
+  const tail = `orgs/${input.orgSlug}/projects/${input.projectSlug}/${scope}/${input.attachmentId}-${sanitizeFilename(input.filename)}`
   return prefix === "" ? tail : `${prefix}/${tail}`
 }
 

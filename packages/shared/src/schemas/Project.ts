@@ -8,6 +8,7 @@
 // `Project` is the full record (used by list responses for now; later by /get).
 
 import * as Schema from "effect/Schema"
+import { AttachmentId } from "./Attachment"
 
 export const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
@@ -117,7 +118,44 @@ export const ProjectSetup = Schema.Struct({
 })
 export type ProjectSetup = typeof ProjectSetup.Type
 
+export const ProjectBannerPreset = Schema.Literals([
+  "sunset",
+  "water_lily_pond",
+  "wheat_stacks",
+  "cliff_walk",
+  "saint_lazare",
+  "bordighera"
+])
+export type ProjectBannerPreset = typeof ProjectBannerPreset.Type
+
+export const ProjectBannerCrop = Schema.Struct({
+  x: Schema.Finite.pipe(
+    Schema.check(Schema.isBetween({ minimum: 0, maximum: 1 }))
+  ),
+  y: Schema.Finite.pipe(
+    Schema.check(Schema.isBetween({ minimum: 0, maximum: 1 }))
+  ),
+  zoom: Schema.Finite.pipe(
+    Schema.check(Schema.isBetween({ minimum: 1, maximum: 4 }))
+  )
+})
+
+export const ProjectBanner = Schema.Union([
+  Schema.Struct({
+    type: Schema.Literal("preset"),
+    preset: ProjectBannerPreset,
+    crop: ProjectBannerCrop
+  }),
+  Schema.Struct({
+    type: Schema.Literal("attachment"),
+    attachmentId: AttachmentId,
+    crop: ProjectBannerCrop
+  })
+])
+export type ProjectBanner = typeof ProjectBanner.Type
+
 export const Project = Schema.Struct({
+  banner: Schema.NullOr(ProjectBanner),
   org: Slug,
   slug: Slug,
   key: ProjectKey,
@@ -177,6 +215,7 @@ export type TransferOwnershipInput = typeof TransferOwnershipInput.Type
 // Partial update payload. Both fields optional — the client sends only what
 // changed. Empty object is allowed but a no-op on the server.
 export const UpdateProjectInput = Schema.Struct({
+  banner: Schema.optional(Schema.NullOr(ProjectBanner)),
   name: Schema.optional(
     Schema.String.pipe(
       Schema.check(Schema.isMinLength(1)),

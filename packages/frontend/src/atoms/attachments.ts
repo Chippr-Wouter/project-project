@@ -1,12 +1,14 @@
 import * as Result from "effect/unstable/reactivity/AsyncResult"
 import * as Atom from "effect/unstable/reactivity/Atom"
 import * as Reactivity from "effect/unstable/reactivity/Reactivity"
+import * as Schema from "effect/Schema"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
-import { ATTACHMENT_PAGE_SIZE } from "@projectproject/shared"
+import { AttachmentId, ATTACHMENT_PAGE_SIZE } from "@projectproject/shared"
 import { runtime } from "@/runtime"
 import { ApiClient } from "@/services/ApiClient"
 import { splitOrgAttachmentsKey } from "./orgAttachmentsKey"
+import { splitProjectKey } from "./projects"
 import { splitTicketKey } from "./tickets"
 
 export class AttachmentUploadFailed extends Data.TaggedError(
@@ -28,6 +30,42 @@ export interface UploadedAttachment {
   readonly filename: string
   readonly contentType: string
 }
+
+const transferAttachment = (input: UploadAttachmentInput, uploadUrl: string) =>
+  Effect.callback<void, AttachmentUploadFailed>((resume, signal) => {
+    const xhr = new XMLHttpRequest()
+    const abort = () => xhr.abort()
+    signal.addEventListener("abort", abort)
+    input.signal?.addEventListener("abort", abort)
+    xhr.open("PUT", uploadUrl, true)
+    xhr.setRequestHeader("content-type", input.file.type)
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        input.onProgress?.(event.loaded / event.total)
+      }
+    }
+    xhr.onload = () =>
+      resume(
+        xhr.status >= 200 && xhr.status < 300
+          ? Effect.void
+          : Effect.fail(
+              new AttachmentUploadFailed({
+                reason: "status",
+                status: xhr.status
+              })
+            )
+      )
+    xhr.onerror = () =>
+      resume(Effect.fail(new AttachmentUploadFailed({ reason: "network" })))
+    xhr.onabort = () =>
+      resume(Effect.fail(new AttachmentUploadFailed({ reason: "abort" })))
+    xhr.send(input.file)
+    return Effect.sync(() => {
+      signal.removeEventListener("abort", abort)
+      input.signal?.removeEventListener("abort", abort)
+      xhr.abort()
+    })
+  })
 
 export const uploadAttachmentAtom = Atom.family((key: string) => {
   const { orgSlug, slug, id } = splitTicketKey(key)
@@ -53,38 +91,7 @@ export const uploadAttachmentAtom = Atom.family((key: string) => {
 
       yield* aborted
 
-      yield* Effect.callback<void, AttachmentUploadFailed>((resume, signal) => {
-        const xhr = new XMLHttpRequest()
-        const abort = () => xhr.abort()
-        signal.addEventListener("abort", abort)
-        xhr.open("PUT", prepared.uploadUrl, true)
-        xhr.setRequestHeader("content-type", input.file.type)
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            input.onProgress?.(event.loaded / event.total)
-          }
-        }
-        xhr.onload = () =>
-          resume(
-            xhr.status >= 200 && xhr.status < 300
-              ? Effect.void
-              : Effect.fail(
-                  new AttachmentUploadFailed({
-                    reason: "status",
-                    status: xhr.status
-                  })
-                )
-          )
-        xhr.onerror = () =>
-          resume(Effect.fail(new AttachmentUploadFailed({ reason: "network" })))
-        xhr.onabort = () =>
-          resume(Effect.fail(new AttachmentUploadFailed({ reason: "abort" })))
-        xhr.send(input.file)
-        return Effect.sync(() => {
-          signal.removeEventListener("abort", abort)
-          xhr.abort()
-        })
-      })
+      yield* transferAttachment(input, prepared.uploadUrl)
 
       yield* aborted
 
@@ -92,8 +99,54 @@ export const uploadAttachmentAtom = Atom.family((key: string) => {
         params: { orgSlug, slug, id, attachmentId: prepared.id }
       })
 
+      yield* Reactivity.invalidate(attachmentsReactivityKey(orgSlug))
+
       return {
         id: committed.id,
+        url: committed.url,
+        filename: committed.filename,
+        contentType: committed.contentType
+      } satisfies UploadedAttachment
+    })
+  )
+})
+
+export const uploadProjectImageAtom = Atom.family((key: string) => {
+  const { orgSlug, slug } = splitProjectKey(key)
+  return runtime.fn(
+    Effect.fn(function* (input: UploadAttachmentInput) {
+      const aborted = Effect.suspend(() =>
+        input.signal?.aborted === true
+          ? Effect.fail(new AttachmentUploadFailed({ reason: "abort" }))
+          : Effect.void
+      )
+
+      yield* aborted
+
+      const client = yield* ApiClient
+      const prepared = yield* client.attachments.prepareProject({
+        params: { orgSlug, slug },
+        payload: {
+          filename: input.file.name,
+          contentType: input.file.type,
+          byteSize: input.file.size
+        }
+      })
+
+      yield* aborted
+
+      yield* transferAttachment(input, prepared.uploadUrl)
+
+      yield* aborted
+
+      const committed = yield* client.attachments.commitProject({
+        params: { orgSlug, slug, attachmentId: prepared.id }
+      })
+
+      return {
+        id: yield* Schema.decodeEffect(AttachmentId)(committed.id).pipe(
+          Effect.orDie
+        ),
         url: committed.url,
         filename: committed.filename,
         contentType: committed.contentType

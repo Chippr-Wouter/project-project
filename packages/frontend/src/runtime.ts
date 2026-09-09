@@ -1,4 +1,3 @@
-import * as Registry from "effect/unstable/reactivity/AtomRegistry"
 import * as Atom from "effect/unstable/reactivity/Atom"
 // packages/frontend/src/runtime.ts
 //
@@ -67,5 +66,3 @@ import { ApiClient } from "@/services/ApiClient"
 export const AppLayer = Layer.mergeAll(ApiClient.Default)
 
 export const runtime = Atom.runtime(AppLayer)
-
-export const registry = Registry.make()

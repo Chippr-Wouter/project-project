@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useMemo, useState, type JSX } from "react"
+import { RegistryContext } from "@effect/atom-react"
+import * as Registry from "effect/unstable/reactivity/AtomRegistry"
+import {
+  useContext,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type JSX
+} from "react"
 import { createPortal } from "react-dom"
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext"
 import {
@@ -40,11 +49,17 @@ const TRIGGERS = mentionProviders.map((p) => p.trigger).join("")
 export function MentionsPlugin(): JSX.Element | null {
   const [editor] = useLexicalComposerContext()
   const scope = useMentionScope()
+  const registry = useContext(RegistryContext)
   const [queryString, setQueryString] = useState<string | null>(null)
   const [activeProvider, setActiveProvider] = useState<MentionProvider | null>(
     null
   )
-  const [results, setResults] = useState<ReadonlyArray<MentionCandidate>>([])
+  const [results, setResults] = useState<{
+    provider: MentionProvider
+    query: string
+    scope: typeof scope
+    candidates: ReadonlyArray<MentionCandidate>
+  } | null>(null)
 
   const checkForTriggerMatch = useCallback((text: string) => {
     for (let i = text.length - 1; i >= 0; i--) {
@@ -70,33 +85,53 @@ export function MentionsPlugin(): JSX.Element | null {
 
   useEffect(() => {
     if (!activeProvider || queryString === null) {
-      setResults([])
+      setResults(null)
       return
     }
-    let cancelled = false
+    const controller = new AbortController()
+    setResults(null)
     Effect.runPromise(
-      activeProvider
-        .search(queryString, scope ?? { orgSlug: "", slug: "" })
-        .pipe(Effect.provide(AppLayer))
+      Effect.gen(function* () {
+        if (queryString.length > 0) yield* Effect.sleep("200 millis")
+        return yield* activeProvider.search(
+          queryString,
+          scope ?? { orgSlug: "", slug: "" }
+        )
+      }).pipe(
+        Effect.provideService(Registry.AtomRegistry, registry),
+        Effect.provide(AppLayer)
+      ),
+      { signal: controller.signal }
     ).then(
       (r) => {
-        if (!cancelled) setResults(r.slice(0, 8))
+        if (!controller.signal.aborted)
+          setResults({
+            provider: activeProvider,
+            query: queryString,
+            scope,
+            candidates: r.slice(0, 8)
+          })
       },
       () => {
-        if (!cancelled) setResults([])
+        if (!controller.signal.aborted) setResults(null)
       }
     )
     return () => {
-      cancelled = true
+      controller.abort()
     }
-  }, [activeProvider, queryString, scope])
+  }, [activeProvider, queryString, scope, registry])
 
   const options = useMemo(
     () =>
-      activeProvider
-        ? results.map((c) => new MentionMenuOption(activeProvider, c))
+      results &&
+      results.provider === activeProvider &&
+      results.query === queryString &&
+      results.scope === scope
+        ? results.candidates.map(
+            (c) => new MentionMenuOption(results.provider, c)
+          )
         : [],
-    [activeProvider, results]
+    [activeProvider, queryString, scope, results]
   )
 
   const onSelectOption = useCallback(

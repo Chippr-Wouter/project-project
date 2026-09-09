@@ -1,11 +1,19 @@
+import { useDebouncer } from "@tanstack/react-pacer"
+import * as Atom from "effect/unstable/reactivity/Atom"
 import * as Random from "effect/Random"
 import * as Effect from "effect/Effect"
-import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
+import {
+  RegistryContext,
+  useAtomRefresh,
+  useAtomSet,
+  useAtomValue
+} from "@effect/atom-react"
 import * as Result from "effect/unstable/reactivity/AsyncResult"
 import { useNavigate } from "@tanstack/react-router"
 import * as Exit from "effect/Exit"
 import { Plus } from "lucide-react"
 import {
+  useContext,
   useMemo,
   useRef,
   useState,
@@ -46,6 +54,8 @@ import type {
 } from "@projectproject/shared"
 import { TicketCreatorShell } from "./TicketCreatorShell"
 
+const idleSearchAtom = Atom.make(Result.initial<ReadonlyArray<Ticket>>())
+
 type Item =
   | { kind: "create"; label: string }
   | { kind: "existing"; ticket: Ticket; otherSprintName: string | null }
@@ -61,6 +71,7 @@ export function SprintTicketCreator({
   groupId: GroupId
   excludeIds: ReadonlySet<TicketId>
 }) {
+  const registry = useContext(RegistryContext)
   const projKey = projectKey(orgSlug, slug)
   const sprintProjectKey = sprintsKey(orgSlug, slug)
   const sectionKey = ticketsListKeyForStatus(
@@ -95,14 +106,17 @@ export function SprintTicketCreator({
   const trimmed = title.trim()
   const expanded = focused || typeMenuOpen || closingMenu
 
+  const [searchQuery, setSearchQuery] = useState("")
+  const searchDebouncer = useDebouncer(setSearchQuery, { wait: 200 })
+  const searchAtom = ticketSearchAtom(
+    ticketSearchKey(orgSlug, slug, {
+      q: searchQuery || undefined,
+      excludeGroupId: groupId,
+      limit: 24
+    })
+  )
   const ticketsResult = useAtomValue(
-    ticketSearchAtom(
-      ticketSearchKey(orgSlug, slug, {
-        q: trimmed.length > 0 ? trimmed : undefined,
-        excludeGroupId: groupId,
-        limit: 24
-      })
-    )
+    expanded && trimmed === searchQuery ? searchAtom : idleSearchAtom
   )
   const sprintsResult = useAtomValue(sprintsListAtom(sprintProjectKey))
   const addToSprint = useAddTicketsToSprint(sprintProjectKey)
@@ -139,6 +153,8 @@ export function SprintTicketCreator({
   const safeHighlight = items.length === 0 ? 0 : highlight % items.length
 
   function reset() {
+    searchDebouncer.cancel()
+    setSearchQuery("")
     setTitle("")
     setHighlight(0)
   }
@@ -318,9 +334,19 @@ export function SprintTicketCreator({
       onValueChange={(v) => {
         setTitle(v)
         setHighlight(0)
+        searchDebouncer.cancel()
+        searchDebouncer.maybeExecute(v.trim())
       }}
-      onFocus={() => setFocused(true)}
-      onBlur={() => setFocused(false)}
+      onPointerEnter={() => registry.mount(searchAtom)()}
+      onFocus={() => {
+        searchDebouncer.cancel()
+        setSearchQuery(trimmed)
+        setFocused(true)
+      }}
+      onBlur={() => {
+        searchDebouncer.cancel()
+        setFocused(false)
+      }}
       onKeyDown={onKeyDown}
       onSubmit={onSubmit}
       expanded={expanded}

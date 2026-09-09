@@ -188,8 +188,12 @@ export function SectionList({
 
             {Result.matchWithError(loadMoreState, {
               onInitial: () => null,
-              onError: (error) => <ErrorPage error={error} contained />,
-              onDefect: (defect) => <ErrorPage error={defect} contained />,
+              onError: (error) => (
+                <ErrorPage error={error} reset={() => loadMore()} contained />
+              ),
+              onDefect: (defect) => (
+                <ErrorPage error={defect} reset={() => loadMore()} contained />
+              ),
               onSuccess: () => null
             })}
             {nextCursor !== null && (

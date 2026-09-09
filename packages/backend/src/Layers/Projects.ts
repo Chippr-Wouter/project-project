@@ -3,7 +3,7 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
 import * as SqlClient from "effect/unstable/sql/SqlClient"
-import { and, asc, eq } from "drizzle-orm"
+import { and, asc, eq, sql as sqlFragment } from "drizzle-orm"
 import { ulid } from "ulid"
 import {
   Conflict,
@@ -25,6 +25,7 @@ import {
 } from "@projectproject/shared"
 import type { CursorPayload } from "@projectproject/shared"
 import type {
+  ProjectBanner,
   AddMemberInput,
   AssignableRole,
   ConnectGithubInput,
@@ -49,6 +50,7 @@ import {
   projectMember,
   projectStatus
 } from "../db/schema"
+import { replaceProjectImageReference } from "../projectImageReferences"
 import { Db } from "../Services/Db"
 import { GitHub } from "../Services/GitHub"
 import { ProjectDocs } from "../Services/ProjectDocs"
@@ -127,6 +129,23 @@ export const ProjectsLive = Layer.effect(
   Projects,
   Effect.gen(function* () {
     const db = yield* Db
+    const withProjectWriteLock = <A, E, R>(
+      slug: string,
+      effect: Effect.Effect<A, E, R>
+    ) =>
+      db
+        .transaction(() =>
+          Effect.gen(function* () {
+            yield* db
+              .execute(
+                sqlFragment`select slug from project_index where slug = ${slug} for update`
+              )
+              .pipe(Effect.orDie)
+            return yield* effect
+          })
+        )
+        .pipe(Effect.catchTag("SqlError", Effect.die))
+
     const sql = yield* SqlClient.SqlClient
     const projectDocs = yield* ProjectDocs
     const ticketDocs = yield* TicketDocs
@@ -399,6 +418,7 @@ export const ProjectsLive = Layer.effect(
           const organizationId = yield* orgIdFromSlug(orgSlug)
           const orgRole = yield* orgRoleForUser(organizationId, userId)
           const baseSelect = {
+            banner: projectIndex.banner,
             slug: projectIndex.slug,
             key: projectIndex.key,
             name: projectIndex.name,
@@ -429,6 +449,7 @@ export const ProjectsLive = Layer.effect(
                   .orderBy(asc(projectIndex.createdAt))
                   .pipe(Effect.orDie)
           return rows.map((r) => ({
+            banner: r.banner,
             org: orgSlug,
             slug: r.slug,
             key: makeProjectKey(r.key),
@@ -603,7 +624,8 @@ export const ProjectsLive = Layer.effect(
       body: string,
       members: ReadonlyArray<Member>,
       connection: GithubConnection | null,
-      setup: ProjectSetup
+      setup: ProjectSetup,
+      banner: ProjectBanner | null = null
     ): Effect.Effect<void, MarkdownError> =>
       projectDocs.write(orgSlug, slug, {
         org: orgSlug,
@@ -619,6 +641,7 @@ export const ProjectsLive = Layer.effect(
           role: m.role
         })),
         github: connection,
+        banner,
         setup,
         body
       })
@@ -755,7 +778,8 @@ export const ProjectsLive = Layer.effect(
             icon: makeProjectIcon(row.icon),
             color: makeProjectColor(row.color),
             createdBy: row.createdBy,
-            createdAt: row.createdAt
+            createdAt: row.createdAt,
+            banner: null
           }
         })
       )
@@ -790,6 +814,7 @@ export const ProjectsLive = Layer.effect(
             createdBy: indexRow.createdBy,
             createdAt: indexRow.createdAt,
             github: connection,
+            banner: file.banner ?? null,
             setup: file.setup,
             body: file.body,
             members,
@@ -814,12 +839,27 @@ export const ProjectsLive = Layer.effect(
           const file = yield* projectDocs.read(orgSlug, slug)
           const connection = yield* loadGithubConnection(indexRow)
 
+          const nextBanner =
+            input.banner === undefined ? (file.banner ?? null) : input.banner
+          if (input.banner !== undefined) {
+            yield* replaceProjectImageReference(db, {
+              orgSlug,
+              projectSlug: slug,
+              slot: "banner",
+              attachmentId:
+                nextBanner?.type === "attachment"
+                  ? nextBanner.attachmentId
+                  : null
+            })
+          }
+
           const nextName = input.name ?? indexRow.name
           const nextBody = input.body ?? file.body
           const nextIcon = input.icon ?? makeProjectIcon(indexRow.icon)
           const nextColor = input.color ?? makeProjectColor(indexRow.color)
 
           const dbPatch: Partial<typeof projectIndex.$inferInsert> = {}
+          if (input.banner !== undefined) dbPatch.banner = nextBanner
           if (input.name !== undefined && input.name !== indexRow.name) {
             dbPatch.name = nextName
           }
@@ -851,7 +891,8 @@ export const ProjectsLive = Layer.effect(
             nextBody,
             members,
             connection,
-            file.setup
+            file.setup,
+            nextBanner
           )
 
           return {
@@ -864,12 +905,13 @@ export const ProjectsLive = Layer.effect(
             createdBy: indexRow.createdBy,
             createdAt: indexRow.createdAt,
             github: connection,
+            banner: nextBanner,
             setup: file.setup,
             body: nextBody,
             members,
             pendingMembers
           }
-        })
+        }).pipe((effect) => withProjectWriteLock(slug, effect))
       )
 
     const updateSetup = (
@@ -902,7 +944,8 @@ export const ProjectsLive = Layer.effect(
             file.body,
             members,
             connection,
-            setup
+            setup,
+            file.banner ?? null
           )
           return {
             org: orgSlug,
@@ -915,11 +958,12 @@ export const ProjectsLive = Layer.effect(
             createdAt: indexRow.createdAt,
             github: connection,
             setup,
+            banner: file.banner ?? null,
             body: file.body,
             members,
             pendingMembers
           }
-        })
+        }).pipe((effect) => withProjectWriteLock(slug, effect))
       )
 
     const remove = (
@@ -963,7 +1007,8 @@ export const ProjectsLive = Layer.effect(
           file.body,
           members,
           connection,
-          file.setup
+          file.setup,
+          file.banner ?? null
         )
         return {
           org: orgSlug,
@@ -975,12 +1020,13 @@ export const ProjectsLive = Layer.effect(
           createdBy: indexRow.createdBy,
           createdAt: indexRow.createdAt,
           github: connection,
+          banner: file.banner ?? null,
           setup: file.setup,
           body: file.body,
           members,
           pendingMembers
         }
-      })
+      }).pipe((effect) => withProjectWriteLock(slug, effect))
 
     const unassignUserFromActiveTickets = (
       orgSlug: string,
@@ -1686,7 +1732,6 @@ export const ProjectsLive = Layer.effect(
             indexRow.organizationId
           )
           if (!orgGithub) return yield* new NotFound()
-          const file = yield* projectDocs.read(orgSlug, slug)
           const currentConnection = yield* loadGithubConnection(indexRow)
 
           const verified = yield* github.verifyInstallationRepo(
@@ -1811,38 +1856,7 @@ export const ProjectsLive = Layer.effect(
             ? withClearedTicketPrMetadata(orgSlug, slug, switchRepository)
             : switchRepository
 
-          const members = yield* loadMembers(slug)
-          const pendingMembers = yield* loadPendingMembers(slug)
-          yield* syncFrontmatter(
-            orgSlug,
-            slug,
-            indexRow.name,
-            indexRow.icon,
-            indexRow.color,
-            indexRow.createdBy,
-            indexRow.createdAt,
-            makeProjectKey(indexRow.key),
-            file.body,
-            members,
-            next,
-            file.setup
-          )
-
-          return {
-            org: orgSlug,
-            slug: indexRow.slug,
-            key: makeProjectKey(indexRow.key),
-            name: indexRow.name,
-            icon: makeProjectIcon(indexRow.icon),
-            color: makeProjectColor(indexRow.color),
-            createdBy: indexRow.createdBy,
-            createdAt: indexRow.createdAt,
-            github: next,
-            setup: file.setup,
-            body: file.body,
-            members,
-            pendingMembers
-          }
+          return yield* replayDetail(orgSlug, slug)
         })
       )
 
@@ -1858,9 +1872,6 @@ export const ProjectsLive = Layer.effect(
         Effect.gen(function* () {
           const indexRow = yield* getIndexRowInOrg(orgSlug, slug)
           yield* requireOrgOwner(indexRow.organizationId, userId)
-          const file = yield* projectDocs.read(orgSlug, slug)
-          const members = yield* loadMembers(slug)
-          const pendingMembers = yield* loadPendingMembers(slug)
           const now = yield* DateTime.nowAsDate
           yield* sql
             .withTransaction(
@@ -1899,35 +1910,7 @@ export const ProjectsLive = Layer.effect(
               })
             )
             .pipe(Effect.catchTag("SqlError", Effect.die))
-          yield* syncFrontmatter(
-            orgSlug,
-            slug,
-            indexRow.name,
-            indexRow.icon,
-            indexRow.color,
-            indexRow.createdBy,
-            indexRow.createdAt,
-            makeProjectKey(indexRow.key),
-            file.body,
-            members,
-            null,
-            file.setup
-          )
-          return {
-            org: orgSlug,
-            slug: indexRow.slug,
-            key: makeProjectKey(indexRow.key),
-            name: indexRow.name,
-            icon: makeProjectIcon(indexRow.icon),
-            color: makeProjectColor(indexRow.color),
-            createdBy: indexRow.createdBy,
-            createdAt: indexRow.createdAt,
-            github: null,
-            setup: file.setup,
-            body: file.body,
-            members,
-            pendingMembers
-          }
+          return yield* replayDetail(orgSlug, slug)
         })
       )
 

@@ -829,6 +829,51 @@ const AttachmentsGroup = HttpApiGroup.make("attachments")
     )
   )
   .add(
+    HttpApiEndpoint.post(
+      "prepareProject",
+      "/orgs/:orgSlug/projects/:slug/attachments/prepare",
+      {
+        params: ProjectPath,
+        payload: PrepareAttachmentInput,
+        success: PrepareAttachmentResult,
+        error: [
+          Unauthorized,
+          NotFound,
+          Forbidden,
+          AttachmentTooLarge,
+          AttachmentTypeRejected,
+          StorageNotConnected,
+          StorageConfigMissing,
+          StorageError
+        ]
+      }
+    )
+  )
+  .add(
+    HttpApiEndpoint.post(
+      "commitProject",
+      "/orgs/:orgSlug/projects/:slug/attachments/:attachmentId/commit",
+      {
+        params: Schema.Struct({
+          ...ProjectPath.fields,
+          attachmentId: Schema.String
+        }),
+        success: Attachment,
+        error: [
+          Unauthorized,
+          NotFound,
+          Forbidden,
+          AttachmentNotUploaded,
+          AttachmentTooLarge,
+          AttachmentTypeRejected,
+          StorageNotConnected,
+          StorageConfigMissing,
+          StorageError
+        ]
+      }
+    )
+  )
+  .add(
     HttpApiEndpoint.get("list", "/orgs/:orgSlug/attachments", {
       params: OrgPath,
       query: AttachmentListParams,

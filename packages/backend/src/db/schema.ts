@@ -56,7 +56,7 @@ import {
   uniqueIndex,
   uuid
 } from "drizzle-orm/pg-core"
-import type { OrgEverhourConfig } from "@projectproject/shared"
+import type { OrgEverhourConfig, ProjectBanner } from "@projectproject/shared"
 
 export * from "./auth-schema"
 import { invitation, organization, user } from "./auth-schema"
@@ -78,6 +78,7 @@ export const projectIndex = pgTable(
     name: text("name").notNull(),
     icon: text("icon").notNull(),
     color: text("color").notNull(),
+    banner: jsonb("banner").$type<ProjectBanner>(),
     nextTicketNumber: integer("next_ticket_number").notNull().default(1),
     createdBy: text("created_by").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -624,7 +625,7 @@ export const attachmentIndex = pgTable(
       .references(() => organization.id, { onDelete: "cascade" }),
     orgSlug: text("org_slug").notNull(),
     projectSlug: text("project_slug").notNull(),
-    ticketId: text("ticket_id").notNull(),
+    ticketId: text("ticket_id"),
     objectKey: text("object_key").notNull(),
     filename: text("filename").notNull(),
     contentType: text("content_type").notNull(),
@@ -659,6 +660,24 @@ export const attachmentIndex = pgTable(
       t.contentHash,
       t.byteSize
     )
+  ]
+)
+
+export const projectImageReference = pgTable(
+  "project_image_reference",
+  {
+    projectSlug: text("project_slug")
+      .notNull()
+      .references(() => projectIndex.slug, { onDelete: "cascade" }),
+    orgSlug: text("org_slug").notNull(),
+    attachmentId: text("attachment_id")
+      .notNull()
+      .references(() => attachmentIndex.id, { onDelete: "restrict" }),
+    slot: text("slot").notNull()
+  },
+  (t) => [
+    primaryKey({ columns: [t.projectSlug, t.slot] }),
+    index("project_image_reference_attachment_idx").on(t.attachmentId)
   ]
 )
 

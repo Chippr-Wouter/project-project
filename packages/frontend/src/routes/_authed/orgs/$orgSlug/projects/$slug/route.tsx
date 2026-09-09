@@ -60,6 +60,7 @@ import {
 } from "@projectproject/shared"
 import { SPRINT_STATE_META } from "@/components/sprints/SprintChip"
 import { motion } from "motion/react"
+import { ProjectBanner } from "@/components/ProjectBanner"
 import { ProjectHeader } from "@/components/ProjectHeader"
 import { useSidebarSection } from "@/components/SidebarSlot"
 import { cn } from "@/lib/utils"
@@ -156,7 +157,7 @@ function ProjectLayout() {
         body={m.project_detail_load_error_body()}
       />
     ),
-    onSuccess: ({ value }) => (
+    onSuccess: ({ value, waiting }) => (
       <ProjectContext.Provider value={value}>
         <TagRenamesProvider>
           <ProjectGitStatePolling
@@ -165,7 +166,13 @@ function ProjectLayout() {
             enabled={value.github !== null}
           />
           <ProjectSetupSlot orgSlug={orgSlug} slug={slug} project={value} />
-          <div className="flex flex-1 flex-col gap-3">
+          <div className={cn("relative isolate flex flex-1 flex-col gap-3")}>
+            <ProjectBanner
+              orgSlug={orgSlug}
+              slug={slug}
+              banner={value.banner}
+              waiting={waiting}
+            />
             {!headerHidden && (
               <PageContainer className="gap-3">
                 <ProjectHeader

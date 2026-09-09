@@ -1,5 +1,5 @@
 import * as Result from "effect/unstable/reactivity/AsyncResult"
-import { useAtomValue, useAtomSet } from "@effect/atom-react"
+import { useAtomValue, useAtomSet, useAtomRefresh } from "@effect/atom-react"
 import { motion, Reorder } from "motion/react"
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { monitorForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter"
@@ -9,9 +9,11 @@ import {
   placeTicketAtom,
   sprintKey
 } from "@/atoms/sprints"
+import { ticketsInSprintAtom, ticketsInSprintKey } from "@/atoms/tickets"
 import {
   projectKey as projectStatusKey,
-  projectStatusesAtom
+  projectStatusesAtom,
+  projectStatusesBaseAtom
 } from "@/atoms/projectStatuses"
 import type {
   GroupId,
@@ -28,25 +30,12 @@ import {
   type ColumnDropData,
   type DragData
 } from "./board-utils"
+import { ErrorPage } from "@/components/ErrorPage"
+import { DitherShell } from "@/components/ui/dither-shell"
 import { SprintBoardColumn } from "./SprintBoardColumn"
 import { useBoardTickets } from "./useBoardTickets"
 
-const EMPTY_STATUSES: ReadonlyArray<ProjectStatus> = []
-
-export function SprintBoard({
-  orgSlug,
-  slug,
-  groupId,
-  ticketIds,
-  query,
-  members,
-  isCompleted,
-  reorderMode,
-  onEnterReorder,
-  onExitReorder,
-  dragOrder,
-  setDragOrder
-}: {
+type SprintBoardProps = {
   orgSlug: string
   slug: string
   groupId: GroupId
@@ -59,6 +48,59 @@ export function SprintBoard({
   onExitReorder: () => void
   dragOrder: ReadonlyArray<string> | null
   setDragOrder: (next: ReadonlyArray<string> | null) => void
+}
+
+export function SprintBoard(props: SprintBoardProps) {
+  const { orgSlug, slug, groupId } = props
+  const atom = ticketsInSprintAtom(ticketsInSprintKey(orgSlug, slug, groupId))
+  const list = useAtomValue(atom)
+  const statusKey = projectStatusKey(orgSlug, slug)
+  const statuses = useAtomValue(projectStatusesAtom(statusKey))
+  const refreshTickets = useAtomRefresh(atom)
+  const refreshStatuses = useAtomRefresh(projectStatusesBaseAtom(statusKey))
+  const refresh = () => {
+    if (Result.isFailure(list)) refreshTickets()
+    if (Result.isFailure(statuses)) refreshStatuses()
+  }
+
+  return Result.matchWithError(Result.all({ tickets: list, statuses }), {
+    onInitial: () => (
+      <DitherShell contained animated>
+        {null}
+      </DitherShell>
+    ),
+    onError: (error) => <ErrorPage error={error} reset={refresh} contained />,
+    onDefect: (defect) => (
+      <ErrorPage error={defect} reset={refresh} contained />
+    ),
+    onSuccess: ({ value, waiting }) => (
+      <SprintBoardContent
+        {...props}
+        statuses={value.statuses}
+        waiting={waiting}
+      />
+    )
+  })
+}
+
+function SprintBoardContent({
+  orgSlug,
+  slug,
+  groupId,
+  ticketIds,
+  query,
+  members,
+  isCompleted,
+  reorderMode,
+  onEnterReorder,
+  onExitReorder,
+  dragOrder,
+  setDragOrder,
+  statuses,
+  waiting
+}: SprintBoardProps & {
+  statuses: ReadonlyArray<ProjectStatus>
+  waiting: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const groupRef = useRef<HTMLDivElement>(null)
@@ -134,15 +176,8 @@ export function SprintBoard({
   }, [reorderMode, onExitReorder])
 
   const key = sprintKey(orgSlug, slug, groupId)
-  const statusKey = projectStatusKey(orgSlug, slug)
   const overlay = useAtomValue(pendingTicketStatusAtom(key))
   const place = useAtomSet(placeTicketAtom(key))
-  const statusesResult = useAtomValue(projectStatusesAtom(statusKey))
-  const statuses: ReadonlyArray<ProjectStatus> = Result.isSuccess(
-    statusesResult
-  )
-    ? statusesResult.value
-    : EMPTY_STATUSES
   const statusSlugs = useMemo(() => boardStatusesFor(statuses), [statuses])
 
   const order = dragOrder ?? statusSlugs
@@ -222,9 +257,11 @@ export function SprintBoard({
     <motion.div
       ref={ref}
       layoutScroll
+      aria-busy={waiting}
       style={{ height: height ? `${height}px` : undefined }}
       className={cn(
         "overflow-x-auto",
+        waiting && "animate-pulse motion-reduce:animate-none",
         hasRightOverflow &&
           "[mask-image:linear-gradient(to_right,black_calc(100%-16px),transparent)]"
       )}

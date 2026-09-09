@@ -24,7 +24,7 @@ const splitKey = (key: string) => {
   return { orgSlug: key.slice(0, idx), slug: key.slice(idx + 1) }
 }
 
-const projectStatusesBaseAtom = Atom.family((key: string) => {
+export const projectStatusesBaseAtom = Atom.family((key: string) => {
   const { orgSlug, slug } = splitKey(key)
   return runtime
     .atom(

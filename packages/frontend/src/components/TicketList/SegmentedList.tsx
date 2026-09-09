@@ -1,5 +1,5 @@
 import * as Result from "effect/unstable/reactivity/AsyncResult"
-import { useAtomValue } from "@effect/atom-react"
+import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
 import { useCallback, useMemo, useState, type ReactNode } from "react"
 import { FilterX, ListChecks } from "lucide-react"
 import * as Schema from "effect/Schema"
@@ -17,7 +17,8 @@ import {
 import { ErrorPage } from "@/components/ErrorPage"
 import {
   projectKey as projectStatusKey,
-  projectStatusesAtom
+  projectStatusesAtom,
+  projectStatusesBaseAtom
 } from "@/atoms/projectStatuses"
 import type { TicketSectionsValue } from "@/atoms/tickets"
 import { m } from "@/paraglide/messages"
@@ -71,6 +72,9 @@ export function SegmentedList({
   const statusesResult = useAtomValue(
     projectStatusesAtom(projectStatusKey(orgSlug, slug))
   )
+  const refreshStatuses = useAtomRefresh(
+    projectStatusesBaseAtom(projectStatusKey(orgSlug, slug))
+  )
   const statuses: ReadonlyArray<ProjectStatus> = Result.isSuccess(
     statusesResult
   )
@@ -122,8 +126,12 @@ export function SegmentedList({
           className="h-96 animate-pulse rounded-lg bg-muted/40 motion-reduce:animate-none"
         />
       ),
-      onError: (error) => <ErrorPage error={error} contained />,
-      onDefect: (defect) => <ErrorPage error={defect} contained />,
+      onError: (error) => (
+        <ErrorPage error={error} reset={refreshStatuses} contained />
+      ),
+      onDefect: (defect) => (
+        <ErrorPage error={defect} reset={refreshStatuses} contained />
+      ),
       onSuccess: () => null
     })
   }

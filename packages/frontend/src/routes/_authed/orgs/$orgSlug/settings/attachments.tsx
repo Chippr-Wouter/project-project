@@ -2,7 +2,6 @@ import * as Result from "effect/unstable/reactivity/AsyncResult"
 import { useAtomValue } from "@effect/atom-react"
 import { createFileRoute } from "@tanstack/react-router"
 import { orgDetailAtom } from "@/atoms/orgs"
-import { orgStorageAtom } from "@/atoms/storage"
 import { AttachmentsBrowser } from "@/components/AttachmentsBrowser"
 import { ErrorPage } from "@/components/ErrorPage"
 import { m } from "@/paraglide/messages"
@@ -19,7 +18,6 @@ export const Route = createFileRoute(
 function AttachmentsSettings() {
   const { orgSlug } = Route.useParams()
   const orgResult = useAtomValue(orgDetailAtom(orgSlug))
-  const storageResult = useAtomValue(orgStorageAtom(orgSlug))
 
   return Result.matchWithError(orgResult, {
     onInitial: () => <BrowserSkeleton />,
@@ -31,14 +29,7 @@ function AttachmentsSettings() {
           {m.attachments_error_forbidden()}
         </p>
       ) : (
-        Result.matchWithError(storageResult, {
-          onInitial: () => <BrowserSkeleton />,
-          onError: (error) => <ErrorPage error={error} contained />,
-          onDefect: (defect) => <ErrorPage error={defect} contained />,
-          onSuccess: ({ value: storage }) => (
-            <AttachmentsBrowser orgSlug={orgSlug} storage={storage} />
-          )
-        })
+        <AttachmentsBrowser orgSlug={orgSlug} />
       )
   })
 }

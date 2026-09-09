@@ -1,5 +1,3 @@
-import * as Registry from "effect/unstable/reactivity/AtomRegistry"
-import * as Effect from "effect/Effect"
 import { projectAtom } from "@/atoms/projects"
 import { projectStatusesAtom } from "@/atoms/projectStatuses"
 import { sprintsListAtom } from "@/atoms/sprints"
@@ -21,28 +19,18 @@ import { useProject } from "./-context"
 export const Route = createFileRoute("/_authed/orgs/$orgSlug/projects/$slug/")({
   component: TicketsTab,
   loaderDeps: ({ search }) => ticketListQueryFromSearch(search),
-  loader: async ({
+  loader: ({
     context: { registry },
     params: { orgSlug, slug },
-    deps: query,
-    abortController
+    deps: query
   }) => {
     const key = projectKey(orgSlug, slug)
-    await Effect.runPromiseExit(
-      Effect.all(
-        [
-          Registry.getResult(registry, projectAtom(key)),
-          Registry.getResult(registry, sprintsListAtom(key)),
-          Registry.getResult(registry, projectStatusesAtom(key)),
-          Registry.getResult(
-            registry,
-            ticketsSectionsAtom(ticketsSectionsKey(orgSlug, slug, query))
-          )
-        ],
-        { concurrency: "unbounded", discard: true }
-      ),
-      { signal: abortController.signal }
-    )
+    registry.mount(projectAtom(key))()
+    registry.mount(sprintsListAtom(key))()
+    registry.mount(projectStatusesAtom(key))()
+    registry.mount(
+      ticketsSectionsAtom(ticketsSectionsKey(orgSlug, slug, query))
+    )()
   },
   validateSearch: (search: Record<string, unknown>) =>
     ticketListQueryToSearch(ticketListQueryFromSearch(search))
