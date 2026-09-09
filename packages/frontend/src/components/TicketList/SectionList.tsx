@@ -109,8 +109,8 @@ export function SectionList({
   const gridCols = cn(
     "grid gap-y-1",
     showExtraActionsCol
-      ? "grid-cols-[auto_auto_auto_minmax(0,1fr)_auto_auto]"
-      : "grid-cols-[auto_auto_auto_minmax(0,1fr)_auto]",
+      ? "grid-cols-[auto_auto_auto_minmax(0,1fr)_auto_auto_auto]"
+      : "grid-cols-[auto_auto_auto_minmax(0,1fr)_auto_auto]",
     waiting && "animate-pulse"
   )
 
