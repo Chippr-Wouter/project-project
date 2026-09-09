@@ -17,6 +17,7 @@ import type {
   ProjectDetail,
   ProjectKey,
   ProjectOwnerRemovalBlocked,
+  RateLimited,
   RepoGone,
   Role,
   Validation,
@@ -176,6 +177,7 @@ export interface ProjectsShape {
     | GitHubTokenExpired
     | GitHubScopeInsufficient
     | RepoGone
+    | RateLimited
     | GitHubError
     | MarkdownError
   >

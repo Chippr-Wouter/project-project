@@ -4,6 +4,8 @@ import * as ConfigProvider from "effect/ConfigProvider"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import { BetterAuth, type BetterAuthShape } from "../../Services/BetterAuth"
+import * as ProjectStateCache from "./projectStateCache"
+import * as GitHubRequest from "./request"
 
 vi.mock("./appAuth", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./appAuth")>()
@@ -34,7 +36,17 @@ const fakeBetterAuth: BetterAuthShape = {
 const FakeBetterAuthLive = Layer.succeed(BetterAuth, fakeBetterAuth)
 
 const buildGitHubLayer = (config: Map<string, string>) =>
-  Layer.build(GitHubLive.pipe(Layer.provide(FakeBetterAuthLive))).pipe(
+  Layer.build(
+    GitHubLive.pipe(
+      Layer.provide(
+        Layer.mergeAll(
+          FakeBetterAuthLive,
+          ProjectStateCache.layer,
+          GitHubRequest.layer
+        )
+      )
+    )
+  ).pipe(
     Effect.scoped,
     Effect.provideService(ConfigProvider.ConfigProvider)(
       ConfigProvider.fromUnknown(Object.fromEntries(config))

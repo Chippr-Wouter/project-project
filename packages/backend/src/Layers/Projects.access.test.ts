@@ -10,6 +10,7 @@ import { Projects } from "../Services/Projects"
 import { TicketDocs } from "../Services/TicketDocs"
 import { TicketIndex } from "../Services/TicketIndex"
 import { Users } from "../Services/Users"
+import * as TicketDocumentLock from "../ticketDocumentLock"
 import { ProjectsLive } from "./Projects"
 
 for (const scenario of [
@@ -28,6 +29,7 @@ for (const scenario of [
           return value
         })
       const layer = ProjectsLive.pipe(
+        Layer.provide(TicketDocumentLock.layer),
         Layer.provide(
           Layer.mergeAll(
             Layer.succeed(Db, {

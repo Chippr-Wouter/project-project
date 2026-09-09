@@ -42,6 +42,7 @@ export default defineConfig({
       "workspace/no-relative-packages": "error"
     },
     ignorePatterns: [
+      "opensrc/**",
       "node_modules",
       "bun.lock",
       "*.tsbuildinfo",
@@ -62,6 +63,7 @@ export default defineConfig({
     sortImports: false,
     sortPackageJson: false,
     ignorePatterns: [
+      "opensrc/**",
       "**/node_modules",
       "**/dist",
       "**/build",

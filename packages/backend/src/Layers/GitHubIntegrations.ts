@@ -3,12 +3,13 @@ import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as SqlClient from "effect/unstable/sql/SqlClient"
-import { and, eq, inArray } from "drizzle-orm"
+import { and, eq, gt, inArray, isNull, or } from "drizzle-orm"
 import { randomBytes, createHash } from "node:crypto"
 import {
   Forbidden,
   GitHubError,
   NotFound,
+  RateLimited,
   type GithubOrgIntegrationStatus,
   type Slug
 } from "@projectproject/shared"
@@ -16,7 +17,9 @@ import {
   githubAppInstallSession,
   organizationGithubIntegration,
   organizationIntegration,
-  projectIntegrationLink
+  projectIntegrationLink,
+  member,
+  organization
 } from "../db/schema"
 import { CurrentOrg } from "../Services/CurrentOrg"
 import { Db } from "../Services/Db"
@@ -200,11 +203,28 @@ export const GitHubIntegrationsLive = Layer.effect(
     ): Effect.Effect<{ authorizeUrl: string }, NotFound | GitHubError> =>
       Effect.gen(function* () {
         const session = yield* sessionForState(state)
+        const now = yield* DateTime.nowAsDate
         yield* db
           .update(githubAppInstallSession)
           .set({ installationId })
-          .where(eq(githubAppInstallSession.id, session.id))
-          .pipe(Effect.orDie)
+          .where(
+            and(
+              eq(githubAppInstallSession.id, session.id),
+              isNull(githubAppInstallSession.completedAt),
+              gt(githubAppInstallSession.expiresAt, now),
+              or(
+                isNull(githubAppInstallSession.installationId),
+                eq(githubAppInstallSession.installationId, installationId)
+              )
+            )
+          )
+          .returning({ id: githubAppInstallSession.id })
+          .pipe(
+            Effect.orDie,
+            Effect.flatMap((rows) =>
+              rows[0] ? Effect.void : Effect.fail(new NotFound())
+            )
+          )
         return { authorizeUrl: yield* githubAuthorizeUrl(state) }
       })
 
@@ -213,19 +233,20 @@ export const GitHubIntegrationsLive = Layer.effect(
       code: string
     ): Effect.Effect<
       { redirectUrl: string },
-      NotFound | Forbidden | GitHubError
+      NotFound | Forbidden | RateLimited | GitHubError
     > =>
       Effect.gen(function* () {
         const session = yield* sessionForState(state)
-        if (!session.installationId) return yield* new NotFound()
+        const installationId = session.installationId
+        if (!installationId) return yield* new NotFound()
         const userToken = yield* github.exchangeAppUserCode(code)
         const canAccess = yield* github.appUserCanAccessInstallation(
           userToken,
-          session.installationId
+          installationId
         )
         if (!canAccess) return yield* new Forbidden()
         const account = yield* github
-          .getInstallationAccount(session.installationId)
+          .getInstallationAccount(installationId)
           .pipe(
             Effect.catchTag("RepoGone", () =>
               Effect.fail(
@@ -233,11 +254,44 @@ export const GitHubIntegrationsLive = Layer.effect(
               )
             )
           )
-        const now = yield* DateTime.nowAsDate
-
         yield* sql
           .withTransaction(
             Effect.gen(function* () {
+              const now = yield* DateTime.nowAsDate
+              const [owner] = yield* db
+                .select({ id: member.id })
+                .from(member)
+                .innerJoin(
+                  organization,
+                  eq(member.organizationId, organization.id)
+                )
+                .where(
+                  and(
+                    eq(member.organizationId, session.organizationId),
+                    eq(member.userId, session.userId),
+                    eq(member.role, "owner"),
+                    isNull(organization.deletedAt)
+                  )
+                )
+                .limit(1)
+                .pipe(Effect.orDie)
+              if (!owner) return yield* new Forbidden()
+
+              const [claimed] = yield* db
+                .update(githubAppInstallSession)
+                .set({ completedAt: now })
+                .where(
+                  and(
+                    eq(githubAppInstallSession.id, session.id),
+                    isNull(githubAppInstallSession.completedAt),
+                    gt(githubAppInstallSession.expiresAt, now),
+                    eq(githubAppInstallSession.installationId, installationId)
+                  )
+                )
+                .returning({ id: githubAppInstallSession.id })
+                .pipe(Effect.orDie)
+              if (!claimed) return yield* new NotFound()
+
               const previousGithubIntegrations = yield* db
                 .select({ id: organizationIntegration.id })
                 .from(organizationIntegration)
@@ -345,12 +399,6 @@ export const GitHubIntegrationsLive = Layer.effect(
                       )
                     )
                     .pipe(Effect.orDie)
-
-              yield* db
-                .update(githubAppInstallSession)
-                .set({ completedAt: now })
-                .where(eq(githubAppInstallSession.id, session.id))
-                .pipe(Effect.orDie)
             })
           )
           .pipe(Effect.catchTag("SqlError", Effect.die))

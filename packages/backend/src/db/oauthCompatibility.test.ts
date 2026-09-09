@@ -90,11 +90,13 @@ describe.skipIf(!databaseUrl)("MCP OAuth provider compatibility", () => {
     auth = (await import("../auth")).auth
     const { McpHttpLive } = await import("../Layers/McpHttp")
     const { McpServerLive } = await import("../Layers/McpServer")
-    const { DbLive, PgLive } = await import("../Layers/Db")
+    const { BackendHttpServicesLive, BackendInfrastructureLive } =
+      await import("../runtime")
     const runtime = ManagedRuntime.make(
       McpHttpLive.pipe(
         Layer.provide(McpServerLive),
-        Layer.provide(DbLive.pipe(Layer.provide(PgLive)))
+        Layer.provide(BackendHttpServicesLive),
+        Layer.provide(BackendInfrastructureLive)
       )
     )
     disposeMcp = () => runtime.dispose()

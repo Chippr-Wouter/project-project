@@ -86,6 +86,7 @@ const FakeTicketIndex = Layer.succeed(TicketIndex, {
   findTicketIdsByTag: () => unexpected("TicketIndex.findTicketIdsByTag"),
   findTicketIdsByStatus: () => unexpected("TicketIndex.findTicketIdsByStatus"),
   findTicketsByBranch: () => unexpected("TicketIndex.findTicketsByBranch"),
+  isRepositoryBranchAttached: () => Effect.succeed(false),
   getBranchDeletedAt: () => Effect.succeed(null),
   upsertTicket: () => unexpected("TicketIndex.upsertTicket"),
   markBranchStale: () => unexpected("TicketIndex.markBranchStale"),

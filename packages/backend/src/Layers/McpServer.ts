@@ -4,23 +4,13 @@ import * as Layer from "effect/Layer"
 import * as ManagedRuntime from "effect/ManagedRuntime"
 import { registerAllTools } from "../mcp/dispatch"
 import { handlers } from "../mcp/handlers"
-import { BackendInfrastructureLive, BackendServicesLive } from "../runtime"
-import { McpServer } from "../Services/McpServer"
-
-// `Layer.orDie` collapses the layer-construction error channel (SqlError,
-// ConfigError, ...) into defects. The dispatcher requires
-// `ManagedRuntime<R, never>`; layer-construction errors are not recoverable
-// per-request anyway — if the DB can't be reached at startup we want a hard
-// crash, not a per-tool error response.
-const McpBackendLive = BackendServicesLive.pipe(
-  Layer.provideMerge(BackendInfrastructureLive),
-  Layer.orDie
-)
+import * as McpServer from "../Services/McpServer"
 
 export const McpServerLive = Layer.effect(
-  McpServer,
+  McpServer.McpServer,
   Effect.gen(function* () {
-    const runtime = ManagedRuntime.make(McpBackendLive)
+    const context = yield* Effect.context<McpServer.McpToolServices>()
+    const runtime = ManagedRuntime.make(Layer.succeedContext(context))
     yield* Effect.addFinalizer(() =>
       Effect.promise(() => runtime.dispose().catch(() => {}))
     )

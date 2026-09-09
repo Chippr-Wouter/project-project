@@ -33,6 +33,7 @@ const TicketFrontmatter = Schema.Struct({
     Schema.withDecodingDefaultTypeKey(Effect.succeed([]))
   ),
   branch: Schema.NullOr(Schema.String),
+  branchAutoLinkDisabled: Schema.optional(Schema.Boolean),
   pr: Schema.NullOr(Schema.Number).pipe(
     Schema.withDecodingDefaultTypeKey(Effect.succeed(null))
   ),
@@ -76,6 +77,9 @@ function frontmatterToDisk(document: TicketDocument): Record<string, unknown> {
     priority: document.priority,
     tags: document.tags,
     branch: document.branch,
+    ...(document.branchAutoLinkDisabled
+      ? { branchAutoLinkDisabled: true }
+      : {}),
     pr: document.pr,
     prState: document.prState,
     lastTransitionedPr: document.lastTransitionedPr,

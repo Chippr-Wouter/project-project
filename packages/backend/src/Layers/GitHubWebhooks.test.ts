@@ -22,6 +22,9 @@ import {
   type TicketDocument
 } from "../Services/TicketDocs"
 import type { TicketIndexShape } from "../Services/TicketIndex"
+import * as TicketDocumentLock from "../ticketDocumentLock"
+
+const testTicketDocumentLock = TicketDocumentLock.make()
 
 type Call =
   | { readonly type: "deleted"; readonly installationId: string }
@@ -788,6 +791,7 @@ const makeFakeIndex = (overrides: Partial<TicketIndexShape> = {}) => {
     findTicketIdsByTag: () => Effect.succeed([]),
     findTicketIdsByStatus: () => Effect.succeed([]),
     findTicketsByBranch: () => Effect.succeed([]),
+    isRepositoryBranchAttached: () => Effect.succeed(false),
     getBranchDeletedAt: () => Effect.succeed(null),
     upsertTicket: (project, document) =>
       Effect.sync(() => {
@@ -826,7 +830,11 @@ it.effect(
       const index = makeFakeIndex()
 
       yield* applyPullRequestWebhookToTicket(
-        { ticketDocs: docs.shape, ticketIndex: index.shape },
+        {
+          ticketDocs: docs.shape,
+          ticketIndex: index.shape,
+          ticketDocumentLock: testTicketDocumentLock
+        },
         baseMatch(),
         openChange,
         "delivery-1"
@@ -853,7 +861,11 @@ it.effect(
       })
 
       const exit = yield* applyPullRequestWebhookToTicket(
-        { ticketDocs: docs.shape, ticketIndex: index.shape },
+        {
+          ticketDocs: docs.shape,
+          ticketIndex: index.shape,
+          ticketDocumentLock: testTicketDocumentLock
+        },
         baseMatch(),
         openChange,
         "delivery-1"
@@ -892,13 +904,21 @@ it.effect(
       yield* Effect.all(
         [
           applyPullRequestWebhookToTicket(
-            { ticketDocs: serialDocs, ticketIndex: index.shape },
+            {
+              ticketDocs: serialDocs,
+              ticketIndex: index.shape,
+              ticketDocumentLock: testTicketDocumentLock
+            },
             baseMatch(),
             openChange,
             "delivery-1"
           ),
           applyPullRequestWebhookToTicket(
-            { ticketDocs: serialDocs, ticketIndex: index.shape },
+            {
+              ticketDocs: serialDocs,
+              ticketIndex: index.shape,
+              ticketDocumentLock: testTicketDocumentLock
+            },
             baseMatch(),
             openChange,
             "delivery-2"
@@ -921,7 +941,11 @@ it.effect(
       const index = makeFakeIndex()
 
       yield* applyPullRequestWebhookToTicket(
-        { ticketDocs: docs.shape, ticketIndex: index.shape },
+        {
+          ticketDocs: docs.shape,
+          ticketIndex: index.shape,
+          ticketDocumentLock: testTicketDocumentLock
+        },
         baseMatch({ branch: "feat/T-1" }),
         openChange,
         "delivery-1"
@@ -954,7 +978,11 @@ it.effect(
       }
 
       yield* applyPullRequestWebhookToTicket(
-        { ticketDocs: malformedDocs, ticketIndex: index.shape },
+        {
+          ticketDocs: malformedDocs,
+          ticketIndex: index.shape,
+          ticketDocumentLock: testTicketDocumentLock
+        },
         baseMatch(),
         openChange,
         "delivery-1"
@@ -973,7 +1001,11 @@ it.effect(
       const index = makeFakeIndex()
 
       yield* applyPullRequestWebhookToTicket(
-        { ticketDocs: docs.shape, ticketIndex: index.shape },
+        {
+          ticketDocs: docs.shape,
+          ticketIndex: index.shape,
+          ticketDocumentLock: testTicketDocumentLock
+        },
         baseMatch(),
         { ...openChange, number: 80 },
         "delivery-1"
@@ -992,7 +1024,11 @@ it.effect(
       const index = makeFakeIndex()
 
       yield* applyPullRequestWebhookToTicket(
-        { ticketDocs: docs.shape, ticketIndex: index.shape },
+        {
+          ticketDocs: docs.shape,
+          ticketIndex: index.shape,
+          ticketDocumentLock: testTicketDocumentLock
+        },
         baseMatch(),
         { ...openChange, state: "merged" },
         "delivery-1"
@@ -1004,7 +1040,11 @@ it.effect(
       expect(docs.writes[0].document.lastTransitionedPr).toBe(80)
 
       yield* applyPullRequestWebhookToTicket(
-        { ticketDocs: docs.shape, ticketIndex: index.shape },
+        {
+          ticketDocs: docs.shape,
+          ticketIndex: index.shape,
+          ticketDocumentLock: testTicketDocumentLock
+        },
         baseMatch(),
         { ...openChange, state: "merged" },
         "delivery-2"

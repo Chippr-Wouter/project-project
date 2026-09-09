@@ -36,6 +36,7 @@ import type { MarkdownError } from "../Services/Markdown"
 import { Projects } from "../Services/Projects"
 import { TicketIndex } from "../Services/TicketIndex"
 import { TicketDocs } from "../Services/TicketDocs"
+import * as TicketDocumentLock from "../ticketDocumentLock"
 
 const MAX_CREATE_ATTEMPTS = 16
 const makeGroupId = Schema.decodeUnknownSync(GroupId)
@@ -94,6 +95,7 @@ export const GroupsLive = Layer.effect(
     const ticketDocs = yield* TicketDocs
     const projects = yield* Projects
     const ticketIndex = yield* TicketIndex
+    const ticketDocumentLock = yield* TicketDocumentLock.TicketDocumentLock
 
     const validateTicketIds = (
       orgSlug: string,
@@ -582,32 +584,37 @@ export const GroupsLive = Layer.effect(
             const status = input.status
             const indexProject = yield* ticketIndex.projectFor(orgSlug, slug)
             let changed = false
-            yield* ticketDocs
-              .update(
-                orgSlug,
-                slug,
-                input.ticketId,
-                (ticket) => {
-                  if (ticket.status === status) {
-                    return Effect.succeed(ticket)
-                  }
-                  changed = true
-                  return Effect.succeed({
-                    ...ticket,
-                    status,
-                    updatedAt: now
-                  })
-                },
-                (next) =>
-                  changed
-                    ? ticketIndex.upsertTicket(indexProject, next)
-                    : Effect.void
-              )
-              .pipe(
-                Effect.catchTag("MalformedTicketDocument", () =>
-                  Effect.fail(new NotFound())
+            yield* ticketDocumentLock.withTicketDocumentLock(
+              orgSlug,
+              slug,
+              input.ticketId,
+              ticketDocs
+                .update(
+                  orgSlug,
+                  slug,
+                  input.ticketId,
+                  (ticket) => {
+                    if (ticket.status === status) {
+                      return Effect.succeed(ticket)
+                    }
+                    changed = true
+                    return Effect.succeed({
+                      ...ticket,
+                      status,
+                      updatedAt: now
+                    })
+                  },
+                  (next) =>
+                    changed
+                      ? ticketIndex.upsertTicket(indexProject, next)
+                      : Effect.void
                 )
-              )
+                .pipe(
+                  Effect.catchTag("MalformedTicketDocument", () =>
+                    Effect.fail(new NotFound())
+                  )
+                )
+            )
           }
 
           const target: GroupDocument = {

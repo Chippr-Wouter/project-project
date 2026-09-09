@@ -109,6 +109,7 @@ export const errorMessage = (error: AppError): string =>
       Match.tag("EverhourError", (error) =>
         m.error_everhour_upstream({ message: error.message })
       ),
+      Match.tag("RateLimited", () => m.error_github_rate_limited()),
       Match.tag("Unauthorized", () => m.error_unknown())
     )
     .pipe(

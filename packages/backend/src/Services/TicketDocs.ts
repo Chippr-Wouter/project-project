@@ -31,6 +31,7 @@ export interface TicketDocument {
   readonly priority: TicketPriority
   readonly tags: ReadonlyArray<TagName>
   readonly branch: string | null
+  readonly branchAutoLinkDisabled?: boolean
   readonly pr: number | null
   readonly prState: PullRequestState | null
   readonly lastTransitionedPr: number | null

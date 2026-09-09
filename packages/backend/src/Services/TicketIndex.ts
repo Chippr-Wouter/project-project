@@ -148,6 +148,10 @@ export interface TicketIndexShape {
     projectId: string,
     branch: string
   ) => Effect.Effect<ReadonlyArray<TicketIndexMatch>>
+  readonly isRepositoryBranchAttached: (
+    repoId: string,
+    branch: string
+  ) => Effect.Effect<boolean>
   readonly getBranchDeletedAt: (
     orgSlug: string,
     slug: string,

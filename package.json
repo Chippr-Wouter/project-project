@@ -21,7 +21,7 @@
     "format:check": "vp fmt --check",
     "prepare": "effect-tsgo patch",
     "check": "vp check && vp run typecheck",
-    "test:db": "vp test run --project backend packages/backend/src/db packages/backend/src/Layers/OAuthApplications.test.ts packages/backend/src/Layers/McpHttp.test.ts --no-file-parallelism"
+    "test:db": "vp test run --project backend packages/backend/src/db packages/backend/src/Layers/OAuthApplications.test.ts packages/backend/src/Layers/McpHttp.test.ts packages/backend/src/Layers/GitHubIntegrations.test.ts --no-file-parallelism"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

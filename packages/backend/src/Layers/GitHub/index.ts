@@ -1,12 +1,12 @@
-import * as Cache from "effect/Cache"
-import * as Duration from "effect/Duration"
+import { createHash } from "node:crypto"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import {
   GitHubError,
   GitHubTokenExpired,
   GithubRepo,
-  GithubRepoPage
+  GithubRepoPage,
+  RateLimited
 } from "@projectproject/shared"
 import { BetterAuth } from "../../Services/BetterAuth"
 import {
@@ -17,13 +17,15 @@ import {
 } from "../../Services/GitHub"
 import { appAuth } from "./appAuth"
 import { octokitFor } from "./clients"
-import { githubErrorMessage, mapHttpError, narrow } from "./errors"
 import {
-  branchExistsWithToken,
-  fetchProjectStatesWithToken,
-  listBranchesWithToken
-} from "./projectState"
-import { githubRequest } from "./request"
+  githubErrorMessage,
+  mapHttpError,
+  narrow,
+  type TaggedFailure
+} from "./errors"
+import * as ProjectState from "./projectState"
+import * as ProjectStateCache from "./projectStateCache"
+import * as GitHubRequest from "./request"
 
 export function githubRepoMatchesQuery(
   repo: {
@@ -55,6 +57,17 @@ export const GitHubLive = Layer.effect(
   Effect.gen(function* () {
     const betterAuth = yield* BetterAuth
     const auth = yield* appAuth()
+    const projectStateCache = yield* ProjectStateCache.ProjectStateCache
+    const requestState = yield* GitHubRequest.GitHubRequestState
+
+    const request = <A, EOut extends TaggedFailure>(
+      attributes: GitHubRequest.GitHubRequestAttributes,
+      fn: (signal: AbortSignal) => Promise<A>,
+      narrowErr: (cause: unknown, now: number) => EOut
+    ): Effect.Effect<A, EOut | RateLimited> =>
+      GitHubRequest.githubRequest(attributes, fn, narrowErr).pipe(
+        Effect.provideService(GitHubRequest.GitHubRequestState, requestState)
+      )
 
     const tokenFor = (
       userId: string
@@ -66,27 +79,20 @@ export const GitHubLive = Layer.effect(
         Effect.catchTag("BetterAuthError", (e) => Effect.die(e))
       )
 
-    const installationTokenCache = yield* Cache.make({
-      capacity: 256,
-      timeToLive: Duration.minutes(45),
-      lookup: (installationId: string) =>
-        Effect.gen(function* () {
-          const result = yield* Effect.tryPromise({
-            try: () =>
-              auth({
-                type: "installation",
-                installationId: Number(installationId)
-              }),
-            catch: (cause) => new GitHubError({ message: String(cause) })
-          })
-          return result.token
+    const installationTokenFor = Effect.fn("GitHub.installationTokenFor")(
+      function* (installationId: string) {
+        const result = yield* Effect.tryPromise({
+          try: () =>
+            auth({
+              type: "installation",
+              installationId: Number(installationId)
+            }),
+          catch: (cause) =>
+            new GitHubError({ message: githubErrorMessage(cause) })
         })
-    })
-
-    const installationTokenFor = (
-      installationId: string
-    ): Effect.Effect<string, GitHubError> =>
-      Cache.get(installationTokenCache, installationId)
+        return result.token
+      }
+    )
 
     const appToken = (): Effect.Effect<string, GitHubError> =>
       Effect.gen(function* () {
@@ -101,9 +107,9 @@ export const GitHubLive = Layer.effect(
       function* (installationId: string) {
         const token = yield* appToken()
         const octokit = octokitFor(token)
-        const result = yield* githubRequest(
+        const result = yield* request(
           {
-            tokenSource: "installation",
+            tokenSource: "app",
             operation: "getInstallationAccount",
             installationId
           },
@@ -140,7 +146,7 @@ export const GitHubLive = Layer.effect(
         const token = yield* installationTokenFor(installationId)
         const octokit = octokitFor(token)
         const perPage = 30
-        const response = yield* githubRequest(
+        const response = yield* request(
           {
             tokenSource: "installation",
             operation: "listInstallationRepos",
@@ -182,7 +188,7 @@ export const GitHubLive = Layer.effect(
       function* (installationId: string, owner: string, name: string) {
         const token = yield* installationTokenFor(installationId)
         const octokit = octokitFor(token)
-        const response = yield* githubRequest(
+        const response = yield* request(
           {
             tokenSource: "installation",
             operation: "verifyInstallationRepo",
@@ -223,9 +229,10 @@ export const GitHubLive = Layer.effect(
       "GitHub.appUserCanAccessInstallation"
     )(function* (userAccessToken: string, installationId: string) {
       const octokit = octokitFor(userAccessToken)
-      const installations = yield* githubRequest(
+      const installations = yield* request(
         {
           tokenSource: "user",
+          scopeKey: `app-user:${createHash("sha256").update(userAccessToken).digest("hex")}`,
           operation: "appUserCanAccessInstallation",
           installationId
         },
@@ -237,10 +244,7 @@ export const GitHubLive = Layer.effect(
               request: { signal }
             }
           ),
-        (cause) =>
-          new GitHubError({
-            message: githubErrorMessage(cause)
-          })
+        narrow(["RateLimited"] as const)
       )
       return installations.some(
         (installation) => String(installation.id) === installationId
@@ -257,15 +261,17 @@ export const GitHubLive = Layer.effect(
       ) {
         const token = yield* tokenFor(userId)
         const octokit = octokitFor(token)
+        yield* projectStateCache.invalidateForRepo(`${owner}\0${name}`)
         const ctx = {
           tokenSource: "user" as const,
           userId,
+          scopeKey: userId,
           repoOwner: owner,
           repoName: name,
           branchName,
           baseBranch
         }
-        const base = yield* githubRequest(
+        const base = yield* request(
           { ...ctx, operation: "createBranchAsUser.getBranch" },
           (signal) =>
             octokit.rest.repos.getBranch({
@@ -285,7 +291,7 @@ export const GitHubLive = Layer.effect(
           }
         )
         const sha = base.data.commit.sha
-        yield* githubRequest(
+        yield* request(
           { ...ctx, operation: "createBranchAsUser.createRef" },
           (signal) =>
             octokit.rest.git.createRef({
@@ -293,9 +299,13 @@ export const GitHubLive = Layer.effect(
               repo: name,
               ref: `refs/heads/${branchName}`,
               sha,
-              request: { signal }
+              request: { signal, retries: 0 }
             }),
           (cause, now) => mapHttpError(cause, now, { branch: branchName })
+        ).pipe(
+          Effect.ensuring(
+            projectStateCache.invalidateForRepo(`${owner}\0${name}`)
+          )
         )
         return { name: branchName, sha }
       }
@@ -316,9 +326,50 @@ export const GitHubLive = Layer.effect(
       ) {
         const token = yield* tokenFor(userId)
         const octokit = octokitFor(token)
-        const result = yield* githubRequest(
+        yield* projectStateCache.invalidateForRepo(`${owner}\0${name}`)
+        const findExisting = request(
           {
             tokenSource: "user",
+            scopeKey: userId,
+            operation: "openPullRequestAsUser.findExisting",
+            repoOwner: owner,
+            repoName: name
+          },
+          async (signal) => {
+            const response = await octokit.rest.pulls.list({
+              owner,
+              repo: name,
+              head: `${owner}:${args.head}`,
+              base: args.base,
+              state: "open",
+              per_page: 100,
+              request: { signal }
+            })
+            const existing = response.data.find(
+              (pr) =>
+                pr.head.ref === args.head &&
+                pr.base.ref === args.base &&
+                pr.head.repo?.id !== undefined &&
+                pr.head.repo.id === pr.base.repo?.id
+            )
+            return existing
+              ? { number: existing.number, url: existing.html_url }
+              : null
+          },
+          narrow([
+            "GitHubTokenExpired",
+            "GitHubScopeInsufficient",
+            "RepoGone",
+            "RateLimited"
+          ])
+        )
+        const existing = yield* findExisting
+        if (existing) return existing
+
+        return yield* request(
+          {
+            tokenSource: "user",
+            scopeKey: userId,
             operation: "openPullRequestAsUser",
             userId,
             repoOwner: owner,
@@ -336,22 +387,32 @@ export const GitHubLive = Layer.effect(
               title: args.title,
               body: args.body,
               draft: args.draft,
-              request: { signal }
+              request: { signal, retries: 0 }
             }),
-          (cause, now) => {
-            const err = mapHttpError(cause, now, { branch: args.head })
-            if (err._tag === "BranchExists") {
-              return new GitHubError({
-                message: "PR already exists for this branch"
-              })
-            }
-            return err
-          }
+          (cause, now) => mapHttpError(cause, now, { branch: args.head })
+        ).pipe(
+          Effect.map((result) => ({
+            number: result.data.number,
+            url: result.data.html_url
+          })),
+          Effect.catchTags({
+            BranchExists: () =>
+              findExisting.pipe(
+                Effect.flatMap((existing) =>
+                  existing
+                    ? Effect.succeed(existing)
+                    : Effect.fail(
+                        new GitHubError({
+                          message: "PR already exists for this branch"
+                        })
+                      )
+                )
+              )
+          }),
+          Effect.ensuring(
+            projectStateCache.invalidateForRepo(`${owner}\0${name}`)
+          )
         )
-        return {
-          number: result.data.number,
-          url: result.data.html_url
-        }
       }
     )
 
@@ -361,15 +422,37 @@ export const GitHubLive = Layer.effect(
       installationId: string,
       owner: string,
       name: string,
-      branches: ReadonlyArray<string>
+      branches: ReadonlyArray<string>,
+      branchQuery?: string
     ) {
-      const token = yield* installationTokenFor(installationId)
-      return yield* fetchProjectStatesWithToken(
-        token,
+      const { key, repoKey } = ProjectStateCache.projectStateCacheKey(
+        installationId,
         owner,
         name,
         branches,
-        "installation"
+        branchQuery
+      )
+      return yield* projectStateCache.cachedProjectStates(
+        key,
+        installationId,
+        repoKey,
+        Effect.gen(function* () {
+          const token = yield* installationTokenFor(installationId)
+          return yield* ProjectState.fetchProjectStatesWithToken(
+            token,
+            owner,
+            name,
+            branches,
+            "installation",
+            branchQuery,
+            installationId
+          ).pipe(
+            Effect.provideService(
+              GitHubRequest.GitHubRequestState,
+              requestState
+            )
+          )
+        })
       )
     })
 
@@ -383,13 +466,16 @@ export const GitHubLive = Layer.effect(
       first: number
     ) {
       const token = yield* installationTokenFor(installationId)
-      return yield* listBranchesWithToken(
+      return yield* ProjectState.listBranchesWithToken(
         token,
         owner,
         name,
         query,
         first,
-        "installation"
+        "installation",
+        installationId
+      ).pipe(
+        Effect.provideService(GitHubRequest.GitHubRequestState, requestState)
       )
     })
 
@@ -402,12 +488,15 @@ export const GitHubLive = Layer.effect(
       branch: string
     ) {
       const token = yield* installationTokenFor(installationId)
-      return yield* branchExistsWithToken(
+      return yield* ProjectState.branchExistsWithToken(
         token,
         owner,
         name,
         branch,
-        "installation"
+        "installation",
+        installationId
+      ).pipe(
+        Effect.provideService(GitHubRequest.GitHubRequestState, requestState)
       )
     })
 

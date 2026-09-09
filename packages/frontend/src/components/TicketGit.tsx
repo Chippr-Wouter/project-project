@@ -1,4 +1,5 @@
 import * as Result from "effect/unstable/reactivity/AsyncResult"
+import * as Option from "effect/Option"
 import { useAtomValue } from "@effect/atom-react"
 import {
   AlertTriangle,
@@ -37,10 +38,8 @@ function useGitState(
   ticket: Pick<Ticket, "id" | "gitState">
 ): { state: GitState | null; waiting: boolean } {
   const states = useAtomValue(projectGitStatesAtom(projectKey(orgSlug, slug)))
-  if (!Result.isSuccess(states)) {
-    return { state: ticket.gitState, waiting: true }
-  }
-  const entry = states.value.states[ticket.id]
+  const value = Option.getOrUndefined(Result.value(states))
+  const entry = value?.states[ticket.id]
   return {
     state: entry ?? ticket.gitState,
     waiting: states.waiting

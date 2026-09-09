@@ -1,3 +1,4 @@
+import * as TicketDocumentLock from "../ticketDocumentLock"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import * as BunServices from "@effect/platform-bun/BunServices"
@@ -147,6 +148,7 @@ const FakeTicketIndex = Layer.succeed(TicketIndex, {
   findTicketIdsByTag: () => Effect.succeed([]),
   findTicketIdsByStatus: () => Effect.succeed([]),
   findTicketsByBranch: () => Effect.succeed([]),
+  isRepositoryBranchAttached: () => Effect.succeed(false),
   getBranchDeletedAt: () => Effect.succeed(null),
   upsertTicket: () => Effect.void,
   markBranchStale: () => Effect.succeed([]),
@@ -219,6 +221,7 @@ const TestLayer = Layer.unwrap(
       Layer.provide(FakeGitHub),
       Layer.provide(FakeTicketIndex),
       Layer.provide(FakeDb),
+      Layer.provide(TicketDocumentLock.layer),
       Layer.provide(MarkdownLive),
       Layer.provideMerge(
         ConfigProvider.layer(

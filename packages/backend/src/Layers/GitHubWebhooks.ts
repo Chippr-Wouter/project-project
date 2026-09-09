@@ -2,7 +2,6 @@ import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
-import * as Semaphore from "effect/Semaphore"
 import * as SqlClient from "effect/unstable/sql/SqlClient"
 import type { ChecksStatus } from "@projectproject/shared"
 import { and, eq, inArray } from "drizzle-orm"
@@ -27,6 +26,8 @@ import {
 import { TicketDocs, type TicketDocsShape } from "../Services/TicketDocs"
 import { TicketIndex, type TicketIndexShape } from "../Services/TicketIndex"
 import { planPullRequestWebhookTicket } from "../ticketGitStatePlanner"
+import * as TicketDocumentLock from "../ticketDocumentLock"
+import * as ProjectStateCache from "./GitHub/projectStateCache"
 
 export interface PullRequestWebhookMatch {
   readonly orgSlug: string
@@ -37,41 +38,20 @@ export interface PullRequestWebhookMatch {
   readonly branch: string
 }
 
-const pullRequestTicketLocks = new Map<string, Semaphore.Semaphore>()
-
-const pullRequestTicketLockKey = (match: PullRequestWebhookMatch) =>
-  `${match.orgSlug}:${match.projectSlug}:${match.ticketId}`
-
-const pullRequestTicketLockFor = (match: PullRequestWebhookMatch) =>
-  Effect.gen(function* () {
-    const key = pullRequestTicketLockKey(match)
-    const cached = pullRequestTicketLocks.get(key)
-    if (cached) return cached
-    const created = yield* Semaphore.make(1)
-    pullRequestTicketLocks.set(key, created)
-    return created
-  })
-
-const withPullRequestTicketLock = <A, E, R>(
-  match: PullRequestWebhookMatch,
-  body: Effect.Effect<A, E, R>
-): Effect.Effect<A, E, R> =>
-  Effect.gen(function* () {
-    const sem = yield* pullRequestTicketLockFor(match)
-    return yield* sem.withPermits(1)(body)
-  })
-
 export const applyPullRequestWebhookToTicket = (
   deps: {
     readonly ticketDocs: TicketDocsShape
     readonly ticketIndex: TicketIndexShape
+    readonly ticketDocumentLock: TicketDocumentLock.TicketDocumentLock["Service"]
   },
   match: PullRequestWebhookMatch,
   change: GitHubPullRequestWebhookChange,
   deliveryId: string | null
 ): Effect.Effect<void, MarkdownError> =>
-  withPullRequestTicketLock(
-    match,
+  deps.ticketDocumentLock.withTicketDocumentLock(
+    match.orgSlug,
+    match.projectSlug,
+    match.ticketId,
     Effect.gen(function* () {
       const indexProject = {
         orgSlug: match.orgSlug,
@@ -733,6 +713,17 @@ export const GitHubWebhooksLive = Layer.effect(
     const sql = yield* SqlClient.SqlClient
     const ticketDocs = yield* TicketDocs
     const ticketIndex = yield* TicketIndex
+    const ticketDocumentLock = yield* TicketDocumentLock.TicketDocumentLock
+    const projectStateCache = yield* ProjectStateCache.ProjectStateCache
+
+    const withProjectStateInvalidation = <A, E>(
+      installationId: string,
+      effect: Effect.Effect<A, E>
+    ): Effect.Effect<A, E> =>
+      Effect.ensuring(
+        effect,
+        projectStateCache.invalidateForInstallation(installationId)
+      )
 
     const installationRow = Effect.fn("GitHubWebhooks.installationRow")(
       function* (installationId: string) {
@@ -1252,7 +1243,7 @@ export const GitHubWebhooksLive = Layer.effect(
                       matches,
                       (match) =>
                         applyPullRequestWebhookToTicket(
-                          { ticketDocs, ticketIndex },
+                          { ticketDocs, ticketIndex, ticketDocumentLock },
                           match,
                           change,
                           deliveryId
@@ -1389,62 +1380,104 @@ export const GitHubWebhooksLive = Layer.effect(
 
     return makeGitHubWebhooks({
       installationDeleted: (installationId, deliveryId) =>
-        updateInstallation(
+        withProjectStateInvalidation(
           installationId,
-          "disconnected",
-          ["active", "broken"],
-          disconnectMessage,
-          deliveryId
+          updateInstallation(
+            installationId,
+            "disconnected",
+            ["active", "broken"],
+            disconnectMessage,
+            deliveryId
+          )
         ),
       installationSuspended: (installationId, deliveryId) =>
-        updateInstallation(
+        withProjectStateInvalidation(
           installationId,
-          "broken",
-          ["active", "broken"],
-          suspendMessage,
-          deliveryId
+          updateInstallation(
+            installationId,
+            "broken",
+            ["active", "broken"],
+            suspendMessage,
+            deliveryId
+          )
         ),
       installationUnsuspended: (installationId, deliveryId) =>
-        updateInstallation(
+        withProjectStateInvalidation(
           installationId,
-          "active",
-          ["broken"],
-          null,
-          deliveryId
+          updateInstallation(
+            installationId,
+            "active",
+            ["broken"],
+            null,
+            deliveryId
+          )
         ),
-      repositoriesRemoved,
-      repositoryRenamed,
-      repositoryTransferred,
-      repositoryArchived: (installationId, repoId, deliveryId) =>
-        setRepositoryConnectionStatus(
+      repositoriesRemoved: (installationId, repoIds, deliveryId) =>
+        withProjectStateInvalidation(
           installationId,
-          repoId,
-          "broken",
-          ["active"],
-          repositoryArchivedMessage,
-          deliveryId
+          repositoriesRemoved(installationId, repoIds, deliveryId)
+        ),
+      repositoryRenamed: (change, deliveryId) =>
+        withProjectStateInvalidation(
+          change.installationId,
+          repositoryRenamed(change, deliveryId)
+        ),
+      repositoryTransferred: (change, deliveryId) =>
+        withProjectStateInvalidation(
+          change.installationId,
+          repositoryTransferred(change, deliveryId)
+        ),
+      repositoryArchived: (installationId, repoId, deliveryId) =>
+        withProjectStateInvalidation(
+          installationId,
+          setRepositoryConnectionStatus(
+            installationId,
+            repoId,
+            "broken",
+            ["active"],
+            repositoryArchivedMessage,
+            deliveryId
+          )
         ),
       repositoryUnarchived: (installationId, repoId, deliveryId) =>
-        setRepositoryConnectionStatus(
+        withProjectStateInvalidation(
           installationId,
-          repoId,
-          "active",
-          ["broken"],
-          null,
-          deliveryId
+          setRepositoryConnectionStatus(
+            installationId,
+            repoId,
+            "active",
+            ["broken"],
+            null,
+            deliveryId
+          )
         ),
       repositoryDeleted: (installationId, repoId, deliveryId) =>
-        setRepositoryConnectionStatus(
+        withProjectStateInvalidation(
           installationId,
-          repoId,
-          "disconnected",
-          ["active", "broken"],
-          null,
-          deliveryId
+          setRepositoryConnectionStatus(
+            installationId,
+            repoId,
+            "disconnected",
+            ["active", "broken"],
+            null,
+            deliveryId
+          )
         ),
-      pullRequestChanged,
-      branchDeleted,
-      checkStateChanged
+      pullRequestChanged: (change, deliveryId) =>
+        withProjectStateInvalidation(
+          change.installationId,
+          pullRequestChanged(change, deliveryId)
+        ),
+      branchDeleted: (change, deliveryId) =>
+        withProjectStateInvalidation(
+          change.installationId,
+          branchDeleted(change, deliveryId)
+        ),
+      checkStateChanged: (change, deliveryId) =>
+        withProjectStateInvalidation(
+          change.installationId,
+          checkStateChanged(change, deliveryId)
+        )
     })
   })
 )

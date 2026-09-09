@@ -21,13 +21,23 @@ export interface RawBranchEntry {
   readonly url: string
   readonly title: string
   readonly mergedAt: Date | null
-  readonly checks: "passing" | "failing" | "pending" | "neutral" | "none"
+  readonly checks: ChecksStatus
 }
+
+export type ChecksStatus =
+  | "passing"
+  | "failing"
+  | "pending"
+  | "neutral"
+  | "none"
 
 export interface RawProjectStates {
   readonly defaultBranch: string
   readonly existingBranches: ReadonlySet<string>
   readonly prByBranch: ReadonlyMap<string, RawBranchEntry>
+  readonly fetchedAt?: Date
+  readonly refreshStatus?: "stale" | "rate_limited"
+  readonly retryAt?: number
 }
 
 export interface GitHubInstallationAccount {
@@ -47,7 +57,10 @@ export interface VerifiedInstallationRepo {
 export interface GitHubShape {
   readonly getInstallationAccount: (
     installationId: string
-  ) => Effect.Effect<GitHubInstallationAccount, RepoGone | GitHubError>
+  ) => Effect.Effect<
+    GitHubInstallationAccount,
+    RepoGone | RateLimited | GitHubError
+  >
   readonly listInstallationRepos: (
     installationId: string,
     query: string | undefined,
@@ -57,14 +70,17 @@ export interface GitHubShape {
     installationId: string,
     owner: string,
     name: string
-  ) => Effect.Effect<VerifiedInstallationRepo, RepoGone | GitHubError>
+  ) => Effect.Effect<
+    VerifiedInstallationRepo,
+    RepoGone | RateLimited | GitHubError
+  >
   readonly exchangeAppUserCode: (
     code: string
   ) => Effect.Effect<string, GitHubError>
   readonly appUserCanAccessInstallation: (
     userAccessToken: string,
     installationId: string
-  ) => Effect.Effect<boolean, GitHubError>
+  ) => Effect.Effect<boolean, RateLimited | GitHubError>
   readonly createBranchAsUser: (
     owner: string,
     name: string,
@@ -105,7 +121,8 @@ export interface GitHubShape {
     installationId: string,
     owner: string,
     name: string,
-    branches: ReadonlyArray<string>
+    branches: ReadonlyArray<string>,
+    branchQuery?: string
   ) => Effect.Effect<RawProjectStates, RepoGone | RateLimited | GitHubError>
   readonly listInstallationBranches: (
     installationId: string,

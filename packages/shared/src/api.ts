@@ -421,6 +421,7 @@ const ProjectsGroup = HttpApiGroup.make("projects")
           GitHubTokenExpired,
           GitHubScopeInsufficient,
           RepoGone,
+          RateLimited,
           GitHubError
         ]
       }

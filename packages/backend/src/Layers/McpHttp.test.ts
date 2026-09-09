@@ -131,10 +131,13 @@ describe.skipIf(!databaseUrl)("stateless MCP", () => {
     }
     const { McpHttpLive } = await import("./McpHttp")
     const { McpServerLive } = await import("./McpServer")
-    const { DbLive, PgLive } = await import("./Db")
+    const { BackendServicesLive, BackendInfrastructureLive } =
+      await import("../runtime")
     const layer = McpHttpLive.pipe(
       Layer.provide(McpServerLive),
-      Layer.provide(DbLive.pipe(Layer.provide(PgLive)))
+      Layer.provide(
+        BackendServicesLive.pipe(Layer.provideMerge(BackendInfrastructureLive))
+      )
     )
     const runtimes = [ManagedRuntime.make(layer), ManagedRuntime.make(layer)]
     dispose = async () => {
