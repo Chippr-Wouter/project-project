@@ -85,7 +85,9 @@ function LinkContents({
   return (
     <>
       <span className="flex min-w-0 flex-1 items-center gap-2">
-        {glyph}
+        <span className="flex size-3.5 shrink-0 items-center justify-center">
+          {glyph}
+        </span>
         <span className="truncate">{name}</span>
       </span>
       <ExternalLink
