@@ -1,11 +1,11 @@
 import { useEffect, type JSX } from "react"
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext"
 import { $insertNodes, COMMAND_PRIORITY_HIGH, PASTE_COMMAND } from "lexical"
-import { figmaSrc, parseFigmaUrl } from "@projectproject/shared"
-import { $createFigmaNode } from "./FigmaNode"
-import { figmaSlugLabel } from "./FigmaChip"
+import { m } from "@/paraglide/messages"
+import { $createPaperNode } from "./PaperNode"
+import { isPaperDesignUrl } from "./paperUrl"
 
-export function FigmaPlugin(): JSX.Element | null {
+export function PaperPlugin(): JSX.Element | null {
   const [editor] = useLexicalComposerContext()
 
   useEffect(
@@ -17,20 +17,14 @@ export function FigmaPlugin(): JSX.Element | null {
           if (event.clipboardData?.files.length) return false
 
           const text = event.clipboardData?.getData("text/plain")?.trim()
-          if (!text || /\s/.test(text)) return false
+          if (!text || /\s/.test(text) || !isPaperDesignUrl(text)) return false
 
-          const ref = parseFigmaUrl(text)
-          if (ref === null) return false
-
-          const slug = figmaSlugLabel(ref.slug)
           event.preventDefault()
           editor.update(() => {
             $insertNodes([
-              $createFigmaNode({
-                url: figmaSrc(text),
-                label: slug.length > 0 ? slug : text,
-                ref,
-                density: "compact"
+              $createPaperNode({
+                url: text,
+                label: m.editor_paper_default_name()
               })
             ])
           })
