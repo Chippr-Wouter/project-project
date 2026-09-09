@@ -82,6 +82,7 @@ function SprintBoardCardImpl({
             />
           </div>
           <AssigneeField
+            sprintTicketsKey={sprintTicketsKey}
             orgSlug={orgSlug}
             slug={slug}
             ticket={visibleTicket}

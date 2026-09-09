@@ -283,7 +283,7 @@ describe("applyOptimisticTicketUpdate", () => {
     }
   )
 
-  it.each(["board type", "board priority"] as const)(
+  it.each(["board type", "board priority", "board assignees"] as const)(
     "keeps %s optimistic until its list finishes refreshing",
     async (scenario) => {
       const registry = AtomRegistry.make()
@@ -294,10 +294,12 @@ describe("applyOptimisticTicketUpdate", () => {
       const patch =
         scenario === "board type"
           ? { type: "bug" as const }
-          : { priority: "high" as const }
+          : scenario === "board priority"
+            ? { priority: "high" as const }
+            : { assignees: ["user-2"] }
       const updated = { ...ticket, ...patch } satisfies TicketDetail
       let saved = false
-      let finishRefresh: (response: Response) => void = vi.fn()
+      let finishRefresh: ((response: Response) => void) | undefined
       const encoded = Schema.encodeSync(TicketDetail)
       const listResponse = (value: TicketDetail) =>
         Response.json([encoded(value)])
@@ -348,7 +350,11 @@ describe("applyOptimisticTicketUpdate", () => {
             )
           ).toMatchObject(patch)
         }
-        finishRefresh(listResponse(updated))
+        const resolveRefresh = await vi.waitFor(() => {
+          if (!finishRefresh) throw new Error("List refresh has not started")
+          return finishRefresh
+        })
+        resolveRefresh(listResponse(updated))
         await vi.waitFor(() =>
           expect(registry.get(preview)).toEqual({ input: {}, waiting: false })
         )
