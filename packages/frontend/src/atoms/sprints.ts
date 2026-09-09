@@ -56,7 +56,7 @@ const splitSprintKey = (
   }
 }
 
-const sprintsListBaseAtom = Atom.family((key: string) => {
+export const sprintsListBaseAtom = Atom.family((key: string) => {
   const { orgSlug, slug } = splitProjectKey(key)
   return runtime
     .atom(

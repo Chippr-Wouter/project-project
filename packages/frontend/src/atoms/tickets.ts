@@ -134,7 +134,7 @@ const sectionsKeyForListKey = (key: string) => {
   return ticketsSectionsKey(orgSlug, slug, decodeStoredQuery(queryJson))
 }
 
-const ticketsSectionsBaseAtom = Atom.family((key: string) => {
+export const ticketsSectionsBaseAtom = Atom.family((key: string) => {
   const { orgSlug, slug, queryJson } = splitFamilyKey(key)
   return runtime
     .atom(
