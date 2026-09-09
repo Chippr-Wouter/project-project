@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 import type * as Effect from "effect/Effect"
 import type { MentionType } from "@projectproject/shared"
+import type { AtomRegistry } from "effect/unstable/reactivity/AtomRegistry"
 import type { ApiClient } from "@/services/ApiClient"
 import type { MentionScope } from "./scope"
 
@@ -19,7 +20,11 @@ export interface MentionProvider {
   readonly search: (
     query: string,
     scope: MentionScope
-  ) => Effect.Effect<ReadonlyArray<MentionCandidate>, never, ApiClient>
+  ) => Effect.Effect<
+    ReadonlyArray<MentionCandidate>,
+    never,
+    ApiClient | AtomRegistry
+  >
   readonly renderRow: (candidate: MentionCandidate) => ReactNode
 }
 
