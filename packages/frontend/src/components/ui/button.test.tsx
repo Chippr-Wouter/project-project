@@ -3,7 +3,7 @@ import { describe, expect, it } from "vite-plus/test"
 import { Button, type ButtonProps } from "./button"
 
 describe("Button", () => {
-  it("keeps sidebar links flush with their container", () => {
+  it("uses the metadata control inset for sidebar links", () => {
     const { getByRole } = render(
       <Button variant="sidebar-link" size="sm">
         Design
@@ -12,7 +12,7 @@ describe("Button", () => {
 
     const button = getByRole("button", { name: "Design" })
 
-    expect(button.classList.contains("px-0")).toBe(true)
+    expect(button.classList.contains("px-1.5")).toBe(true)
     expect(button.classList.contains("px-3")).toBe(false)
   })
 

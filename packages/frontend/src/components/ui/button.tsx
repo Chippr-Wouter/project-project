@@ -64,7 +64,7 @@ const buttonVariants = cva(
       iconRight: { true: "" }
     },
     compoundVariants: [
-      { variant: "sidebar-link", className: "px-0" },
+      { variant: "sidebar-link", className: "px-1.5" },
       { size: "xs", iconLeft: true, className: "pl-1" },
       { size: "sm", iconLeft: true, className: "pl-[6px]" },
       { size: "md", iconLeft: true, className: "pl-[10px]" },
