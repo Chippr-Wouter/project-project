@@ -27,11 +27,13 @@ function resolveAssignees(
 }
 
 function rowLabel(resolved: ReadonlyArray<Member>): string {
-  return resolved.length === 0
-    ? m.tickets_assignees_row_unassigned_aria_label()
-    : resolved.length === 1
-      ? m.tickets_assignees_row_one_aria_label({ name: resolved[0].name })
-      : m.tickets_assignees_row_many_aria_label({ count: resolved.length })
+  if (resolved.length === 0) {
+    return m.tickets_assignees_row_unassigned_aria_label()
+  }
+  return m.tickets_assignees_row_aria_label({
+    count: resolved.length,
+    name: resolved[0].name
+  })
 }
 
 function chipLabel(resolved: ReadonlyArray<Member>): string {
