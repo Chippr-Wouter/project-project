@@ -62,7 +62,7 @@ it("starts each edit from the current title and discards cancelled drafts", () =
   )
 })
 
-it("submits once when Enter is followed by blur while saving", async () => {
+it("flattens newlines and submits once when Enter is followed by blur while saving", async () => {
   let resolve: (exit: Exit.Exit<void>) => void = () => {}
   const pending = new Promise<Exit.Exit<void>>((done) => {
     resolve = done
@@ -74,13 +74,12 @@ it("submits once when Enter is followed by blur while saving", async () => {
   fireEvent.change(input, { target: { value: "  New title  " } })
   fireEvent.keyDown(input, { key: "Enter", isComposing: true })
   expect(mutation.update).not.toHaveBeenCalled()
-  expect(fireEvent.keyDown(input, { key: "Enter", shiftKey: true })).toBe(true)
-  expect(mutation.update).not.toHaveBeenCalled()
   fireEvent.change(input, { target: { value: "  New title\nSecond line  " } })
-  fireEvent.keyDown(input, { key: "Enter" })
+  expect(input).toHaveProperty("value", "  New title Second line  ")
+  fireEvent.keyDown(input, { key: "Enter", shiftKey: true })
   fireEvent.blur(input)
   expect(mutation.update).toHaveBeenCalledExactlyOnceWith({
-    title: "New title\nSecond line"
+    title: "New title Second line"
   })
   await act(async () => resolve(Exit.void))
   expect(screen.queryByRole("textbox")).toBeNull()

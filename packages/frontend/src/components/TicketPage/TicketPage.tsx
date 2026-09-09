@@ -104,7 +104,12 @@ export function TicketPage({
         </div>
         <div className="flex min-w-0 flex-1 flex-col items-start gap-1">
           <h1 className="w-full">
-            <TitleField orgSlug={orgSlug} slug={slug} ticket={ticket} />
+            <TitleField
+              key={ticket.id}
+              orgSlug={orgSlug}
+              slug={slug}
+              ticket={ticket}
+            />
           </h1>
           <div className="flex items-center gap-1.5 px-2">
             <span className="font-mono text-xs tabular-nums text-muted-foreground">
