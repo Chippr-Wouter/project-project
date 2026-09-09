@@ -8,11 +8,16 @@
 // You should not need to touch this file in Chapter 0.
 
 import { RegistryContext } from "@effect/atom-react"
-import { StrictMode } from "react"
+import { StrictMode, useSyncExternalStore } from "react"
 import ReactDOM from "react-dom/client"
-import { createRouter, RouterProvider } from "@tanstack/react-router"
+import {
+  createBrowserHistory,
+  createRouter,
+  RouterProvider
+} from "@tanstack/react-router"
 import { STATE_COLORS } from "@projectproject/shared"
-import { registry } from "./runtime"
+import { createSessionCache } from "./lib/sessionCache"
+import { authClient } from "./services/AuthClient"
 import { routeTree } from "./routeTree.gen"
 import "./styles.css"
 
@@ -26,17 +31,34 @@ const darkStateVars = Object.entries(STATE_COLORS)
 stateColorStyle.textContent = `:root{${lightStateVars}}.dark{${darkStateVars}}`
 document.head.appendChild(stateColorStyle)
 
-const router = createRouter({
-  routeTree,
-  defaultPreload: "intent",
-  scrollRestoration: true,
-  scrollToTopSelectors: ["[data-scroll-root]"],
-  context: { registry }
-})
+const history = createBrowserHistory()
+const sessions = createSessionCache((registry) =>
+  createRouter({
+    routeTree,
+    history,
+    defaultPreload: "intent",
+    scrollRestoration: true,
+    scrollToTopSelectors: ["[data-scroll-root]"],
+    context: { registry }
+  })
+)
+
+authClient.$store.atoms.$sessionSignal.listen(sessions.refreshIdentity)
+window.addEventListener("focus", sessions.refreshIdentity)
+
+function App() {
+  const session = useSyncExternalStore(sessions.subscribe, sessions.getSnapshot)
+  if (!session.ready) return null
+  return (
+    <RegistryContext.Provider key={session.generation} value={session.registry}>
+      <RouterProvider router={session.router} />
+    </RegistryContext.Provider>
+  )
+}
 
 declare module "@tanstack/react-router" {
   interface Register {
-    router: typeof router
+    router: ReturnType<typeof sessions.getSnapshot>["router"]
   }
 }
 
@@ -45,8 +67,6 @@ if (!rootEl) throw new Error("Root element #root not found")
 
 ReactDOM.createRoot(rootEl).render(
   <StrictMode>
-    <RegistryContext.Provider value={registry}>
-      <RouterProvider router={router} />
-    </RegistryContext.Provider>
+    <App />
   </StrictMode>
 )
