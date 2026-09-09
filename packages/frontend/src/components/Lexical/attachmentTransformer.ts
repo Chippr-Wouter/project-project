@@ -4,8 +4,7 @@ import {
   attachmentSrc,
   attachmentViewParams,
   parseAttachmentUrl,
-  withAttachmentParams,
-  type AttachmentDensity
+  formatAttachmentMarkdown
 } from "@projectproject/shared"
 import {
   $createAttachmentNode,
@@ -15,21 +14,6 @@ import {
 
 export const ATTACHMENT_MARKDOWN_RE =
   /(!?)\[((?:\\.|[^\]\\])*)\]\((\/api\/attachments\/[^)\s]+)\)/
-
-export const formatAttachmentMarkdown = (input: {
-  readonly kind: "image" | "file"
-  readonly alt: string
-  readonly url: string
-  readonly width?: number | null
-  readonly density?: AttachmentDensity
-}): string => {
-  const alt = input.alt.replace(/([[\]\\])/g, "\\$1")
-  const url = withAttachmentParams(input.url, {
-    width: input.width,
-    density: input.density
-  })
-  return `${input.kind === "image" ? "!" : ""}[${alt}](${url})`
-}
 
 export const unescapeAttachmentAlt = (alt: string): string =>
   alt.replace(/\\(.)/g, "$1")

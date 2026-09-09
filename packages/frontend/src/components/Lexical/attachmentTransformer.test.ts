@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vite-plus/test"
 import {
+  formatAttachmentMarkdown,
   attachmentViewParams,
   parseAttachmentUrl
 } from "@projectproject/shared"
 import {
   ATTACHMENT_MARKDOWN_RE,
-  formatAttachmentMarkdown,
   unescapeAttachmentAlt
 } from "./attachmentTransformer"
 
@@ -169,4 +169,15 @@ describe("formatAttachmentMarkdown density round-trip", () => {
     expect(attachmentViewParams(url).width).toBe(240)
     expect(attachmentViewParams(url).density).toBe("compact")
   })
+})
+
+it("round-trips large widths without decoding a plus sign as a space", () => {
+  const markdown = formatAttachmentMarkdown({
+    kind: "image",
+    alt: "shot",
+    url: URL,
+    width: 1e21
+  })
+  const match = markdown.match(ATTACHMENT_MARKDOWN_RE)
+  expect(attachmentViewParams(match![3]).width).toBe(1e21)
 })

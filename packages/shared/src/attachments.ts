@@ -71,12 +71,29 @@ export const withAttachmentParams = (
   const query: Array<string> = []
   const width = params.width ?? null
   if (width !== null && Number.isFinite(width) && width > 0) {
-    query.push(`${WIDTH_PARAM}=${Math.max(1, Math.round(width))}`)
+    query.push(
+      `${WIDTH_PARAM}=${encodeURIComponent(Math.max(1, Math.round(width)))}`
+    )
   }
   if (params.density === "compact") {
     query.push(`${DENSITY_PARAM}=compact`)
   }
   return query.length === 0 ? base : `${base}?${query.join("&")}`
+}
+
+export const formatAttachmentMarkdown = (input: {
+  readonly kind: "image" | "file"
+  readonly alt: string
+  readonly url: string
+  readonly width?: number | null
+  readonly density?: AttachmentDensity
+}): string => {
+  const alt = input.alt.replace(/([[\]\\*_`~&<>])/g, "\\$1")
+  const url = withAttachmentParams(input.url, {
+    width: input.width,
+    density: input.density
+  })
+  return `${input.kind === "image" ? "!" : ""}[${alt}](${url})`
 }
 
 const unanchored = (pattern: RegExp) => pattern.source.replace(/^\^|\$$/g, "")
