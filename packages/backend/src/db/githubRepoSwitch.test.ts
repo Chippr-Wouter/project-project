@@ -58,6 +58,11 @@ describe.skipIf(!databaseUrl)("GitHub repository switch", () => {
     commentsRegion: "",
     body: "Ticket body"
   }
+  const banner = {
+    type: "preset" as const,
+    preset: "sunset" as const,
+    crop: { x: 0.5, y: 0.65, zoom: 1 }
+  }
   let ticket = initialTicket
   let failWrite = false
   let lockChecks = 0
@@ -196,9 +201,13 @@ describe.skipIf(!databaseUrl)("GitHub repository switch", () => {
                   invitePeopleDismissedAt: null,
                   connectGithubDismissedAt: null
                 },
+                banner,
                 body: "Project body"
               }),
-            write: () => Effect.void,
+            write: (_org, _slug, next) =>
+              Effect.sync(() => {
+                expect(next.banner).toEqual(banner)
+              }),
             removeDir: unused,
             readRaw: unused
           })
@@ -267,6 +276,7 @@ describe.skipIf(!databaseUrl)("GitHub repository switch", () => {
     failWrite = false
     const result = await connect()
     expect(result.github?.repoId).toBe("new-repo")
+    expect(result.banner).toEqual(banner)
     expect(lockChecks).toBe(2)
     expect(ticket).toMatchObject({
       branch: "feat/T-1",

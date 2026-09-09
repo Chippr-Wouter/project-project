@@ -1732,7 +1732,6 @@ export const ProjectsLive = Layer.effect(
             indexRow.organizationId
           )
           if (!orgGithub) return yield* new NotFound()
-          const file = yield* projectDocs.read(orgSlug, slug)
           const currentConnection = yield* loadGithubConnection(indexRow)
 
           const verified = yield* github.verifyInstallationRepo(
@@ -1857,41 +1856,8 @@ export const ProjectsLive = Layer.effect(
             ? withClearedTicketPrMetadata(orgSlug, slug, switchRepository)
             : switchRepository
 
-          const members = yield* loadMembers(slug)
-          const pendingMembers = yield* loadPendingMembers(slug)
-          yield* syncFrontmatter(
-            orgSlug,
-            slug,
-            indexRow.name,
-            indexRow.icon,
-            indexRow.color,
-            indexRow.createdBy,
-            indexRow.createdAt,
-            makeProjectKey(indexRow.key),
-            file.body,
-            members,
-            next,
-            file.setup,
-            file.banner ?? null
-          )
-
-          return {
-            org: orgSlug,
-            slug: indexRow.slug,
-            key: makeProjectKey(indexRow.key),
-            name: indexRow.name,
-            icon: makeProjectIcon(indexRow.icon),
-            color: makeProjectColor(indexRow.color),
-            createdBy: indexRow.createdBy,
-            createdAt: indexRow.createdAt,
-            github: next,
-            banner: file.banner ?? null,
-            setup: file.setup,
-            body: file.body,
-            members,
-            pendingMembers
-          }
-        }).pipe((effect) => withProjectWriteLock(slug, effect))
+          return yield* replayDetail(orgSlug, slug)
+        })
       )
 
     const disconnectGithub = (
@@ -1906,9 +1872,6 @@ export const ProjectsLive = Layer.effect(
         Effect.gen(function* () {
           const indexRow = yield* getIndexRowInOrg(orgSlug, slug)
           yield* requireOrgOwner(indexRow.organizationId, userId)
-          const file = yield* projectDocs.read(orgSlug, slug)
-          const members = yield* loadMembers(slug)
-          const pendingMembers = yield* loadPendingMembers(slug)
           const now = yield* DateTime.nowAsDate
           yield* sql
             .withTransaction(
@@ -1947,38 +1910,8 @@ export const ProjectsLive = Layer.effect(
               })
             )
             .pipe(Effect.catchTag("SqlError", Effect.die))
-          yield* syncFrontmatter(
-            orgSlug,
-            slug,
-            indexRow.name,
-            indexRow.icon,
-            indexRow.color,
-            indexRow.createdBy,
-            indexRow.createdAt,
-            makeProjectKey(indexRow.key),
-            file.body,
-            members,
-            null,
-            file.setup,
-            file.banner ?? null
-          )
-          return {
-            org: orgSlug,
-            slug: indexRow.slug,
-            key: makeProjectKey(indexRow.key),
-            name: indexRow.name,
-            icon: makeProjectIcon(indexRow.icon),
-            color: makeProjectColor(indexRow.color),
-            createdBy: indexRow.createdBy,
-            createdAt: indexRow.createdAt,
-            github: null,
-            banner: file.banner ?? null,
-            setup: file.setup,
-            body: file.body,
-            members,
-            pendingMembers
-          }
-        }).pipe((effect) => withProjectWriteLock(slug, effect))
+          return yield* replayDetail(orgSlug, slug)
+        })
       )
 
     return {

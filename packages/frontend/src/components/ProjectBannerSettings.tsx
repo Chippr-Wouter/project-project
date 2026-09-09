@@ -527,7 +527,7 @@ export default function ProjectBannerSettings({
                   <Button
                     variant="tertiary"
                     leadingIcon={ImagePlus}
-                    className="h-12 w-full justify-start text-muted-foreground"
+                    size="banner-add"
                     onClick={() => edit(false)}
                   >
                     {m.project_banner_settings_add()}
@@ -544,8 +544,7 @@ export default function ProjectBannerSettings({
                 >
                   <Button
                     variant="image-option"
-                    size="image-option"
-                    className="aspect-auto h-12"
+                    size="image-strip"
                     aria-label={m.project_banner_settings_preview()}
                     onClick={() => edit(false)}
                   >
