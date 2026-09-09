@@ -59,7 +59,7 @@ export const userOrgsAtom = runtime
   )
   .pipe(Atom.setIdleTTL("1 minute"))
 
-const orgDetailBaseAtom = Atom.family((orgSlug: string) =>
+export const orgDetailBaseAtom = Atom.family((orgSlug: string) =>
   runtime
     .atom(
       Effect.gen(function* () {
