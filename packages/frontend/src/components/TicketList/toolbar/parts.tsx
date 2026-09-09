@@ -39,7 +39,7 @@ import {
 } from "@projectproject/shared"
 import { useTicketToolbar } from "./context"
 import { SORT_LABELS } from "../sort"
-import { ControlSlot, TOOLBAR_BUTTON_CLASS } from "./shared"
+import { ControlSlot } from "./shared"
 
 export function SearchInput() {
   const { search, searchActive: compact, setFocused } = useTicketToolbar()
@@ -113,7 +113,7 @@ export function Status() {
             <button
               type="button"
               className={cn(
-                TOOLBAR_BUTTON_CLASS,
+                "inline-flex h-9 items-center gap-2 rounded-xl border border-border bg-background px-3 text-sm text-muted-foreground transition-all duration-100 hover:text-foreground active:scale-[0.97] ring-offset-background focus-visible:ring-2 focus-visible:ring-ring outline-none",
                 active && "bg-accent text-foreground hover:text-foreground"
               )}
               aria-label={m.tickets_status_aria_label({ label: currentLabel })}
@@ -212,7 +212,7 @@ export function Sort() {
           render={
             <button
               type="button"
-              className={TOOLBAR_BUTTON_CLASS}
+              className="inline-flex h-9 items-center gap-2 rounded-xl border border-border bg-background px-3 text-sm text-muted-foreground transition-all duration-100 hover:text-foreground active:scale-[0.97] ring-offset-background focus-visible:ring-2 focus-visible:ring-ring outline-none"
               aria-label={m.tickets_sort_aria_label({
                 label: SORT_LABELS[sortKey]()
               })}

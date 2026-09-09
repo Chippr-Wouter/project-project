@@ -39,12 +39,7 @@ import {
   type SprintFilterValue
 } from "./model"
 import { useTicketToolbar } from "./context"
-import {
-  ControlSlot,
-  FilterSection,
-  SectionLabel,
-  TOOLBAR_BUTTON_CLASS
-} from "./shared"
+import { ControlSlot, FilterSection, SectionLabel } from "./shared"
 
 export function Filters() {
   const {
@@ -82,7 +77,7 @@ export function Filters() {
             <button
               type="button"
               className={cn(
-                TOOLBAR_BUTTON_CLASS,
+                "inline-flex h-9 items-center gap-2 rounded-xl border border-border bg-background px-3 text-sm text-muted-foreground transition-all duration-100 hover:text-foreground active:scale-[0.97] ring-offset-background focus-visible:ring-2 focus-visible:ring-ring outline-none",
                 active && "bg-accent text-foreground hover:text-foreground"
               )}
               aria-label={
