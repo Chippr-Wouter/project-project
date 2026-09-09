@@ -82,8 +82,12 @@ export const MARKDOWN_TRANSFORMERS = [
 ]
 
 const ATTACHMENT_MARKDOWN_TRANSFORMERS = [
+  createTableTransformer([
+    ATTACHMENT_TRANSFORMER,
+    ...INLINE_AND_BLOCK_TRANSFORMERS
+  ]),
   ATTACHMENT_TRANSFORMER,
-  ...MARKDOWN_TRANSFORMERS
+  ...INLINE_AND_BLOCK_TRANSFORMERS
 ]
 
 export const transformersForAttachments = (

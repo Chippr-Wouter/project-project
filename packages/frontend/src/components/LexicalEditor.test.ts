@@ -503,3 +503,14 @@ it.each(["---", "***", "___"])(
     )
   }
 )
+
+it("loads image and file attachments inside table cells and preserves their display settings", () => {
+  const markdown = `| Preview | File |\n| --- | --- |\n| ![shot](${ATTACHMENT_URL}?w=240) | [report.pdf](${ATTACHMENT_URL}?d=compact) |`
+  const transformers = transformersForAttachments(descriptionAttachments(true))
+  expect(
+    markdownNodeTypes(markdown, transformers).filter(
+      (type) => type === "attachment"
+    )
+  ).toHaveLength(2)
+  expect(roundTripAttachmentMarkdown(markdown)).toBe(markdown)
+})
