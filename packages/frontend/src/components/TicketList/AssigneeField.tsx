@@ -23,7 +23,7 @@ export function resolveAssignees(
     .filter((member): member is Member => !!member)
 }
 
-interface AssigneeContextValue {
+type AssigneeContextValue = {
   state: {
     assignees: ReadonlyArray<string>
     resolved: ReadonlyArray<Member>
