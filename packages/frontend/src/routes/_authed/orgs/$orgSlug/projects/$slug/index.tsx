@@ -3,12 +3,7 @@ import * as Effect from "effect/Effect"
 import { projectAtom } from "@/atoms/projects"
 import { projectStatusesAtom } from "@/atoms/projectStatuses"
 import { sprintsListAtom } from "@/atoms/sprints"
-import {
-  ticketsCountAtom,
-  ticketsCountKey,
-  ticketsListAtom,
-  ticketsListKeyForStatus
-} from "@/atoms/tickets"
+import { ticketsSectionsAtom, ticketsSectionsKey } from "@/atoms/tickets"
 import { useMemo } from "react"
 import { createFileRoute } from "@tanstack/react-router"
 import { useAtomValue } from "@effect/atom-react"
@@ -37,39 +32,11 @@ export const Route = createFileRoute("/_authed/orgs/$orgSlug/projects/$slug/")({
         [
           Registry.getResult(registry, projectAtom(key)),
           Registry.getResult(registry, sprintsListAtom(key)),
+          Registry.getResult(registry, projectStatusesAtom(key)),
           Registry.getResult(
             registry,
-            ticketsCountAtom(
-              ticketsCountKey(orgSlug, slug, {
-                filter: query.filter,
-                q: query.q
-              })
-            )
-          ),
-          Effect.gen(function* () {
-            const statuses = yield* Registry.getResult(
-              registry,
-              projectStatusesAtom(key)
-            )
-            yield* Effect.forEach(
-              statuses.filter(
-                (status) =>
-                  !query.filter?.status?.length ||
-                  query.filter.status.includes(status.slug)
-              ),
-              (status) =>
-                Effect.exit(
-                  // @effect-diagnostics-next-line anyUnknownInErrorContext:off
-                  Registry.getResult(
-                    registry,
-                    ticketsListAtom(
-                      ticketsListKeyForStatus(orgSlug, slug, query, status.slug)
-                    )
-                  )
-                ),
-              { concurrency: 4 }
-            )
-          })
+            ticketsSectionsAtom(ticketsSectionsKey(orgSlug, slug, query))
+          )
         ],
         { concurrency: "unbounded", discard: true }
       ),

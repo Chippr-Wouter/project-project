@@ -1,23 +1,15 @@
-import { TICKET_LIST_LIMIT } from "@projectproject/shared"
 import * as Result from "effect/unstable/reactivity/AsyncResult"
-import { useAtomSet, useAtomValue } from "@effect/atom-react"
-import { AnimatePresence, motion } from "motion/react"
-import { Loader2 } from "lucide-react"
-import {
-  useDeferredValue,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode
-} from "react"
-import { Button } from "@/components/ui/button"
 import { ErrorPage } from "@/components/ErrorPage"
+import { useAtomSet, useAtomValue } from "@effect/atom-react"
+import { AnimatePresence, motion, useReducedMotion } from "motion/react"
+import { Loader2 } from "lucide-react"
+import { useRef, useState, type ReactNode } from "react"
+import { Button } from "@/components/ui/button"
 import {
   loadMoreTicketsAtom,
   pendingTicketStatusChangesAtom,
-  ticketsListAtom,
   ticketsListKeyForStatus,
-  type TicketsListValue
+  type TicketSectionValue
 } from "@/atoms/tickets"
 import { projectKey } from "@/atoms/projects"
 import { cn } from "@/lib/utils"
@@ -36,8 +28,6 @@ import { Row } from "./Row"
 import { SectionHeader } from "./SectionHeader"
 import { SectionTicketCreator } from "./SectionTicketCreator"
 
-const EMPTY_ITEMS: ReadonlyArray<Ticket> = []
-
 export function SectionList({
   orgSlug,
   slug,
@@ -45,6 +35,7 @@ export function SectionList({
   statuses,
   query,
   count,
+  page,
   collapsed,
   onToggleCollapsed,
   members,
@@ -62,6 +53,7 @@ export function SectionList({
   statuses: ReadonlyArray<ProjectStatus>
   query: TicketListQuery
   count: number
+  page: TicketSectionValue
   collapsed: boolean
   onToggleCollapsed: () => void
   members: ReadonlyArray<Member>
@@ -74,50 +66,33 @@ export function SectionList({
   onPreviewOpenChange: (ticketId: TicketId, open: boolean) => void
 }) {
   const sectionKey = ticketsListKeyForStatus(orgSlug, slug, query, status)
-  const deferredKey = useDeferredValue(sectionKey)
-  const list = useAtomValue(ticketsListAtom(deferredKey))
   const pendingStatusChanges = useAtomValue(
     pendingTicketStatusChangesAtom(projectKey(orgSlug, slug))
   )
-  const isStaleKey = sectionKey !== deferredKey
-
-  const previousRef = useRef<TicketsListValue | null>(null)
-  if (Result.isSuccess(list)) previousRef.current = list.value
-
-  const listFailure =
-    previousRef.current === null && Result.isFailure(list) ? list : null
-
-  const loadMore = useAtomSet(loadMoreTicketsAtom(deferredKey))
-  const loadMoreState = useAtomValue(loadMoreTicketsAtom(deferredKey))
+  const reducedMotion = useReducedMotion()
+  const loadMore = useAtomSet(loadMoreTicketsAtom(sectionKey))
+  const loadMoreState = useAtomValue(loadMoreTicketsAtom(sectionKey))
   const loadingMore = loadMoreState.waiting
 
   const [creating, setCreating] = useState(false)
 
-  const items: ReadonlyArray<Ticket> = Result.isSuccess(list)
-    ? list.value.items
-    : (previousRef.current?.items ?? EMPTY_ITEMS)
-  const nextCursor: string | null = Result.isSuccess(list)
-    ? list.value.nextCursor
-    : (previousRef.current?.nextCursor ?? null)
-  const waiting =
-    (Result.isSuccess(list) && list.waiting === true) || isStaleKey
-
-  const itemRowState = useStableTicketKeys(items, waiting)
-
+  const { items, nextCursor } = page
   const remaining = Math.max(0, count - items.length)
 
   const gridCols = cn(
     "grid gap-y-1",
     showExtraActionsCol
       ? "grid-cols-[auto_auto_auto_minmax(0,1fr)_auto_auto_auto]"
-      : "grid-cols-[auto_auto_auto_minmax(0,1fr)_auto_auto]",
-    waiting && "animate-pulse"
+      : "grid-cols-[auto_auto_auto_minmax(0,1fr)_auto_auto]"
   )
 
   const shellRef = useRef<HTMLDivElement>(null)
 
+  const toggleCollapsed = () => {
+    onToggleCollapsed()
+  }
   const onStartCreate = () => {
-    if (collapsed) onToggleCollapsed()
+    if (collapsed) toggleCollapsed()
     setCreating(true)
   }
   const onDismissCreate = () => setCreating(false)
@@ -135,7 +110,7 @@ export function SectionList({
         count={count}
         collapsed={collapsed}
         creating={creating}
-        onToggleCollapsed={onToggleCollapsed}
+        onToggleCollapsed={toggleCollapsed}
         onStartCreate={onStartCreate}
         onDismissCreate={onDismissCreate}
         creator={
@@ -150,186 +125,108 @@ export function SectionList({
         }
       />
 
-      <div
-        aria-hidden={collapsed || undefined}
-        inert={collapsed ? true : undefined}
-        className={cn(
-          "grid duration-150 transition-[grid-template-rows,opacity] ease-[cubic-bezier(0.65,0,0.35,1)] motion-reduce:transition-none",
-          collapsed
-            ? "grid-rows-[0fr] opacity-0"
-            : "grid-rows-[1fr] opacity-100"
-        )}
-      >
-        <div className="min-h-0 overflow-hidden">
-          <div className="flex flex-col gap-1 pt-1">
-            {listFailure !== null ? (
-              Result.matchWithError(listFailure, {
+      <AnimatePresence initial={false}>
+        {!collapsed && (
+          <motion.div
+            key="content"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{
+              duration: reducedMotion ? 0 : 0.15,
+              ease: "easeInOut"
+            }}
+            className="overflow-hidden"
+          >
+            <div className="flex flex-col gap-1 pt-1">
+              {items.length === 0 ? (
+                <div className="px-3 py-4 text-center text-xs text-muted-foreground">
+                  —
+                </div>
+              ) : (
+                <ul
+                  className={gridCols}
+                  style={{
+                    contentVisibility: "auto",
+                    containIntrinsicBlockSize: `auto ${Math.max(0, items.length * 56 - 4)}px`
+                  }}
+                >
+                  <AnimatePresence initial={false}>
+                    {items.map(({ ticket, key, pending }) => {
+                      return (
+                        <motion.li
+                          key={key}
+                          inert={pending}
+                          aria-busy={pending}
+                          initial={
+                            pending && !reducedMotion ? { opacity: 0 } : false
+                          }
+                          animate={{ opacity: 1 }}
+                          transition={transitions.presence}
+                          className={cn(
+                            "col-span-full grid grid-cols-subgrid",
+                            pending && "pointer-events-none animate-pulse",
+                            pendingStatusChanges.has(ticket.id) &&
+                              "animate-pulse"
+                          )}
+                        >
+                          <Row
+                            orgSlug={orgSlug}
+                            slug={slug}
+                            ticket={ticket}
+                            query={query}
+                            members={members}
+                            showSprintCol={showSprintCol}
+                            showExtraActionsCol={showExtraActionsCol}
+                            sprintMembership={
+                              sprintMembership?.get(ticket.id) ?? null
+                            }
+                            extraRowActions={extraRowActions}
+                            pending={pending}
+                            previewOpen={activePreviewId === ticket.id}
+                            onPreviewPointerEnter={onPreviewPointerEnter}
+                            onPreviewOpenChange={onPreviewOpenChange}
+                          />
+                        </motion.li>
+                      )
+                    })}
+                  </AnimatePresence>
+                </ul>
+              )}
+
+              {Result.matchWithError(loadMoreState, {
                 onInitial: () => null,
                 onError: (error) => <ErrorPage error={error} contained />,
                 onDefect: (defect) => <ErrorPage error={defect} contained />,
                 onSuccess: () => null
-              })
-            ) : previousRef.current === null ? (
-              <div
-                aria-busy="true"
-                className="flex flex-col gap-1 animate-pulse motion-reduce:animate-none"
-              >
-                {Array.from(
-                  { length: Math.min(count, TICKET_LIST_LIMIT) },
-                  (_, index) => (
-                    <div
-                      key={index}
-                      aria-hidden="true"
-                      className="flex h-[52px] items-center gap-3 px-3"
-                    >
-                      <div className="size-4 rounded-full bg-muted" />
-                      <div className="h-3 w-10 rounded bg-muted" />
-                      <div className="h-3 w-2/5 rounded bg-muted" />
-                    </div>
-                  )
-                )}
-              </div>
-            ) : items.length === 0 ? (
-              <div className="px-3 py-4 text-center text-xs text-muted-foreground">
-                —
-              </div>
-            ) : (
-              <ul
-                className={gridCols}
-                style={{
-                  contentVisibility: "auto",
-                  containIntrinsicBlockSize: `auto ${Math.max(0, items.length * 56 - 4)}px`
-                }}
-              >
-                <AnimatePresence initial={false}>
-                  {items.map((t, idx) => {
-                    const membership = sprintMembership?.get(t.id) ?? null
-                    const rowState = itemRowState[idx]
-                    return (
-                      <motion.li
-                        key={rowState.key}
-                        initial={{ opacity: 0, filter: "blur(8px)" }}
-                        animate={{ opacity: 1, filter: "blur(0px)" }}
-                        transition={transitions.presence}
-                        className={cn(
-                          "col-span-full grid grid-cols-subgrid",
-                          pendingStatusChanges.has(t.id) && "animate-pulse"
-                        )}
-                      >
-                        <Row
-                          orgSlug={orgSlug}
-                          slug={slug}
-                          ticket={t}
-                          query={query}
-                          members={members}
-                          showSprintCol={showSprintCol}
-                          showExtraActionsCol={showExtraActionsCol}
-                          sprintMembership={membership}
-                          extraRowActions={extraRowActions}
-                          pending={rowState.pending}
-                          previewOpen={activePreviewId === t.id}
-                          onPreviewPointerEnter={onPreviewPointerEnter}
-                          onPreviewOpenChange={onPreviewOpenChange}
+              })}
+              {nextCursor !== null && (
+                <div className="flex justify-center py-2">
+                  <Button
+                    type="button"
+                    variant="tertiary"
+                    size="sm"
+                    onClick={() => loadMore()}
+                    disabled={loadingMore}
+                  >
+                    {loadingMore ? (
+                      <>
+                        <Loader2
+                          className="size-4 animate-spin"
+                          strokeWidth={1.75}
                         />
-                      </motion.li>
-                    )
-                  })}
-                </AnimatePresence>
-              </ul>
-            )}
-
-            {nextCursor !== null && (
-              <div className="flex justify-center py-2">
-                <Button
-                  type="button"
-                  variant="tertiary"
-                  size="sm"
-                  onClick={() => loadMore()}
-                  disabled={loadingMore}
-                >
-                  {loadingMore ? (
-                    <>
-                      <Loader2
-                        className="size-4 animate-spin"
-                        strokeWidth={1.75}
-                      />
-                      {m.tickets_load_more_loading()}
-                    </>
-                  ) : (
-                    m.tickets_section_load_more_button({ remaining })
-                  )}
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+                        {m.tickets_load_more_loading()}
+                      </>
+                    ) : (
+                      m.tickets_section_load_more_button({ remaining })
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
-}
-
-interface RowState {
-  readonly key: string
-  readonly pending: boolean
-}
-
-export function useStableTicketKeys(
-  items: ReadonlyArray<Pick<Ticket, "id">>,
-  waiting: boolean
-): ReadonlyArray<RowState> {
-  const entriesRef = useRef<
-    Map<TicketId, { key: string; bornWaiting: boolean }>
-  >(new Map())
-  const prevItemsRef = useRef<ReadonlyArray<Pick<Ticket, "id">>>(items)
-  const prevWaitingRef = useRef<boolean>(waiting)
-  const keySequenceRef = useRef(0)
-
-  const justSettled = prevWaitingRef.current && !waiting
-  const prevItems = prevItemsRef.current
-  const currIds = new Set(items.map((t) => t.id))
-
-  const states = items.map<RowState>((t, idx) => {
-    const existing = entriesRef.current.get(t.id)
-    if (existing !== undefined) {
-      const stillPending = existing.bornWaiting && waiting
-      if (existing.bornWaiting && !waiting) {
-        entriesRef.current.set(t.id, { ...existing, bornWaiting: false })
-      }
-      return { key: existing.key, pending: stillPending }
-    }
-    if (justSettled) {
-      const prevAtIdx = prevItems[idx]
-      if (prevAtIdx && !currIds.has(prevAtIdx.id)) {
-        const prevEntry = entriesRef.current.get(prevAtIdx.id)
-        const inheritedKey = prevEntry?.key ?? prevAtIdx.id
-        entriesRef.current.delete(prevAtIdx.id)
-        entriesRef.current.set(t.id, {
-          key: inheritedKey,
-          bornWaiting: false
-        })
-        return { key: inheritedKey, pending: false }
-      }
-    }
-    const usedKeys = new Set(
-      [...entriesRef.current.values()].map(({ key }) => key)
-    )
-    const key = usedKeys.has(t.id)
-      ? `${t.id}:${++keySequenceRef.current}`
-      : t.id
-    entriesRef.current.set(t.id, { key, bornWaiting: waiting })
-    return { key, pending: waiting }
-  })
-
-  useEffect(() => {
-    prevItemsRef.current = items
-    prevWaitingRef.current = waiting
-    if (entriesRef.current.size > 200) {
-      const live = new Set(items.map((t) => t.id))
-      for (const id of entriesRef.current.keys()) {
-        if (!live.has(id)) entriesRef.current.delete(id)
-      }
-    }
-  }, [items, waiting])
-
-  return states
 }

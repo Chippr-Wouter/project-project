@@ -123,7 +123,18 @@ export function TypeButton({
             >
               <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-muted-foreground transition-colors group-hover/hitbox:bg-foreground/5 group-hover/hitbox:text-foreground">
                 <Icon className="size-3.5" strokeWidth={1.75} />
-                <span>{typeLabel}</span>
+                <span className="grid justify-items-start whitespace-nowrap">
+                  {Object.entries(TYPE_LABELS).map(([type, label]) => (
+                    <span
+                      key={type}
+                      aria-hidden="true"
+                      className="invisible col-start-1 row-start-1"
+                    >
+                      {label()}
+                    </span>
+                  ))}
+                  <span className="col-start-1 row-start-1">{typeLabel}</span>
+                </span>
               </span>
             </Hitbox>
           )

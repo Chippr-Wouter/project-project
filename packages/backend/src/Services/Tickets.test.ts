@@ -1964,3 +1964,61 @@ it.effect(
     }).pipe(Effect.provide(layer))
   }
 )
+
+it.effect(
+  "sections returns matching counts and independently paginated status pages",
+  () => {
+    const { documents, layer } = makeTicketsFixture("T", [])
+    for (let index = 1; index <= 52; index++) {
+      documents.set(
+        `T-${index}`,
+        makeTicketDocument(`T-${index}`, {
+          title: `needle ${index}`,
+          status: ticketStatus("todo")
+        })
+      )
+    }
+    documents.set(
+      "T-53",
+      makeTicketDocument("T-53", {
+        title: "needle in progress",
+        status: ticketStatus("in_progress")
+      })
+    )
+    documents.set(
+      "T-54",
+      makeTicketDocument("T-54", {
+        title: "unrelated",
+        status: ticketStatus("done")
+      })
+    )
+    return Effect.gen(function* () {
+      const tickets = yield* Tickets
+      const query = { q: "needle", sort: { key: "id", dir: "asc" } } as const
+      const snapshot = yield* tickets.sections("org", "user-1", "p", query)
+      expect(snapshot.counts).toEqual({
+        total: 53,
+        byStatus: { todo: 52, in_progress: 1 }
+      })
+      const todo = snapshot.sections[ticketStatus("todo")]
+      expect(todo.items).toHaveLength(50)
+      expect(todo.nextCursor).not.toBeNull()
+      expect(
+        snapshot.sections[ticketStatus("in_progress")].items.map(({ id }) => id)
+      ).toEqual(["T-53"])
+      const next = yield* tickets.list("org", "user-1", "p", {
+        ...query,
+        filter: { status: [ticketStatus("todo")] },
+        cursor: todo.nextCursor ?? undefined
+      })
+      expect(next.items.map(({ id }) => id)).toEqual(["T-51", "T-52"])
+      expect(next.nextCursor).toBeNull()
+      const selected = yield* tickets.sections("org", "user-1", "p", {
+        ...query,
+        filter: { status: [ticketStatus("in_progress")] }
+      })
+      expect(Object.keys(selected.sections)).toEqual(["in_progress"])
+      expect(selected.counts).toEqual(snapshot.counts)
+    }).pipe(Effect.provide(layer))
+  }
+)
