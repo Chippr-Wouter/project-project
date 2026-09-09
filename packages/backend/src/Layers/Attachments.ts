@@ -157,7 +157,7 @@ export const AttachmentsLive = Layer.effect(
             objectKey,
             filename: input.filename,
             contentType: input.contentType,
-            byteSize: input.byteSize,
+            byteSize: input.byteSize ?? 0,
             status: "pending",
             uploadedBy: userId
           })
