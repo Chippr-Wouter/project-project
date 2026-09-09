@@ -19,8 +19,7 @@ import type {
   Ticket,
   TicketListQuery
 } from "@projectproject/shared"
-import { UserRound } from "lucide-react"
-import { Assignee, assigneeRowLabel, resolveAssignees } from "./AssigneeField"
+import { AssigneeField } from "./AssigneeField"
 import { PriorityButton } from "./PriorityField"
 import { SprintField } from "./SprintField"
 import { StatusButton } from "./StatusField"
@@ -170,29 +169,13 @@ function RowImpl({
                   membership={sprintMembership}
                 />
               )}
-              <Assignee.Root
+              <AssigneeField
                 orgSlug={orgSlug}
                 slug={slug}
                 ticket={visibleTicket}
                 members={members}
-              >
-                <Assignee.Trigger
-                  label={assigneeRowLabel(
-                    resolveAssignees(visibleTicket.assignees, members)
-                  )}
-                  className="hidden sm:inline-flex"
-                >
-                  <span className="inline-flex items-center text-muted-foreground transition-colors group-hover/hitbox:text-foreground">
-                    <Assignee.Empty>
-                      <span className="grid size-5 shrink-0 place-items-center rounded-full bg-foreground/15">
-                        <UserRound className="size-3" strokeWidth={1.75} />
-                      </span>
-                    </Assignee.Empty>
-                    <Assignee.Avatars />
-                  </span>
-                </Assignee.Trigger>
-                <Assignee.Content />
-              </Assignee.Root>
+                className="hidden sm:inline-flex"
+              />
             </div>
             <TypeButton
               orgSlug={orgSlug}

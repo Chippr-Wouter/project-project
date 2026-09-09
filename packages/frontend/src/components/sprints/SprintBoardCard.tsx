@@ -10,12 +10,7 @@ import {
 import { TicketGitChip } from "@/components/TicketGit"
 import { cn } from "@/lib/utils"
 import type { Member, Ticket } from "@projectproject/shared"
-import { UserRound } from "lucide-react"
-import {
-  Assignee,
-  assigneeRowLabel,
-  resolveAssignees
-} from "@/components/TicketList/AssigneeField"
+import { AssigneeField } from "@/components/TicketList/AssigneeField"
 import { PriorityButton } from "@/components/TicketList/PriorityField"
 import { TypeButton } from "@/components/TicketList/TypeField"
 
@@ -39,7 +34,6 @@ function SprintBoardCardImpl({
     ticket,
     updatePreview.input
   )
-  const resolvedAssignees = resolveAssignees(visibleTicket.assignees, members)
 
   return (
     <DeferredDropdownMenus>
@@ -87,29 +81,13 @@ function SprintBoardCardImpl({
               ticket={visibleTicket}
             />
           </div>
-          <Assignee.Root
+          <AssigneeField
             orgSlug={orgSlug}
             slug={slug}
             ticket={visibleTicket}
             members={members}
-          >
-            <Assignee.Trigger
-              label={assigneeRowLabel(resolvedAssignees)}
-              className={cn(
-                "transition-opacity",
-                resolvedAssignees.length === 0 &&
-                  "opacity-0 group-hover/card:opacity-100 group-focus-within/card:opacity-100"
-              )}
-            >
-              <Assignee.Empty>
-                <span className="grid size-6 place-items-center rounded-full text-muted-foreground transition-colors group-hover/hitbox:bg-foreground/5 group-hover/hitbox:text-foreground">
-                  <UserRound className="size-4" strokeWidth={1.75} />
-                </span>
-              </Assignee.Empty>
-              <Assignee.Avatars />
-            </Assignee.Trigger>
-            <Assignee.Content />
-          </Assignee.Root>
+            variant="card"
+          />
         </div>
       </div>
     </DeferredDropdownMenus>
