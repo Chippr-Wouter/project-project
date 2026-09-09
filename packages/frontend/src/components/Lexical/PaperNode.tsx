@@ -176,6 +176,7 @@ function PaperSelectable({
 
   useEffect(() => {
     const onDelete = (event: globalThis.KeyboardEvent) => {
+      if (editing) return false
       if (!isSelected || !$isNodeSelection($getSelection())) return false
       event.preventDefault()
       remove()
@@ -218,7 +219,15 @@ function PaperSelectable({
         COMMAND_PRIORITY_LOW
       )
     )
-  }, [editor, nodeKey, isSelected, setSelected, clearSelection, remove])
+  }, [
+    editor,
+    nodeKey,
+    isSelected,
+    setSelected,
+    clearSelection,
+    remove,
+    editing
+  ])
 
   const selectOnPointer = (event: ReactMouseEvent<HTMLElement>) => {
     if (isInteractiveTarget(event.target)) return
