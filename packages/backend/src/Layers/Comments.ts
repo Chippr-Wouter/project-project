@@ -22,11 +22,15 @@ import {
   validateCommentBody
 } from "../comments-region"
 import { Db } from "../Services/Db"
-import { Markdown, type MarkdownError } from "../Services/Markdown"
+import type { MarkdownError } from "../Services/Markdown"
 import { Projects } from "../Services/Projects"
-import { TicketDocs } from "../Services/TicketDocs"
+import { TicketIndex } from "../Services/TicketIndex"
+import {
+  type MalformedTicketDocument,
+  TicketDocs
+} from "../Services/TicketDocs"
 import { Users } from "../Services/Users"
-import { validateBodyMentions } from "../Services/BodyMentions"
+import { validateBodyMentionsWithLookups } from "../Services/BodyMentions"
 import {
   Comments,
   InvalidCommentBody,
@@ -40,8 +44,8 @@ export const CommentsLive = Layer.effect(
   Comments,
   Effect.gen(function* () {
     const db = yield* Db
-    const md = yield* Markdown
     const projects = yield* Projects
+    const ticketIndex = yield* TicketIndex
     const ticketDocs = yield* TicketDocs
     const users = yield* Users
 
@@ -54,40 +58,47 @@ export const CommentsLive = Layer.effect(
       slug: string,
       body: string
     ) =>
-      Effect.gen(function* () {
-        if (!body.includes("](mention:")) return
-        const project = yield* projects.get(orgSlug, userId, slug)
-        const memberIds = new Set<string>(project.members.map((m) => m.id))
-        const ids = yield* ticketDocs.listIds(orgSlug, slug)
-        const ticketIds = new Set<string>(ids)
-        yield* validateBodyMentions(body, memberIds, ticketIds)
+      validateBodyMentionsWithLookups(body, {
+        existingTicketIds: (ticketIds) =>
+          ticketIndex
+            .projectFor(orgSlug, slug)
+            .pipe(
+              Effect.flatMap((project) =>
+                ticketIndex.existingIds(project, ticketIds)
+              )
+            ),
+        memberIds: () =>
+          projects
+            .get(orgSlug, userId, slug)
+            .pipe(
+              Effect.map(
+                (project) =>
+                  new Set<string>(project.members.map((member) => member.id))
+              )
+            )
       })
 
-    const readBlocks = (orgSlug: string, slug: string, ticketId: string) =>
-      Effect.gen(function* () {
-        const parts = yield* md.readTicketParts(orgSlug, slug, ticketId)
-        return {
-          description: parts.description,
-          frontmatter: parts.data,
-          blocks: parseCommentsRegion(parts.region)
-        }
-      })
-
-    const writeBlocks = (
+    const updateBlocks = (
       orgSlug: string,
       slug: string,
       ticketId: string,
-      frontmatter: Record<string, unknown>,
-      description: string,
-      blocks: ReadonlyArray<CommentBlock>
+      transform: (
+        blocks: ReadonlyArray<CommentBlock>
+      ) => ReadonlyArray<CommentBlock>,
+      onPersist?: Effect.Effect<void>
     ) =>
-      md.writeTicketWithRegion(
+      ticketDocs.update(
         orgSlug,
         slug,
         ticketId,
-        frontmatter,
-        description,
-        serializeCommentsRegion(blocks)
+        (document) =>
+          Effect.succeed({
+            ...document,
+            commentsRegion: serializeCommentsRegion(
+              transform(parseCommentsRegion(document.commentsRegion))
+            )
+          }),
+        () => onPersist ?? Effect.void
       )
 
     const list = (
@@ -95,7 +106,10 @@ export const CommentsLive = Layer.effect(
       userId: string,
       slug: string,
       ticketId: TicketId
-    ): Effect.Effect<ReadonlyArray<Comment>, NotFound | MarkdownError> =>
+    ): Effect.Effect<
+      ReadonlyArray<Comment>,
+      NotFound | MarkdownError | MalformedTicketDocument
+    > =>
       Effect.gen(function* () {
         yield* ensureMember(orgSlug, userId, slug)
         const rows = yield* db.query.commentIndex
@@ -111,7 +125,8 @@ export const CommentsLive = Layer.effect(
           })
           .pipe(Effect.orDie)
         if (rows.length === 0) return []
-        const { blocks } = yield* readBlocks(orgSlug, slug, ticketId)
+        const document = yield* ticketDocs.read(orgSlug, slug, ticketId)
+        const blocks = parseCommentsRegion(document.commentsRegion)
         const blockById = new Map(blocks.map((b) => [b.id, b]))
         const authors = yield* users.fullByIds(rows.map((r) => r.authorId))
         const authorById = new Map(authors.map((u) => [u.id, u]))
@@ -141,7 +156,11 @@ export const CommentsLive = Layer.effect(
       input: CreateCommentInput
     ): Effect.Effect<
       Comment,
-      NotFound | InvalidCommentBody | MentionInvalid | MarkdownError
+      | NotFound
+      | InvalidCommentBody
+      | MentionInvalid
+      | MarkdownError
+      | MalformedTicketDocument
     > =>
       Effect.gen(function* () {
         yield* ensureMember(orgSlug, userId, slug)
@@ -150,11 +169,6 @@ export const CommentsLive = Layer.effect(
           return yield* new InvalidCommentBody({ reason: validation.reason })
         }
         yield* validateBody(orgSlug, userId, slug, input.body)
-        const { description, frontmatter, blocks } = yield* readBlocks(
-          orgSlug,
-          slug,
-          ticketId
-        )
         const id = newCommentId()
         const now = yield* DateTime.nowAsDate
 
@@ -177,7 +191,7 @@ export const CommentsLive = Layer.effect(
           editedAt: null,
           body: input.body
         }
-        yield* writeBlocks(orgSlug, slug, ticketId, frontmatter, description, [
+        yield* updateBlocks(orgSlug, slug, ticketId, (blocks) => [
           ...blocks,
           next
         ]).pipe(
@@ -238,7 +252,12 @@ export const CommentsLive = Layer.effect(
       input: UpdateCommentInput
     ): Effect.Effect<
       Comment,
-      NotFound | Forbidden | InvalidCommentBody | MentionInvalid | MarkdownError
+      | NotFound
+      | Forbidden
+      | InvalidCommentBody
+      | MentionInvalid
+      | MarkdownError
+      | MalformedTicketDocument
     > =>
       Effect.gen(function* () {
         yield* ensureMember(orgSlug, userId, slug)
@@ -249,26 +268,21 @@ export const CommentsLive = Layer.effect(
         const meta = yield* requireAuthor(slug, ticketId, commentId, userId)
         yield* validateBody(orgSlug, userId, slug, input.body)
         const editedAt = yield* DateTime.nowAsDate
-        yield* db
-          .update(commentIndex)
-          .set({ editedAt })
-          .where(eq(commentIndex.id, commentId))
-          .pipe(Effect.orDie)
-        const { description, frontmatter, blocks } = yield* readBlocks(
-          orgSlug,
-          slug,
-          ticketId
-        )
-        const nextBlocks = blocks.map((b) =>
-          b.id === commentId ? { ...b, body: input.body, editedAt } : b
-        )
-        yield* writeBlocks(
+        yield* updateBlocks(
           orgSlug,
           slug,
           ticketId,
-          frontmatter,
-          description,
-          nextBlocks
+          (blocks) =>
+            blocks.map((block) =>
+              block.id === commentId
+                ? { ...block, body: input.body, editedAt }
+                : block
+            ),
+          db
+            .update(commentIndex)
+            .set({ editedAt })
+            .where(eq(commentIndex.id, commentId))
+            .pipe(Effect.asVoid, Effect.orDie)
         )
         const author = yield* users
           .fullByIds([userId])
@@ -290,26 +304,22 @@ export const CommentsLive = Layer.effect(
       slug: string,
       ticketId: TicketId,
       commentId: CommentId
-    ): Effect.Effect<void, NotFound | Forbidden | MarkdownError> =>
+    ): Effect.Effect<
+      void,
+      NotFound | Forbidden | MarkdownError | MalformedTicketDocument
+    > =>
       Effect.gen(function* () {
         yield* ensureMember(orgSlug, userId, slug)
         yield* requireAuthor(slug, ticketId, commentId, userId)
-        yield* db
-          .delete(commentIndex)
-          .where(eq(commentIndex.id, commentId))
-          .pipe(Effect.orDie)
-        const { description, frontmatter, blocks } = yield* readBlocks(
-          orgSlug,
-          slug,
-          ticketId
-        )
-        yield* writeBlocks(
+        yield* updateBlocks(
           orgSlug,
           slug,
           ticketId,
-          frontmatter,
-          description,
-          blocks.filter((b) => b.id !== commentId)
+          (blocks) => blocks.filter((block) => block.id !== commentId),
+          db
+            .delete(commentIndex)
+            .where(eq(commentIndex.id, commentId))
+            .pipe(Effect.asVoid, Effect.orDie)
         )
       })
 

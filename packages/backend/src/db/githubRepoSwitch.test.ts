@@ -55,6 +55,7 @@ describe.skipIf(!databaseUrl)("GitHub repository switch", () => {
     createdBy: userId,
     createdAt,
     updatedAt: createdAt,
+    commentsRegion: "",
     body: "Ticket body"
   }
   let ticket = initialTicket
@@ -130,6 +131,18 @@ describe.skipIf(!databaseUrl)("GitHub repository switch", () => {
           }
           ticket = next
           return yield* Effect.void
+        }),
+      update: (_org, _slug, _id, transform, onPersist) =>
+        Effect.gen(function* () {
+          const next = yield* transform(ticket)
+          if (failWrite)
+            return yield* new MarkdownError({
+              message: "Write failed",
+              cause: new Error("Test failure")
+            })
+          ticket = next
+          if (onPersist) yield* onPersist(next)
+          return next
         }),
       create: unused,
       remove: unused,

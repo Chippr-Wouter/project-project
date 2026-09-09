@@ -42,3 +42,8 @@ packages/frontend/src/paraglide/
 
 # opensrc - source code for packages
 opensrc/
+
+# Local benchmark output
+.benchmark-results/
+docs/benchmarks/*.json
+docs/benchmarks/*.jsonl

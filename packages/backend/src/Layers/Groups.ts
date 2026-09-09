@@ -580,34 +580,40 @@ export const GroupsLive = Layer.effect(
 
           const now = yield* DateTime.nowAsDate
 
-          const status = input.status
-          if (status !== undefined) {
+          if (input.status !== undefined) {
+            const status = input.status
+            const indexProject = yield* ticketIndex.projectFor(orgSlug, slug)
+            let changed = false
             yield* ticketDocumentLock.withTicketDocumentLock(
               orgSlug,
               slug,
               input.ticketId,
-              Effect.gen(function* () {
-                const indexProject = yield* ticketIndex.projectFor(
+              ticketDocs
+                .update(
                   orgSlug,
-                  slug
+                  slug,
+                  input.ticketId,
+                  (ticket) => {
+                    if (ticket.status === status) {
+                      return Effect.succeed(ticket)
+                    }
+                    changed = true
+                    return Effect.succeed({
+                      ...ticket,
+                      status,
+                      updatedAt: now
+                    })
+                  },
+                  (next) =>
+                    changed
+                      ? ticketIndex.upsertTicket(indexProject, next)
+                      : Effect.void
                 )
-                const ticket = yield* ticketDocs
-                  .read(orgSlug, slug, input.ticketId)
-                  .pipe(
-                    Effect.catchTag("MalformedTicketDocument", () =>
-                      Effect.fail(new NotFound())
-                    )
+                .pipe(
+                  Effect.catchTag("MalformedTicketDocument", () =>
+                    Effect.fail(new NotFound())
                   )
-                if (ticket.status !== status) {
-                  const next = {
-                    ...ticket,
-                    status,
-                    updatedAt: now
-                  }
-                  yield* ticketDocs.write(orgSlug, slug, input.ticketId, next)
-                  yield* ticketIndex.upsertTicket(indexProject, next)
-                }
-              })
+                )
             )
           }
 

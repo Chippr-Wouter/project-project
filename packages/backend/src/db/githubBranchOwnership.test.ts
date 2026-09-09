@@ -21,6 +21,8 @@ const unusedTicketDocs: TicketDocsShape = {
   read: () => Effect.die(new Error("TicketDocs unavailable in ownership test")),
   create: () =>
     Effect.die(new Error("TicketDocs unavailable in ownership test")),
+  update: () =>
+    Effect.die(new Error("TicketDocs unavailable in ownership test")),
   write: () =>
     Effect.die(new Error("TicketDocs unavailable in ownership test")),
   remove: () =>

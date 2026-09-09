@@ -1,6 +1,7 @@
 import * as BunFileSystem from "@effect/platform-bun/BunFileSystem"
 import * as BunPath from "@effect/platform-bun/BunPath"
 import * as Layer from "effect/Layer"
+import { AttachmentUploadsLive } from "./Layers/AttachmentUploads"
 import { AttachmentsLive } from "./Layers/Attachments"
 import { AuthenticationLive } from "./Layers/Auth"
 import { BetterAuthLive } from "./Layers/BetterAuth"
@@ -10,6 +11,9 @@ import { DbLive, PgLive } from "./Layers/Db"
 import { EverhourLive } from "./Layers/Everhour"
 import { EverhourIntegrationsLive } from "./Layers/EverhourIntegrations"
 import { EverhourTimeTrackingLive } from "./Layers/EverhourTimeTracking"
+import { FigmaLive } from "./Layers/Figma"
+import { FigmaIntegrationsLive } from "./Layers/FigmaIntegrations"
+import { FigmaLinksLive } from "./Layers/FigmaLinks"
 import { GitHubLive } from "./Layers/GitHub"
 import * as GitHubProjectStateCache from "./Layers/GitHub/projectStateCache"
 import * as GitHubRequest from "./Layers/GitHub/request"
@@ -46,7 +50,9 @@ export const BackendInfrastructureLive = Layer.mergeAll(
 export const BackendServicesLive = TagsLive.pipe(
   Layer.provideMerge(ProjectStatusesLive),
   Layer.provideMerge(TicketsLive),
+  Layer.provideMerge(AttachmentUploadsLive),
   Layer.provideMerge(AttachmentsLive),
+  Layer.provideMerge(FigmaLinksLive),
   Layer.provideMerge(CommentsLive),
   Layer.provideMerge(GroupsLive),
   Layer.provideMerge(ProjectsLive),
@@ -64,6 +70,9 @@ export const BackendServicesLive = TagsLive.pipe(
     ),
     Layer.provideMerge(
       EverhourIntegrationsLive.pipe(Layer.provideMerge(EverhourLive))
+    ),
+    Layer.provideMerge(
+      FigmaIntegrationsLive.pipe(Layer.provideMerge(FigmaLive))
     ),
     Layer.provideMerge(
       EverhourTimeTrackingLive.pipe(Layer.provideMerge(EverhourLive))

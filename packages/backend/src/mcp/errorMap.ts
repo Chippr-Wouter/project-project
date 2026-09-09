@@ -55,6 +55,37 @@ export const mapToolError = (e: unknown): McpToolErrorResult => {
           : "Mention error."
       )
     }
+    case "StorageNotConnected":
+      return text(
+        "StorageNotConnected: Attachments are unavailable because this organization has not connected storage. Connect storage in organization settings, then retry."
+      )
+    case "StorageConfigMissing":
+      return text(
+        "StorageConfigMissing: Server storage configuration is missing. Ask the server administrator to configure attachment storage, then retry."
+      )
+    case "StorageError":
+      return text(
+        "StorageError: Attachment storage could not complete the operation. Check the connection in organization settings and retry."
+      )
+    case "AttachmentNotUploaded":
+      return text(
+        "AttachmentNotUploaded: The uploaded object could not be verified. Retry the POST to uploadUrl. If the upload URL expired, prepare a new upload."
+      )
+    case "AttachmentTooLarge": {
+      const limit =
+        "maxBytes" in e &&
+        typeof e.maxBytes === "number" &&
+        Number.isFinite(e.maxBytes)
+          ? `${e.maxBytes / (1024 * 1024)} MiB`
+          : "the server limit"
+      return text(
+        `AttachmentTooLarge: The file must be non-empty and at most ${limit}.`
+      )
+    }
+    case "AttachmentTypeRejected":
+      return text(
+        "AttachmentTypeRejected: Use PNG, JPEG, GIF, WebP, AVIF, PDF, ZIP, gzip, or tar."
+      )
     case "SchemaError":
       return text(
         e instanceof Error

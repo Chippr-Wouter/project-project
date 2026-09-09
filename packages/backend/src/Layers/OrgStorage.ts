@@ -1,6 +1,7 @@
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import * as Schema from "effect/Schema"
 import * as SqlClient from "effect/unstable/sql/SqlClient"
 import { and, eq, inArray } from "drizzle-orm"
 import { ulid } from "ulid"
@@ -24,7 +25,7 @@ import {
   OrgStorage,
   type OrgStorageShape
 } from "../Services/OrgStorage"
-import { S3Storage, type S3Connection } from "../Services/S3Storage"
+import { S3Endpoint, S3Storage, type S3Connection } from "../Services/S3Storage"
 import { SecretCrypto } from "../Services/SecretCrypto"
 
 const notConnectedStatus: OrgStorageStatus = {
@@ -318,6 +319,10 @@ export const OrgStorageLive = Layer.effect(
 
         const row = rows[0]
         if (!row) return yield* new StorageNotConnected()
+
+        yield* Schema.decodeEffect(S3Endpoint)(row.endpoint).pipe(
+          Effect.mapError(() => new StorageConfigMissing())
+        )
 
         const secretAccessKey = yield* secrets
           .open({

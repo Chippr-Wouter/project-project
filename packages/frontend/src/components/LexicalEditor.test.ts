@@ -7,15 +7,22 @@ import { HorizontalRuleNode } from "@lexical/extension"
 import { LinkNode } from "@lexical/link"
 import { ListItemNode, ListNode } from "@lexical/list"
 import { HeadingNode, QuoteNode } from "@lexical/rich-text"
-import { describe, expect, it } from "vite-plus/test"
-import { $getRoot, $isElementNode, createEditor } from "lexical"
+import { describe, expect, it, vi } from "vite-plus/test"
+import {
+  $getRoot,
+  $isElementNode,
+  createEditor,
+  type LexicalNode
+} from "lexical"
 import * as Schema from "effect/Schema"
 import { TicketId } from "@projectproject/shared"
 import { MentionNode } from "./Lexical/MentionNode"
 import { AttachmentNode } from "./Lexical/AttachmentNode"
+import { FigmaNode } from "./Lexical/FigmaNode"
 import {
   attachmentsForDescription,
   AUTO_LINK_MATCHERS,
+  createCoalescedSaveQueue,
   MARKDOWN_TRANSFORMERS,
   nextMarkdownChange,
   transformersForAttachments
@@ -34,6 +41,7 @@ function roundTripMarkdown(markdown: string) {
     namespace: "lexical-editor-test",
     nodes: [
       CodeNode,
+      FigmaNode,
       HeadingNode,
       HorizontalRuleNode,
       LinkNode,
@@ -117,6 +125,7 @@ function roundTripAttachmentMarkdown(markdown: string) {
     nodes: [
       AttachmentNode,
       CodeNode,
+      FigmaNode,
       HeadingNode,
       HorizontalRuleNode,
       LinkNode,
@@ -143,6 +152,50 @@ function roundTripAttachmentMarkdown(markdown: string) {
   return exported
 }
 
+const FIGMA_KEY = "aBcDeF1234567890GhIjKl"
+const FIGMA_URL = `https://figma.com/design/${FIGMA_KEY}/Checkout?node-id=1-2`
+const FIGMA_MARKDOWN = `[Checkout](${FIGMA_URL})`
+
+function markdownNodeTypes(
+  markdown: string,
+  transformers: ReturnType<typeof transformersForAttachments>
+) {
+  const editor = createEditor({
+    namespace: "lexical-editor-test",
+    nodes: [
+      AttachmentNode,
+      CodeNode,
+      FigmaNode,
+      HeadingNode,
+      HorizontalRuleNode,
+      LinkNode,
+      ListNode,
+      ListItemNode,
+      MentionNode,
+      QuoteNode
+    ],
+    onError: (error) => {
+      throw error
+    }
+  })
+
+  const types: Array<string> = []
+
+  editor.update(
+    () => {
+      $convertFromMarkdownString(markdown, transformers)
+      const visit = (node: LexicalNode) => {
+        types.push(node.getType())
+        if ($isElementNode(node)) node.getChildren().forEach(visit)
+      }
+      $getRoot().getChildren().forEach(visit)
+    },
+    { discrete: true }
+  )
+
+  return types
+}
+
 describe("nextMarkdownChange", () => {
   it("records the first content edit after initialization", () => {
     expect(nextMarkdownChange("", "pasted text")).toBe("pasted text")
@@ -150,6 +203,89 @@ describe("nextMarkdownChange", () => {
 
   it("ignores updates that serialize to the loaded markdown", () => {
     expect(nextMarkdownChange("unchanged", "unchanged")).toBeNull()
+  })
+})
+
+describe("createCoalescedSaveQueue", () => {
+  it("debounces queued changes down to the latest value", async () => {
+    const save = vi.fn(async () => {})
+    const queue = createCoalescedSaveQueue({
+      save,
+      schedule: vi.fn(),
+      onStatus: vi.fn(),
+      onError: vi.fn()
+    })
+
+    queue.enqueue("first")
+    queue.enqueue("latest")
+    await queue.flush()
+
+    expect(save).toHaveBeenCalledTimes(1)
+    expect(save).toHaveBeenCalledWith("latest")
+  })
+
+  it("coalesces edits made during a save and keeps their status dirty", async () => {
+    let finishFirstSave: (() => void) | undefined
+    const save = vi.fn((value: string) =>
+      value === "first"
+        ? new Promise<void>((resolve) => {
+            finishFirstSave = resolve
+          })
+        : Promise.resolve()
+    )
+    const schedule = vi.fn()
+    const onStatus = vi.fn()
+    const queue = createCoalescedSaveQueue({
+      save,
+      schedule,
+      onStatus,
+      onError: vi.fn()
+    })
+
+    queue.enqueue("first")
+    const firstSave = queue.flush()
+    queue.enqueue("second")
+    queue.enqueue("latest")
+    finishFirstSave?.()
+    await firstSave
+
+    expect(onStatus).not.toHaveBeenCalledWith("saved")
+    expect(schedule).toHaveBeenCalledTimes(1)
+
+    await queue.flush()
+
+    expect(save).toHaveBeenNthCalledWith(1, "first")
+    expect(save).toHaveBeenNthCalledWith(2, "latest")
+    expect(onStatus).toHaveBeenLastCalledWith("saved")
+  })
+
+  it("keeps a failed save queued for retry", async () => {
+    const save = vi
+      .fn<(value: string) => Promise<void>>()
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValue()
+    const schedule = vi.fn()
+    const onStatus = vi.fn()
+    const onError = vi.fn()
+    const queue = createCoalescedSaveQueue({
+      save,
+      schedule,
+      onStatus,
+      onError
+    })
+
+    queue.enqueue("latest")
+    await queue.flush()
+
+    expect(onError).toHaveBeenCalledOnce()
+    expect(onStatus).toHaveBeenLastCalledWith("dirty")
+    expect(schedule).not.toHaveBeenCalled()
+
+    await queue.flush()
+
+    expect(save).toHaveBeenCalledTimes(2)
+    expect(save).toHaveBeenNthCalledWith(2, "latest")
+    expect(onStatus).toHaveBeenLastCalledWith("saved")
   })
 })
 
@@ -195,6 +331,54 @@ describe("MARKDOWN_TRANSFORMERS", () => {
     expect(roundTripMarkdown("See [Wouter](mention:user/github_42).")).toBe(
       "See [Wouter](mention:user/github_42)."
     )
+  })
+})
+
+describe("figma links in the assembled transformer pipeline", () => {
+  it("round-trips a figma design link with a node id", () => {
+    const line = `See ${FIGMA_MARKDOWN} for the flow.`
+    expect(roundTripMarkdown(line)).toBe(line)
+  })
+
+  it("parses a figma link into a figma node, not a link node", () => {
+    const types = markdownNodeTypes(FIGMA_MARKDOWN, MARKDOWN_TRANSFORMERS)
+    expect(types).toContain("figma")
+    expect(types).not.toContain("link")
+    expect(types).not.toContain("attachment")
+  })
+
+  it("round-trips the compact density param", () => {
+    const line = `[Checkout](${FIGMA_URL}&pp-density=compact)`
+    expect(roundTripMarkdown(line)).toBe(line)
+  })
+
+  it("leaves a link without a density param without one", () => {
+    expect(roundTripMarkdown(FIGMA_MARKDOWN)).toBe(FIGMA_MARKDOWN)
+    expect(roundTripMarkdown(FIGMA_MARKDOWN)).not.toContain("pp-density")
+  })
+
+  it("keeps a figma link, an attachment and an ordinary link intact in one document", () => {
+    const line = `${FIGMA_MARKDOWN} ${ATTACHMENT_MARKDOWN} [docs](https://example.com/x)`
+    expect(roundTripAttachmentMarkdown(line)).toBe(line)
+  })
+
+  it("gives each link in a mixed document its own node type", () => {
+    const line = `${FIGMA_MARKDOWN} ${ATTACHMENT_MARKDOWN} [docs](https://example.com/x)`
+    const types = markdownNodeTypes(
+      line,
+      transformersForAttachments(descriptionAttachments(true))
+    )
+    expect(types.filter((type) => type === "figma")).toHaveLength(1)
+    expect(types.filter((type) => type === "attachment")).toHaveLength(1)
+    expect(types.filter((type) => type === "link")).toHaveLength(1)
+  })
+
+  it("does not claim a non-figma host that resembles a figma path", () => {
+    const line = `[A](https://notfigma.test/design/${FIGMA_KEY}/A)`
+    expect(roundTripMarkdown(line)).toBe(line)
+    const types = markdownNodeTypes(line, MARKDOWN_TRANSFORMERS)
+    expect(types).toContain("link")
+    expect(types).not.toContain("figma")
   })
 })
 

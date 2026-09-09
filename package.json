@@ -21,7 +21,7 @@
     "format:check": "vp fmt --check",
     "prepare": "effect-tsgo patch",
     "check": "vp check && vp run typecheck",
-    "test:db": "vp test run --project backend packages/backend/src/db packages/backend/src/Layers/OAuthApplications.test.ts packages/backend/src/Layers/GitHubIntegrations.test.ts --no-file-parallelism"
+    "test:db": "vp test run --project backend packages/backend/src/db packages/backend/src/Layers/OAuthApplications.test.ts packages/backend/src/Layers/McpHttp.test.ts packages/backend/src/Layers/GitHubIntegrations.test.ts --no-file-parallelism"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
@@ -31,7 +31,7 @@
     "vite-plus": "0.3.0",
     "effect": "4.0.0-rc.112"
   },
-  "packageManager": "bun@1.3.13",
+  "packageManager": "bun@1.4.2",
   "engines": {
     "node": "^22.18.0 || >=24.11.0",
     "bun": ">=1.3.13"

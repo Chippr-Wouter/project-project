@@ -67,6 +67,9 @@ export function SegmentedList({
 }) {
   const resetFilters = useResetTicketSearch()
   const [activePreviewId, setActivePreviewId] = useState<TicketId | null>(null)
+  const handlePreviewPointerEnter = useCallback((ticketId: TicketId) => {
+    setActivePreviewId((current) => (current === ticketId ? current : null))
+  }, [])
   const handlePreviewOpenChange = useCallback(
     (ticketId: TicketId, open: boolean) => {
       setActivePreviewId((current) =>
@@ -152,6 +155,16 @@ export function SegmentedList({
     sprintMembership !== undefined && sprintMembership.size > 0
   const showExtraActionsCol = extraRowActions !== undefined
 
+  if (active === null) {
+    return (
+      <div
+        key="loading"
+        aria-busy="true"
+        className="h-96 animate-pulse rounded-lg bg-muted/40 motion-reduce:animate-none"
+      />
+    )
+  }
+
   if (counts.total === 0 && !hasActiveFilter) {
     return (
       <Empty>
@@ -196,6 +209,7 @@ export function SegmentedList({
 
   return (
     <div
+      key="sections"
       className={cn(
         "flex flex-col gap-1 has-[[data-creating]]:[&>:not([data-creating])]:opacity-35",
         isStale && "animate-pulse"
@@ -221,6 +235,7 @@ export function SegmentedList({
             showSprintCol={showSprintCol}
             showExtraActionsCol={showExtraActionsCol}
             activePreviewId={activePreviewId}
+            onPreviewPointerEnter={handlePreviewPointerEnter}
             onPreviewOpenChange={handlePreviewOpenChange}
           />
         )

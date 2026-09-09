@@ -1,3 +1,4 @@
+import { flushSync } from "react-dom"
 import * as Result from "effect/unstable/reactivity/AsyncResult"
 import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import {
@@ -10,6 +11,9 @@ import {
 } from "@tanstack/react-router"
 import * as DateTime from "effect/DateTime"
 import {
+  startTransition,
+  useOptimistic,
+  type MouseEvent,
   useCallback,
   useLayoutEffect,
   useRef,
@@ -98,14 +102,15 @@ export const Route = createFileRoute("/_authed/orgs/$orgSlug/projects/$slug")({
 
 function ProjectLayout() {
   const { orgSlug, slug } = Route.useParams()
-  const location = useLocation()
   const project = useAtomValue(projectAtom(projectKey(orgSlug, slug)))
-  const onTicketDetail = location.pathname.startsWith(
-    `/orgs/${orgSlug}/projects/${slug}/tickets/`
-  )
-  const onSettings = location.pathname.startsWith(
-    `/orgs/${orgSlug}/projects/${slug}/settings`
-  )
+  const onTicketDetail = useLocation({
+    select: (location) =>
+      location.pathname.startsWith(`/orgs/${orgSlug}/projects/${slug}/tickets/`)
+  })
+  const onSettings = useLocation({
+    select: (location) =>
+      location.pathname.startsWith(`/orgs/${orgSlug}/projects/${slug}/settings`)
+  })
 
   return Result.matchWithError(project, {
     onInitial: () => (
@@ -352,7 +357,9 @@ function TabsNav({
   slug: string
   project: ProjectDetailType
 }) {
-  const location = useLocation()
+  const pathname = useMatches({
+    select: (matches) => matches[matches.length - 1]?.pathname ?? ""
+  })
   const base = `/orgs/${orgSlug}/projects/${slug}`
   const ticketsResult = useAtomValue(
     ticketsCountAtom(ticketsCountKey(orgSlug, slug, {}))
@@ -367,17 +374,22 @@ function TabsNav({
     ? activeAndPlannedCount(sprintsResult.value)
     : null
 
-  const isActive = (key: TabKey): boolean => {
+  const matchesTab = (key: TabKey): boolean => {
     const t = TABS.find((x) => x.key === key)!
     const target = t.to.replace("$orgSlug", orgSlug).replace("$slug", slug)
     return t.exact
-      ? location.pathname === target ||
-          location.pathname === target + "/" ||
-          location.pathname === base ||
-          location.pathname === base + "/"
-      : location.pathname === target ||
-          location.pathname.startsWith(target + "/")
+      ? pathname === target ||
+          pathname === target + "/" ||
+          pathname === base ||
+          pathname === base + "/"
+      : pathname === target || pathname.startsWith(target + "/")
   }
+
+  const [selectedTab, selectTab] = useOptimistic(
+    TABS.find((tab) => matchesTab(tab.key))?.key ?? "tickets"
+  )
+  const navigate = useNavigate()
+  const isActive = (key: TabKey) => selectedTab === key
 
   const statusesResult = useAtomValue(
     projectStatusesAtom(projectStatusKey(orgSlug, slug))
@@ -413,14 +425,44 @@ function TabsNav({
       <SegmentedTabs
         items={items}
         layoutId={`project-tabs-${slug}`}
+        className="project-tabs"
         isActive={isActive}
         renderItem={(item, content, { active }) => {
           const def = TABS.find((t) => t.key === item.key)!
+          const destination =
+            item.key === "sprints" && sprintTarget
+              ? {
+                  to: "/orgs/$orgSlug/projects/$slug/sprints/$groupId" as const,
+                  params: { orgSlug, slug, groupId: sprintTarget.id }
+                }
+              : { to: def.to, params: { orgSlug, slug } }
+          const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
+            if (
+              event.defaultPrevented ||
+              event.button !== 0 ||
+              event.metaKey ||
+              event.ctrlKey ||
+              event.shiftKey ||
+              event.altKey
+            )
+              return
+            event.preventDefault()
+            startTransition(async () => {
+              flushSync(() => selectTab(item.key))
+              await new Promise<void>((resolve) => {
+                requestAnimationFrame(() => {
+                  requestAnimationFrame(() => window.setTimeout(resolve, 0))
+                })
+              })
+              await navigate(destination)
+            })
+          }
+
           if (item.key === "tickets" && ticketsCount !== null) {
             return (
               <Link
-                to={def.to}
-                params={{ orgSlug, slug }}
+                onClick={onClick}
+                {...destination}
                 className={SEGMENTED_ITEM_CLASS(active)}
               >
                 {active && (
@@ -484,21 +526,10 @@ function TabsNav({
                 </span>
               </>
             )
-            if (sprintTarget) {
-              return (
-                <Link
-                  to="/orgs/$orgSlug/projects/$slug/sprints/$groupId"
-                  params={{ orgSlug, slug, groupId: sprintTarget.id }}
-                  className={SEGMENTED_ITEM_CLASS(active)}
-                >
-                  {children}
-                </Link>
-              )
-            }
             return (
               <Link
-                to={def.to}
-                params={{ orgSlug, slug }}
+                onClick={onClick}
+                {...destination}
                 className={SEGMENTED_ITEM_CLASS(active)}
               >
                 {children}
@@ -507,8 +538,8 @@ function TabsNav({
           }
           return (
             <Link
-              to={def.to}
-              params={{ orgSlug, slug }}
+              onClick={onClick}
+              {...destination}
               className={SEGMENTED_ITEM_CLASS(active)}
             >
               {content}

@@ -1,8 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm"
-import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js"
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js"
 import { requireMcpAuth } from "@better-auth/mcp"
-import { randomUUID } from "node:crypto"
 import * as Cause from "effect/Cause"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
@@ -22,23 +20,6 @@ export const McpHttpLive = Layer.effect(
     const { createServer, runtime } = yield* McpServer
     const db = yield* Db
 
-    type Session = {
-      readonly transport: WebStandardStreamableHTTPServerTransport
-      readonly server: ReturnType<typeof createServer>
-      readonly userId: string
-      readonly clientId: string
-    }
-    const sessions = new Map<string, Session>()
-    yield* Effect.addFinalizer(() =>
-      Effect.promise(async () => {
-        for (const { transport, server } of sessions.values()) {
-          await transport.close().catch(() => {})
-          await server.close().catch(() => {})
-        }
-        sessions.clear()
-      })
-    )
-
     const unauthorized = () =>
       new Response("Unauthorized", {
         status: 401,
@@ -46,56 +27,6 @@ export const McpHttpLive = Layer.effect(
           "www-authenticate": `Bearer resource_metadata="${new URL("/.well-known/oauth-protected-resource/mcp", mcpResource).href}"`
         }
       })
-
-    const resolveTransport = async (
-      req: Request,
-      body: unknown,
-      userId: string,
-      clientId: string
-    ): Promise<WebStandardStreamableHTTPServerTransport | Response> => {
-      const sessionId = req.headers.get("mcp-session-id") ?? undefined
-
-      if (sessionId && sessions.has(sessionId)) {
-        const session = sessions.get(sessionId)!
-        if (session.userId !== userId || session.clientId !== clientId) {
-          return unauthorized()
-        }
-        return session.transport
-      }
-
-      if (!sessionId && isInitializeRequest(body)) {
-        const server = createServer()
-        const transport = new WebStandardStreamableHTTPServerTransport({
-          sessionIdGenerator: () => randomUUID(),
-          onsessioninitialized: (sid) => {
-            sessions.set(sid, { transport, server, userId, clientId })
-          },
-          onsessionclosed: (sid) => {
-            const existing = sessions.get(sid)
-            sessions.delete(sid)
-            if (existing) {
-              existing.server.close().catch(() => {})
-            }
-          }
-        })
-        await server.connect(transport)
-        return transport
-      }
-
-      return new Response(
-        JSON.stringify({
-          jsonrpc: "2.0",
-          error: {
-            code: -32000,
-            message: sessionId
-              ? "Unknown or expired Mcp-Session-Id"
-              : "Mcp-Session-Id header required for non-initialize requests"
-          },
-          id: null
-        }),
-        { status: 400, headers: { "content-type": "application/json" } }
-      )
-    }
 
     const handle = requireMcpAuth(
       auth,
@@ -145,21 +76,18 @@ export const McpHttpLive = Layer.effect(
         const user = exit.value
         if (!user) return unauthorized()
 
-        let body: unknown
-        if (req.method === "POST") {
-          try {
-            body = await req.clone().json()
-          } catch {
-            body = undefined
-          }
+        if (req.method !== "POST") {
+          return new Response(null, { status: 405, headers: { allow: "POST" } })
         }
-
-        const resolved = await resolveTransport(req, body, userId, clientId)
-        if (resolved instanceof Response) return resolved
-
+        const server = createServer()
+        const transport = new WebStandardStreamableHTTPServerTransport({
+          sessionIdGenerator: undefined,
+          enableJsonResponse: true
+        })
         try {
+          await server.connect(transport)
           return await currentUserStorage.run(user, () =>
-            resolved.handleRequest(req, { parsedBody: body })
+            transport.handleRequest(req)
           )
         } catch (e) {
           runtime.runSync(
@@ -170,6 +98,8 @@ export const McpHttpLive = Layer.effect(
             )
           )
           return new Response("Internal MCP transport error", { status: 500 })
+        } finally {
+          await server.close()
         }
       },
       { resource: mcpResource }

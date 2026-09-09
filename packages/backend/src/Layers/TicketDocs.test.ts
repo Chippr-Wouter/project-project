@@ -56,6 +56,7 @@ const ticketDocument = (
   createdBy: "user-1",
   createdAt: DateTime.toDate(DateTime.makeUnsafe("2026-09-07T10:00:00Z")),
   updatedAt: DateTime.toDate(DateTime.makeUnsafe("2026-09-07T10:00:00Z")),
+  commentsRegion: "",
   body: "# Branch matching\n"
 })
 

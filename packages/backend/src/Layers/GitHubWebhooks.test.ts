@@ -720,6 +720,7 @@ const baseDocument = (
   createdAt: DateTime.toDate(DateTime.makeUnsafe("2026-05-01T00:00:00.000Z")),
   updatedAt: DateTime.toDate(DateTime.makeUnsafe("2026-05-01T00:00:00.000Z")),
   body: "",
+  commentsRegion: "",
   ...overrides
 })
 
@@ -753,6 +754,22 @@ const makeFakeDocs = (initial: ReadonlyArray<TicketDocument>) => {
         documents.set(id, document)
         writes.push({ id, document })
       }),
+    update: (_org, _slug, id, transform, onPersist) => {
+      reads.push(id)
+      const document = documents.get(id)
+      if (!document) return Effect.fail(new NotFound())
+      return transform(document).pipe(
+        Effect.tap((next) =>
+          next === document
+            ? Effect.void
+            : Effect.sync(() => {
+                documents.set(id, next)
+                writes.push({ id, document: next })
+              })
+        ),
+        Effect.tap((next) => (onPersist ? onPersist(next) : Effect.void))
+      )
+    },
     remove: () => Effect.die(new Error("unexpected TicketDocs.remove call")),
     readRaw: () => Effect.die(new Error("unexpected TicketDocs.readRaw call"))
   }
@@ -765,12 +782,17 @@ const makeFakeIndex = (overrides: Partial<TicketIndexShape> = {}) => {
     projectFor: () =>
       Effect.die(new Error("unexpected TicketIndex.projectFor call")),
     list: () => Effect.succeed([]),
+    query: () => Effect.succeed([]),
+    count: () => Effect.succeed({ total: 0, byStatus: {} }),
     listIds: () => Effect.succeed([]),
+    existingIds: () => Effect.succeed(new Set()),
+    reserveTicketNumber: () => Effect.succeed(1),
     tagUsageCounts: () => Effect.succeed({}),
     findTicketIdsByTag: () => Effect.succeed([]),
     findTicketIdsByStatus: () => Effect.succeed([]),
     findTicketsByBranch: () => Effect.succeed([]),
     isRepositoryBranchAttached: () => Effect.succeed(false),
+    getBranchDeletedAt: () => Effect.succeed(null),
     upsertTicket: (project, document) =>
       Effect.sync(() => {
         upserts.push({ projectId: project.projectId, ticketId: document.id })
@@ -834,6 +856,7 @@ it.effect(
     Effect.gen(function* () {
       const docs = makeFakeDocs([baseDocument()])
       const index = makeFakeIndex({
+        getBranchDeletedAt: () => Effect.succeed(null),
         upsertTicket: () => Effect.die(new Error("index failed"))
       })
 
@@ -859,20 +882,20 @@ it.effect(
     Effect.gen(function* () {
       const docs = makeFakeDocs([baseDocument()])
       const index = makeFakeIndex()
-      let activeReads = 0
-      let maxActiveReads = 0
+      let activeUpdates = 0
+      let maxActiveUpdates = 0
       const serialDocs: TicketDocsShape = {
         ...docs.shape,
-        read: (org, slug, id) =>
+        update: (org, slug, id, transform, onPersist) =>
           Effect.gen(function* () {
-            activeReads += 1
-            maxActiveReads = Math.max(maxActiveReads, activeReads)
+            activeUpdates += 1
+            maxActiveUpdates = Math.max(maxActiveUpdates, activeUpdates)
             yield* Effect.yieldNow
-            return yield* docs.shape.read(org, slug, id)
+            return yield* docs.shape.update(org, slug, id, transform, onPersist)
           }).pipe(
             Effect.ensuring(
               Effect.sync(() => {
-                activeReads -= 1
+                activeUpdates -= 1
               })
             )
           )
@@ -904,7 +927,7 @@ it.effect(
         { concurrency: "unbounded" }
       )
 
-      expect(maxActiveReads).toBe(1)
+      expect(maxActiveUpdates).toBe(1)
       expect(docs.writes).toHaveLength(1)
       expect(index.upserts).toHaveLength(1)
     })

@@ -503,11 +503,14 @@ export const ProjectsLive = Layer.effect(
         })
       })
 
-    const requireMember = (
+    const requireMemberContext = (
       orgSlug: string,
       userId: string,
       slug: string
-    ): Effect.Effect<{ role: Role }, NotFound> =>
+    ): Effect.Effect<
+      { role: Role; indexRow: typeof projectIndex.$inferSelect },
+      NotFound
+    > =>
       withProjectTelemetry(
         "requireMember",
         orgSlug,
@@ -527,14 +530,20 @@ export const ProjectsLive = Layer.effect(
             })
             .pipe(Effect.orDie)
           const explicitRole = explicit ? makeRole(explicit.role) : null
-          if (explicitRole === "owner") return { role: "owner" as const }
+          if (explicitRole === "owner")
+            return { role: "owner" as const, indexRow }
           const orgRole = yield* orgRoleForUser(indexRow.organizationId, userId)
           if (orgRole === "owner" || orgRole === "admin") {
-            return { role: "admin" as const }
+            return { role: "admin" as const, indexRow }
           }
-          if (explicitRole) return { role: explicitRole }
+          if (explicitRole) return { role: explicitRole, indexRow }
           return yield* new NotFound()
         })
+      )
+
+    const requireMember = (orgSlug: string, userId: string, slug: string) =>
+      requireMemberContext(orgSlug, userId, slug).pipe(
+        Effect.map(({ role }) => ({ role }))
       )
 
     const requireRole = (
@@ -561,8 +570,11 @@ export const ProjectsLive = Layer.effect(
         orgSlug,
         { slug, userId },
         Effect.gen(function* () {
-          yield* requireMember(orgSlug, userId, slug)
-          const indexRow = yield* getIndexRowInOrg(orgSlug, slug)
+          const { indexRow } = yield* requireMemberContext(
+            orgSlug,
+            userId,
+            slug
+          )
           return yield* Effect.sync(() => makeProjectKey(indexRow.key)).pipe(
             Effect.orDie
           )
@@ -575,8 +587,7 @@ export const ProjectsLive = Layer.effect(
       slug: string
     ): Effect.Effect<ProjectGithubIntegration | null, NotFound> =>
       Effect.gen(function* () {
-        yield* requireMember(orgSlug, userId, slug)
-        const indexRow = yield* getIndexRowInOrg(orgSlug, slug)
+        const { indexRow } = yield* requireMemberContext(orgSlug, userId, slug)
         return yield* loadGithubIntegration(indexRow)
       })
 
@@ -759,8 +770,11 @@ export const ProjectsLive = Layer.effect(
         orgSlug,
         { slug, userId },
         Effect.gen(function* () {
-          yield* requireMember(orgSlug, userId, slug)
-          const indexRow = yield* getIndexRowInOrg(orgSlug, slug)
+          const { indexRow } = yield* requireMemberContext(
+            orgSlug,
+            userId,
+            slug
+          )
           const file = yield* projectDocs.read(orgSlug, slug)
           const members = yield* loadMembers(slug)
           const pendingMembers = yield* loadPendingMembers(slug)
@@ -977,34 +991,39 @@ export const ProjectsLive = Layer.effect(
         const project = yield* ticketIndex
           .projectFor(orgSlug, slug)
           .pipe(Effect.orDie)
-        const ids = yield* ticketDocs.listIds(orgSlug, slug)
+        const tickets = yield* ticketIndex.list(project)
+        const ids = tickets
+          .filter(
+            (ticket) =>
+              ticket.status !== "done" && ticket.assignees.includes(userId)
+          )
+          .map((ticket) => ticket.id)
         yield* Effect.forEach(
           ids,
           (id) =>
-            ticketDocumentLock.withTicketDocumentLock(
-              orgSlug,
-              slug,
-              id,
-              Effect.gen(function* () {
-                const ticket = yield* ticketDocs
-                  .read(orgSlug, slug, id)
-                  .pipe(Effect.catchTag("NotFound", () => Effect.succeed(null)))
-                if (
-                  ticket === null ||
-                  ticket.status === "done" ||
-                  !ticket.assignees.includes(userId)
-                ) {
-                  return
-                }
-                const next = {
-                  ...ticket,
-                  assignees: ticket.assignees.filter((id) => id !== userId),
-                  updatedAt: yield* DateTime.nowAsDate
-                }
-                yield* ticketDocs.write(orgSlug, slug, id, next)
-                yield* ticketIndex.upsertTicket(project, next)
-              })
-            ),
+            ticketDocs
+              .update(
+                orgSlug,
+                slug,
+                id,
+                (ticket) => {
+                  if (
+                    ticket.status === "done" ||
+                    !ticket.assignees.includes(userId)
+                  ) {
+                    return Effect.succeed(ticket)
+                  }
+                  return DateTime.nowAsDate.pipe(
+                    Effect.map((updatedAt) => ({
+                      ...ticket,
+                      assignees: ticket.assignees.filter((id) => id !== userId),
+                      updatedAt
+                    }))
+                  )
+                },
+                (next) => ticketIndex.upsertTicket(project, next)
+              )
+              .pipe(Effect.catchTag("NotFound", () => Effect.succeed(null))),
           { concurrency: 8 }
         )
       })
@@ -1049,9 +1068,35 @@ export const ProjectsLive = Layer.effect(
               lastTransitionedPr: null,
               updatedAt: yield* DateTime.nowAsDate
             }
-            yield* ticketDocs.write(orgSlug, slug, id, next)
-            originals.push(ticket)
-            yield* ticketIndex.upsertTicket(project, next)
+            yield* ticketDocs
+              .update(
+                orgSlug,
+                slug,
+                id,
+                (current) =>
+                  Effect.succeed({
+                    ...current,
+                    pr: next.pr,
+                    prState: next.prState,
+                    lastTransitionedPr: next.lastTransitionedPr,
+                    updatedAt: next.updatedAt
+                  }),
+                (updated) =>
+                  Effect.gen(function* () {
+                    originals.push(ticket)
+                    yield* ticketIndex.upsertTicket(project, updated)
+                  })
+              )
+              .pipe(
+                Effect.catchTags({
+                  NotFound: () => Effect.void,
+                  MalformedTicketDocument: (error) =>
+                    Effect.logWarning(
+                      "Skipping unreadable ticket pr metadata",
+                      { orgSlug, slug, ticketId: id, error }
+                    )
+                })
+              )
           }
           return yield* switchRepository
         }).pipe(
@@ -1059,10 +1104,20 @@ export const ProjectsLive = Layer.effect(
             Effect.forEach(
               originals,
               (ticket) =>
-                Effect.gen(function* () {
-                  yield* ticketDocs.write(orgSlug, slug, ticket.id, ticket)
-                  yield* ticketIndex.upsertTicket(project, ticket)
-                }),
+                ticketDocs.update(
+                  orgSlug,
+                  slug,
+                  ticket.id,
+                  (current) =>
+                    Effect.succeed({
+                      ...current,
+                      pr: ticket.pr,
+                      prState: ticket.prState,
+                      lastTransitionedPr: ticket.lastTransitionedPr,
+                      updatedAt: ticket.updatedAt
+                    }),
+                  (restored) => ticketIndex.upsertTicket(project, restored)
+                ),
               { discard: true }
             ).pipe(Effect.orDie)
           ),

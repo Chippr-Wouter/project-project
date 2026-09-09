@@ -11,6 +11,7 @@ import { meAtom } from "@/atoms/auth"
 import { projectKey, updateProjectSetupAtom } from "@/atoms/projects"
 import { ErrorPage } from "@/components/ErrorPage"
 import { GithubChip } from "@/components/GithubChip"
+import { FigmaProjectSettings } from "@/components/settings/FigmaProjectSettings"
 import { EverhourApiKeyWalkthrough } from "@/components/time/EverhourApiKeyWalkthrough"
 import { Button } from "@/components/ui/button"
 import { type AppError, errorMessage } from "@/lib/errorMessage"
@@ -73,6 +74,11 @@ function IntegrationsSettings() {
         </div>
       ) : null}
       <EverhourSettingsCard orgSlug={orgSlug} slug={project.slug} role={role} />
+      <FigmaProjectSettings
+        orgSlug={orgSlug}
+        slug={project.slug}
+        canManage={role === "owner" || role === "admin"}
+      />
     </section>
   )
 }

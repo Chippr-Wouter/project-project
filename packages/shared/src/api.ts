@@ -87,6 +87,12 @@ import {
   WorkTypeOption
 } from "./schemas/TimeTracking"
 import {
+  ConnectFigmaProjectInput,
+  FigmaLinkMetadata,
+  FigmaProjectIntegrationStatus,
+  PersonalFigma
+} from "./schemas/Figma"
+import {
   CompleteSprintInput,
   CreateGroupInput,
   Group,
@@ -122,6 +128,10 @@ import {
   EverhourConfigMissing,
   EverhourError,
   EverhourRateLimited,
+  FigmaAuthInvalid,
+  FigmaError,
+  FigmaNotConnected,
+  FigmaRateLimited,
   Forbidden,
   GitHubError,
   GitHubScopeInsufficient,
@@ -674,6 +684,75 @@ const EverhourGroup = HttpApiGroup.make("everhour")
   )
   .middleware(Authentication)
 
+const FigmaGroup = HttpApiGroup.make("figma")
+  .add(
+    HttpApiEndpoint.get("profile", "/integrations/figma/profile", {
+      success: PersonalFigma,
+      error: [Unauthorized]
+    })
+  )
+  .add(
+    HttpApiEndpoint.delete("disconnectProfile", "/integrations/figma/profile", {
+      success: PersonalFigma,
+      error: [Unauthorized]
+    })
+  )
+  .add(
+    HttpApiEndpoint.get(
+      "projectStatus",
+      "/orgs/:orgSlug/projects/:slug/integrations/figma",
+      {
+        params: ProjectPath,
+        success: FigmaProjectIntegrationStatus,
+        error: [Unauthorized, NotFound]
+      }
+    )
+  )
+  .add(
+    HttpApiEndpoint.post(
+      "connectProject",
+      "/orgs/:orgSlug/projects/:slug/integrations/figma/connect",
+      {
+        params: ProjectPath,
+        payload: ConnectFigmaProjectInput,
+        success: FigmaProjectIntegrationStatus,
+        error: [
+          Unauthorized,
+          NotFound,
+          Forbidden,
+          StorageNotConnected,
+          FigmaNotConnected,
+          FigmaAuthInvalid,
+          FigmaRateLimited,
+          FigmaError
+        ]
+      }
+    )
+  )
+  .add(
+    HttpApiEndpoint.delete(
+      "disconnectProject",
+      "/orgs/:orgSlug/projects/:slug/integrations/figma",
+      {
+        params: ProjectPath,
+        success: FigmaProjectIntegrationStatus,
+        error: [Unauthorized, NotFound, Forbidden]
+      }
+    )
+  )
+  .add(
+    HttpApiEndpoint.get(
+      "ticketLinks",
+      "/orgs/:orgSlug/projects/:slug/tickets/:id/figma/links",
+      {
+        params: TicketPath,
+        success: Schema.Array(FigmaLinkMetadata),
+        error: [Unauthorized, NotFound, Forbidden]
+      }
+    )
+  )
+  .middleware(Authentication)
+
 const StorageGroup = HttpApiGroup.make("storage")
   .add(
     HttpApiEndpoint.get("get", "/orgs/:orgSlug/storage", {
@@ -830,7 +909,7 @@ const TicketsGroup = HttpApiGroup.make("tickets")
       {
         params: ProjectPath,
         payload: QuickCreateTicketInput,
-        success: Ticket,
+        success: TicketDetail,
         error: [Unauthorized, NotFound, Validation]
       }
     )
@@ -1279,6 +1358,7 @@ const AppApi = HttpApi.make("projectproject")
   .add(OrgGroup)
   .add(ProjectsGroup)
   .add(EverhourGroup)
+  .add(FigmaGroup)
   .add(StorageGroup)
   .add(AttachmentsGroup)
   .add(TicketsGroup)

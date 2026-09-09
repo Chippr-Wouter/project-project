@@ -154,12 +154,15 @@ export type AttachmentValidationError =
 
 export const validateUploadRequest = (input: {
   readonly contentType: string
-  readonly byteSize: number
+  readonly byteSize?: number
 }): AttachmentValidationError | null => {
   if (!isAllowedAttachmentContentType(input.contentType)) {
     return { kind: "type", contentType: input.contentType }
   }
-  if (input.byteSize <= 0 || input.byteSize > ATTACHMENT_MAX_BYTES) {
+  if (
+    input.byteSize !== undefined &&
+    (input.byteSize <= 0 || input.byteSize > ATTACHMENT_MAX_BYTES)
+  ) {
     return { kind: "size", maxBytes: ATTACHMENT_MAX_BYTES }
   }
   return null
@@ -180,7 +183,9 @@ export interface AttachmentsShape {
     slug: string,
     ticketId: string,
     userId: string,
-    input: PrepareAttachmentInput
+    input: Omit<PrepareAttachmentInput, "byteSize"> & {
+      readonly byteSize?: number
+    }
   ) => Effect.Effect<PrepareAttachmentResult, AttachmentUploadError>
   readonly commit: (
     orgSlug: string,

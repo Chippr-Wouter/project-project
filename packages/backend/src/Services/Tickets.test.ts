@@ -8,18 +8,24 @@ import * as Schema from "effect/Schema"
 import { expect } from "vite-plus/test"
 import {
   DEFAULT_TICKET_SORT,
+  matchesTicketQuery,
   NotFound,
+  padNumericIdSort,
+  paginateSorted,
   ProjectKey,
   RateLimited,
   TICKET_LIST_LIMIT,
   TicketId,
   TicketStatus,
+  tryDecodeCursor,
+  type TicketCountQuery,
   type TicketListQuery
 } from "@projectproject/shared"
 import { applyPullRequestWebhookToTicket } from "../Layers/GitHubWebhooks"
 import { TicketsLive } from "../Layers/Tickets"
 import * as TicketDocumentLock from "../ticketDocumentLock"
 import { Attachments, type AttachmentsShape } from "./Attachments"
+import { FigmaLinks, type FigmaLinksShape } from "./FigmaLinks"
 import { Comments, type CommentsShape } from "./Comments"
 import { Db } from "./Db"
 import { GitHub, type GitHubShape } from "./GitHub"
@@ -90,6 +96,7 @@ function makeTicketDocument(
     createdAt: now,
     updatedAt: now,
     body: "",
+    commentsRegion: "",
     ...overrides
   }
 }
@@ -99,17 +106,22 @@ function makeFakeTicketDocs(initialIds: ReadonlyArray<string>) {
     initialIds.map((id) => [id, makeTicketDocument(id)])
   )
 
-  const service = {
+  const service: TicketDocsShape = {
     listIds: () =>
       Effect.succeed([...documents.keys()].map((id) => ticketId(id))),
     read: (_org: string, _slug: string, id: string) => {
       const document = documents.get(id)
       return document ? Effect.succeed(document) : Effect.fail(new NotFound())
     },
-    create: (_org: string, _slug: string, document: TicketDocument) => {
+    create: (
+      _org: string,
+      _slug: string,
+      document: TicketDocument,
+      onPersist
+    ) => {
       if (documents.has(document.id)) return Effect.fail(new TicketIdTaken())
       documents.set(document.id, document)
-      return Effect.void
+      return onPersist ? onPersist(document) : Effect.void
     },
     write: (
       _org: string,
@@ -120,12 +132,27 @@ function makeFakeTicketDocs(initialIds: ReadonlyArray<string>) {
       documents.set(id, document)
       return Effect.void
     },
-    remove: (_org: string, _slug: string, id: string) => {
+    update: (org: string, slug: string, id: string, transform, onPersist) =>
+      service.read(org, slug, id).pipe(
+        Effect.flatMap(transform),
+        Effect.tap((document) =>
+          Effect.sync(() => documents.set(id, document))
+        ),
+        Effect.tap((document) =>
+          onPersist ? onPersist(document) : Effect.void
+        )
+      ),
+    remove: (
+      _org: string,
+      _slug: string,
+      id: string,
+      onPersist = Effect.void
+    ) => {
       documents.delete(id)
-      return Effect.void
+      return onPersist
     },
     readRaw: () => unexpected("TicketDocs.readRaw")
-  } satisfies TicketDocsShape
+  }
 
   return {
     documents,
@@ -209,6 +236,35 @@ const makeFakeAttachments = (
     ...overrides
   } satisfies AttachmentsShape)
 
+const makeFakeFigmaLinks = (
+  overrides: Partial<FigmaLinksShape> = {}
+): Layer.Layer<FigmaLinks> =>
+  Layer.succeed(FigmaLinks, {
+    reconcileTicket: () => Effect.void,
+    listForTicket: () => unexpected("FigmaLinks.listForTicket"),
+    resolveThumbnailUrl: () => unexpected("FigmaLinks.resolveThumbnailUrl"),
+    ...overrides
+  } satisfies FigmaLinksShape)
+
+const makeRecordingFigmaLinks = () => {
+  const calls: Array<{
+    readonly orgSlug: string
+    readonly slug: string
+    readonly ticketId: string
+    readonly title: string
+    readonly body: string
+  }> = []
+  return {
+    calls,
+    layer: makeFakeFigmaLinks({
+      reconcileTicket: (orgSlug, slug, ticketId, title, body) =>
+        Effect.sync(() => {
+          calls.push({ orgSlug, slug, ticketId, title, body })
+        })
+    })
+  }
+}
+
 const makeRecordingAttachments = () => {
   const calls: Array<{
     readonly orgSlug: string
@@ -254,7 +310,7 @@ const makeFakeGitHub = (overrides: Partial<GitHubShape> = {}) =>
   } satisfies GitHubShape)
 
 const entryFromDocument = (document: TicketDocument) => {
-  const { body: _body, ...entry } = document
+  const { body: _body, commentsRegion: _commentsRegion, ...entry } = document
   return {
     ...entry,
     branchDeletedAt: null,
@@ -264,11 +320,56 @@ const entryFromDocument = (document: TicketDocument) => {
   }
 }
 
+const priorityOrdinal = { high: 3, med: 2, low: 1 } as const
+
+const ticketSortValue = (
+  document: TicketDocument,
+  query: TicketListQuery
+): string => {
+  switch (query.sort.key) {
+    case "id":
+      return padNumericIdSort(document.id) ?? document.id
+    case "created":
+      return document.createdAt.toISOString()
+    case "updated":
+      return document.updatedAt.toISOString()
+    case "title":
+      return document.title.toLowerCase()
+    case "priority":
+      return String(priorityOrdinal[document.priority]).padStart(2, "0")
+  }
+  throw new Error("unsupported ticket sort key")
+}
+
+const matchingDocuments = (
+  documents: Map<string, TicketDocument>,
+  query: Pick<TicketListQuery, "filter" | "q">,
+  viewerId: string,
+  ticketIds?: ReadonlyArray<string>,
+  excludeTicketIds?: ReadonlyArray<string>
+) => {
+  const included = ticketIds === undefined ? null : new Set(ticketIds)
+  const excluded = new Set(excludeTicketIds)
+  return [...documents.values()].filter(
+    (document) =>
+      (included === null || included.has(document.id)) &&
+      !excluded.has(document.id) &&
+      matchesTicketQuery(document, query, viewerId)
+  )
+}
+
 const makeFakeTicketIndex = (
   documents: Map<string, TicketDocument>,
   overrides: Partial<TicketIndexShape> = {}
-) =>
-  Layer.succeed(TicketIndex, {
+) => {
+  let nextTicketNumber =
+    Math.max(
+      0,
+      ...[...documents.keys()].map((id) =>
+        Number(id.slice(id.lastIndexOf("-") + 1))
+      )
+    ) + 1
+  return Layer.succeed(TicketIndex, {
     projectFor: () => Effect.succeed(ticketIndexProject),
     list: (_project, ticketIds) =>
       Effect.sync(() => {
@@ -277,7 +378,53 @@ const makeFakeTicketIndex = (
           .filter((document) => wanted === null || wanted.has(document.id))
           .map(entryFromDocument)
       }),
+    query: (_project, query, options) =>
+      Effect.sync(() => {
+        const sign = query.sort.dir === "asc" ? 1 : -1
+        const sorted = matchingDocuments(
+          documents,
+          query,
+          options.viewerId,
+          options.ticketIds,
+          options.excludeTicketIds
+        ).toSorted((left, right) => {
+          const leftValue = ticketSortValue(left, query)
+          const rightValue = ticketSortValue(right, query)
+          if (leftValue < rightValue) return -1 * sign
+          if (leftValue > rightValue) return sign
+          return left.id.localeCompare(right.id)
+        })
+        return paginateSorted(sorted, {
+          cursor: tryDecodeCursor(query.cursor),
+          limit: options.limit,
+          sortKey: (document) => ticketSortValue(document, query),
+          id: (document) => document.id,
+          dir: query.sort.dir
+        }).items.map((document) => ({
+          entry: entryFromDocument(document),
+          sortValue: ticketSortValue(document, query)
+        }))
+      }),
+    count: (_project, query: TicketCountQuery, options) =>
+      Effect.sync(() => {
+        const byStatus: Record<string, number> = {}
+        const matching = matchingDocuments(
+          documents,
+          query,
+          options.viewerId,
+          options.ticketIds
+        )
+        for (const document of matching) {
+          byStatus[document.status] = (byStatus[document.status] ?? 0) + 1
+        }
+        return { total: matching.length, byStatus }
+      }),
     listIds: () => Effect.sync(() => [...documents.keys()]),
+    existingIds: (_project, ticketIds) =>
+      Effect.sync(
+        () => new Set(ticketIds.filter((ticketId) => documents.has(ticketId)))
+      ),
+    reserveTicketNumber: () => Effect.sync(() => nextTicketNumber++),
     tagUsageCounts: () =>
       Effect.sync(() => {
         const counts: Record<string, number> = {}
@@ -319,6 +466,7 @@ const makeFakeTicketIndex = (
       Effect.sync(() =>
         [...documents.values()].some((document) => document.branch === branch)
       ),
+    getBranchDeletedAt: () => Effect.succeed(null),
     upsertTicket: (_project, document) =>
       Effect.sync(() => {
         documents.set(document.id, document)
@@ -361,6 +509,7 @@ const makeFakeTicketIndex = (
       }),
     ...overrides
   } satisfies TicketIndexShape)
+}
 
 const makeRecordingTicketIndex = (documents: Map<string, TicketDocument>) => {
   const calls: Array<
@@ -376,6 +525,7 @@ const makeRecordingTicketIndex = (documents: Map<string, TicketDocument>) => {
   return {
     calls,
     layer: makeFakeTicketIndex(documents, {
+      getBranchDeletedAt: () => Effect.succeed(null),
       upsertTicket: (_project, document) =>
         Effect.sync(() => {
           documents.set(document.id, document)
@@ -398,6 +548,7 @@ function makeTicketsLayer(
     readonly github?: Layer.Layer<GitHub>
     readonly ticketIndex?: Layer.Layer<TicketIndex>
     readonly attachments?: Layer.Layer<Attachments>
+    readonly figmaLinks?: Layer.Layer<FigmaLinks>
   } = {}
 ) {
   return TicketsLive.pipe(
@@ -406,6 +557,7 @@ function makeTicketsLayer(
     Layer.provide(FakeGroups),
     Layer.provide(FakeComments),
     Layer.provide(options.attachments ?? makeFakeAttachments()),
+    Layer.provide(options.figmaLinks ?? makeFakeFigmaLinks()),
     Layer.provide(options.github ?? makeFakeGitHub()),
     Layer.provide(options.ticketIndex ?? makeFakeTicketIndex(new Map())),
     Layer.provide(FakeDb),
@@ -440,6 +592,7 @@ it.effect("listGitStates fetches only distinct ticket branches", () => {
     Layer.provide(FakeGroups),
     Layer.provide(FakeComments),
     Layer.provide(makeFakeAttachments()),
+    Layer.provide(makeFakeFigmaLinks()),
     Layer.provide(
       makeFakeGitHub({
         fetchInstallationProjectStates: (
@@ -501,6 +654,7 @@ it.effect(
       Layer.provide(FakeGroups),
       Layer.provide(FakeComments),
       Layer.provide(makeFakeAttachments()),
+      Layer.provide(makeFakeFigmaLinks()),
       Layer.provide(
         makeFakeGitHub({
           fetchInstallationProjectStates: () =>
@@ -762,6 +916,13 @@ it.effect(
         Layer.succeed(TicketDocs, {
           ...docs.service,
           read: (_org, slug) => Effect.succeed(documents.get(slug)!),
+          update: (_org, slug, _id, transform, onPersist) =>
+            Effect.gen(function* () {
+              const next = yield* transform(documents.get(slug)!)
+              documents.set(slug, next)
+              if (onPersist) yield* onPersist(next)
+              return next
+            }),
           write: (_org, slug, _id, document) =>
             Effect.sync(() => {
               documents.set(slug, document)
@@ -848,14 +1009,22 @@ it.effect("manual unlink waits for a webhook write and remains unlinked", () =>
     docs.documents.set("T-1", makeTicketDocument("T-1", { branch: "feat/T-1" }))
     const coordinatedDocs: TicketDocsShape = {
       ...docs.service,
-      write: (org, slug, id, document) =>
-        Effect.gen(function* () {
-          if (document.pr === 42) {
-            yield* Deferred.succeed(writeStarted, undefined)
-            yield* Deferred.await(releaseWrite)
-          }
-          yield* docs.service.write(org, slug, id, document)
-        })
+      update: (org, slug, id, transform, onPersist) =>
+        docs.service.update(
+          org,
+          slug,
+          id,
+          (document) =>
+            Effect.gen(function* () {
+              const next = yield* transform(document)
+              if (next.pr === 42) {
+                yield* Deferred.succeed(writeStarted, undefined)
+                yield* Deferred.await(releaseWrite)
+              }
+              return next
+            }),
+          onPersist
+        )
     }
     const indexLayer = makeFakeTicketIndex(docs.documents)
     const layer = makeTicketsLayer(
@@ -1121,8 +1290,10 @@ it.effect(
   () => {
     const docs = makeFakeTicketDocs(["T-1"])
     const attachments = makeRecordingAttachments()
+    const figmaLinks = makeRecordingFigmaLinks()
     const layer = makeTicketsLayer("T", docs.layer, {
       attachments: attachments.layer,
+      figmaLinks: figmaLinks.layer,
       ticketIndex: makeFakeTicketIndex(docs.documents)
     })
 
@@ -1133,6 +1304,43 @@ it.effect(
       expect(attachments.calls).toEqual([
         { orgSlug: "org", slug: "p", ticketId: "T-1", body: "" }
       ])
+      expect(figmaLinks.calls).toEqual([
+        { orgSlug: "org", slug: "p", ticketId: "T-1", title: "", body: "" }
+      ])
+    }).pipe(Effect.provide(layer))
+  }
+)
+
+it.effect(
+  "create, quickCreate and update reconcile figma references with the saved body",
+  () => {
+    const docs = makeFakeTicketDocs([])
+    const figmaLinks = makeRecordingFigmaLinks()
+    const layer = makeTicketsLayer("T", docs.layer, {
+      figmaLinks: figmaLinks.layer,
+      ticketIndex: makeFakeTicketIndex(docs.documents)
+    })
+
+    return Effect.gen(function* () {
+      const tickets = yield* Tickets
+      const created = yield* tickets.create("org", "user-1", "p", {
+        title: "One",
+        body: "# One\nhttps://www.figma.com/design/FILEKEY123/Spec\n"
+      })
+      const quick = yield* tickets.quickCreate("org", "user-1", "p", {
+        title: "Two"
+      })
+      yield* tickets.update("org", "user-1", "p", created.id, {
+        body: "# One\nedited\n"
+      })
+
+      expect(figmaLinks.calls.map((call) => call.ticketId)).toEqual([
+        created.id,
+        quick.id,
+        created.id
+      ])
+      expect(figmaLinks.calls[0]!.body).toContain("figma.com")
+      expect(figmaLinks.calls[2]!.body).toContain("edited")
     }).pipe(Effect.provide(layer))
   }
 )
@@ -1141,6 +1349,7 @@ it.effect("create propagates ticket index write failures", () => {
   const docs = makeFakeTicketDocs([])
   const layer = makeTicketsLayer("T", docs.layer, {
     ticketIndex: makeFakeTicketIndex(docs.documents, {
+      getBranchDeletedAt: () => Effect.succeed(null),
       upsertTicket: () => Effect.die(new Error("index failed"))
     })
   })
@@ -1241,6 +1450,51 @@ it.effect("create keeps legacy T project ids readable and sequential", () => {
 
     expect(created.id).toBe("T-36")
     expect(documents.has("T-36")).toBe(true)
+  }).pipe(Effect.provide(layer))
+})
+
+it.effect(
+  "create advances past an unindexed file collision without scanning the ticket directory",
+  () => {
+    const docs = makeFakeTicketDocs(["FOO-2"])
+    const indexed = new Map([["FOO-1", makeTicketDocument("FOO-1")]])
+    const layer = makeTicketsLayer("FOO", docs.layer, {
+      ticketIndex: makeFakeTicketIndex(indexed, {
+        listIds: () => unexpected("TicketIndex.listIds")
+      })
+    })
+
+    return Effect.gen(function* () {
+      const tickets = yield* Tickets
+      const created = yield* tickets.create("org", "user-1", "p", {
+        title: "Skip stale collision"
+      })
+
+      expect(created.id).toBe("FOO-3")
+      expect(docs.documents.has("FOO-3")).toBe(true)
+    }).pipe(Effect.provide(layer))
+  }
+)
+
+it.effect("ticket mention validation trusts the ticket index", () => {
+  const docs = makeFakeTicketDocs(["T-1"])
+  const layer = makeTicketsLayer("T", docs.layer, {
+    ticketIndex: makeFakeTicketIndex(new Map())
+  })
+
+  return Effect.gen(function* () {
+    const tickets = yield* Tickets
+    const error = yield* tickets
+      .create("org", "user-1", "p", {
+        title: "Reference a ticket",
+        body: "See [T-1](mention:ticket/T-1)."
+      })
+      .pipe(Effect.flip)
+
+    expect(error).toMatchObject({
+      _tag: "MentionInvalid",
+      kind: "unknown_ticket"
+    })
   }).pipe(Effect.provide(layer))
 })
 
@@ -1605,3 +1859,108 @@ it.effect("count substitutes mine to viewerId like list", () => {
     })
   }).pipe(Effect.provide(layer))
 })
+
+for (const scenario of [
+  { branch: null, pr: null, tag: "no_branch", indexReads: 1 },
+  { branch: "feat/T-1", pr: 80, tag: "pr_pending", indexReads: 1 },
+  { branch: "feat/T-1", pr: null, tag: "stale_branch", indexReads: 1 }
+] as const) {
+  it.effect(
+    `detail preserves git state with one index lookup for ${scenario.tag}`,
+    () => {
+      const docs = makeFakeTicketDocs(["T-1"])
+      const document = makeTicketDocument("T-1", {
+        branch: scenario.branch,
+        pr: scenario.pr
+      })
+      docs.documents.set("T-1", document)
+      let projectReads = 0
+      let indexReads = 0
+      const layer = makeTicketsLayer("T", docs.layer, {
+        ticketIndex: makeFakeTicketIndex(docs.documents, {
+          projectFor: () =>
+            Effect.sync(() => {
+              projectReads++
+              return ticketIndexProject
+            }),
+          getBranchDeletedAt: () =>
+            Effect.sync(() => {
+              indexReads++
+              return isoDate("2026-01-02T00:00:00.000Z")
+            })
+        })
+      })
+      return Effect.gen(function* () {
+        const tickets = yield* Tickets
+        const detail = yield* tickets.get("org", "user-1", "p", "T-1")
+        expect(detail.gitState.tag).toBe(scenario.tag)
+        expect(projectReads).toBe(0)
+        expect(indexReads).toBe(scenario.indexReads)
+      }).pipe(Effect.provide(layer))
+    }
+  )
+}
+
+it.effect(
+  "metadata edits skip attachment reconciliation while body edits retain it",
+  () => {
+    const docs = makeFakeTicketDocs(["T-1"])
+    const attachments = makeRecordingAttachments()
+    const layer = makeTicketsLayer("T", docs.layer, {
+      attachments: attachments.layer
+    })
+    return Effect.gen(function* () {
+      const tickets = yield* Tickets
+      yield* tickets.update("org", "user-1", "p", "T-1", {
+        title: "New title",
+        priority: "high"
+      })
+      expect(attachments.calls).toEqual([])
+      yield* tickets.update("org", "user-1", "p", "T-1", {
+        body: "Updated description"
+      })
+      expect(attachments.calls).toEqual([
+        {
+          orgSlug: "org",
+          slug: "p",
+          ticketId: "T-1",
+          body: "Updated description"
+        }
+      ])
+    }).pipe(Effect.provide(layer))
+  }
+)
+
+it.effect(
+  "creating a branch preserves comments added during the GitHub request",
+  () => {
+    const docs = makeFakeTicketDocs(["T-1"])
+    const layer = makeTicketsLayer("T", docs.layer, {
+      projects: makeFakeProjects("T", {
+        getGithubIntegration: () => Effect.succeed(githubIntegration)
+      }),
+      ticketIndex: makeFakeTicketIndex(docs.documents),
+      github: makeFakeGitHub({
+        createBranchAsUser: () =>
+          docs.service
+            .update("org", "p", "T-1", (document) =>
+              Effect.succeed({
+                ...document,
+                commentsRegion: "Concurrent comment"
+              })
+            )
+            .pipe(Effect.as({ name: "feat/T-1", sha: "abc123" }), Effect.orDie)
+      })
+    })
+    return Effect.gen(function* () {
+      const tickets = yield* Tickets
+      yield* tickets.createBranch("org", "user-1", "p", "T-1", {
+        name: "feat/T-1"
+      })
+      expect(docs.documents.get("T-1")).toMatchObject({
+        branch: "feat/T-1",
+        commentsRegion: "Concurrent comment"
+      })
+    }).pipe(Effect.provide(layer))
+  }
+)

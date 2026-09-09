@@ -228,3 +228,33 @@ export class AttachmentNotUploaded extends Schema.TaggedError<AttachmentNotUploa
   {},
   { httpApiStatus: 409 }
 ) {}
+
+export class FigmaNotConnected extends Schema.TaggedError<FigmaNotConnected>()(
+  "FigmaNotConnected",
+  {},
+  { httpApiStatus: 409 }
+) {}
+
+export class FigmaAuthInvalid extends Schema.TaggedError<FigmaAuthInvalid>()(
+  "FigmaAuthInvalid",
+  {},
+  { httpApiStatus: 401 }
+) {}
+
+export class FigmaRateLimited extends Schema.TaggedError<FigmaRateLimited>()(
+  "FigmaRateLimited",
+  { retryAfterSeconds: Schema.Finite },
+  { httpApiStatus: 429 }
+) {}
+
+export class FigmaFileNotFound extends Schema.TaggedError<FigmaFileNotFound>()(
+  "FigmaFileNotFound",
+  { fileKey: Schema.String },
+  { httpApiStatus: 404 }
+) {}
+
+export class FigmaError extends Schema.TaggedError<FigmaError>()(
+  "FigmaError",
+  { reason: Schema.String },
+  { httpApiStatus: 502 }
+) {}

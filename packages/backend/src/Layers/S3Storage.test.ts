@@ -1,4 +1,8 @@
-import { describe, expect, it } from "vite-plus/test"
+import { it } from "@effect/vitest"
+import * as Effect from "effect/Effect"
+import { S3Storage } from "../Services/S3Storage"
+import { S3StorageLive } from "./S3Storage"
+import { describe, expect } from "vite-plus/test"
 import {
   attachmentObjectKey,
   normalizeEtag,
@@ -95,4 +99,48 @@ describe("normalizeEtag", () => {
   it("refuses anything that is not a hex digest", () => {
     expect(normalizeEtag('"not-a-digest"')).toBeNull()
   })
+})
+
+describe("S3 endpoint transport", () => {
+  const connection = {
+    bucket: "test",
+    region: "auto",
+    keyPrefix: null,
+    forcePathStyle: true,
+    accessKeyId: "test",
+    secretAccessKey: "test"
+  }
+  it.effect.each([
+    "http://storage.example.test",
+    "http://localhost.example.test",
+    "ftp://localhost",
+    "file:///tmp/bucket",
+    "not a URL"
+  ])("rejects %s before signing", (endpoint) =>
+    Effect.gen(function* () {
+      const storage = yield* S3Storage
+      const error = yield* Effect.flip(
+        storage.presignPut({ ...connection, endpoint }, "file", "image/png", 60)
+      )
+      expect(error._tag).toBe("S3Unavailable")
+      expect(error.retryable).toBe(false)
+    }).pipe(Effect.provide(S3StorageLive))
+  )
+  it.effect.each([
+    "https://storage.example.test",
+    "http://localhost:9000",
+    "http://127.0.0.1:9000",
+    "http://[::1]:9000"
+  ])("allows %s", (endpoint) =>
+    Effect.gen(function* () {
+      const storage = yield* S3Storage
+      const url = yield* storage.presignPut(
+        { ...connection, endpoint },
+        "file",
+        "image/png",
+        60
+      )
+      expect(new URL(url).origin).toBe(endpoint)
+    }).pipe(Effect.provide(S3StorageLive))
+  )
 })

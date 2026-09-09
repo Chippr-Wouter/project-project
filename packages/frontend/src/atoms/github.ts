@@ -1,7 +1,6 @@
 import * as Result from "effect/unstable/reactivity/AsyncResult"
 import * as Atom from "effect/unstable/reactivity/Atom"
 import * as Option from "effect/Option"
-import * as Schema from "effect/Schema"
 // GitHub-related atoms.
 //
 // The mutation atoms here use the project's optimistic-update pattern (see
@@ -16,17 +15,16 @@ import * as Reactivity from "effect/unstable/reactivity/Reactivity"
 import * as Effect from "effect/Effect"
 import { runtime } from "@/runtime"
 import { ApiClient } from "@/services/ApiClient"
-import { TicketId } from "@projectproject/shared"
 import type {
   AttachBranchInput,
   ConnectGithubInput,
   CreateBranchInput,
   GitState,
   GitStatesResponse,
+  TicketId,
   Slug
 } from "@projectproject/shared"
 import { projectAtom, projectBaseAtom } from "./projects"
-import { ticketBaseAtom, ticketKey } from "./tickets"
 
 export const githubAuthEpochAtom = Atom.make(0)
 
@@ -157,20 +155,7 @@ export const projectGitStatesBaseAtom = Atom.family((key: string) => {
           shouldInvalidateTicketsForGitStates(response) ||
           changedStateIds.length > 0
         if (shouldInvalidate) {
-          yield* Reactivity.invalidate(["tickets", orgSlug, slug])
-          const changedTicketIds = new Set([
-            ...response.transitioned.map((transition) => transition.ticketId),
-            ...(response.changedTicketIds ?? []),
-            ...changedStateIds
-          ])
-          for (const rawTicketId of changedTicketIds) {
-            const ticketId = Schema.decodeOption(TicketId)(rawTicketId)
-            if (Option.isSome(ticketId)) {
-              get.refresh(
-                ticketBaseAtom(ticketKey(orgSlug, slug, ticketId.value))
-              )
-            }
-          }
+          yield* Reactivity.invalidate([`tickets/${orgSlug}/${slug}`])
         }
         return states
       })
@@ -406,8 +391,7 @@ export const createBranchAtom = Atom.family((key: string) => {
           payload: { name: input.name, baseBranch: input.baseBranch }
         })
         get.refresh(projectGitStatesBaseAtom(key))
-        get.refresh(ticketBaseAtom(ticketKey(orgSlug, slug, input.id)))
-        yield* Reactivity.invalidate(["tickets", orgSlug, slug])
+        yield* Reactivity.invalidate([`tickets/${orgSlug}/${slug}`])
         yield* Reactivity.invalidate(["branches", orgSlug, slug])
         return updated
       })
@@ -454,8 +438,7 @@ export const attachBranchAtom = Atom.family((key: string) => {
           payload: { name: input.name }
         })
         get.refresh(projectGitStatesBaseAtom(key))
-        get.refresh(ticketBaseAtom(ticketKey(orgSlug, slug, input.id)))
-        yield* Reactivity.invalidate(["tickets", orgSlug, slug])
+        yield* Reactivity.invalidate([`tickets/${orgSlug}/${slug}`])
         return updated
       })
     )
@@ -485,8 +468,7 @@ export const clearBranchAtom = Atom.family((key: string) => {
         const updated = yield* client.tickets.clearBranch({
           params: { orgSlug, slug, id: input.id }
         })
-        get.refresh(ticketBaseAtom(ticketKey(orgSlug, slug, input.id)))
-        yield* Reactivity.invalidate(["tickets", orgSlug, slug])
+        yield* Reactivity.invalidate([`tickets/${orgSlug}/${slug}`])
         get.refresh(projectGitStatesBaseAtom(key))
         return updated
       })
