@@ -12,7 +12,13 @@ export class ApiClient extends Context.Service<
   static readonly Default = Layer.effect(
     ApiClient,
     HttpApiClient.make(AppApi, { baseUrl: "/api" }).pipe(
-      Effect.provide(FetchHttpClient.layer)
+      Effect.provide(
+        Layer.provide(
+          FetchHttpClient.layer,
+          Layer.succeed(FetchHttpClient.Fetch, ((request, init) =>
+            globalThis.fetch(request, init)) as typeof globalThis.fetch)
+        )
+      )
     )
   )
 }

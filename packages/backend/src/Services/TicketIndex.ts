@@ -7,7 +7,9 @@ import type {
   TicketId,
   TicketPriority,
   TicketStatus,
-  TicketType
+  TicketType,
+  TicketCountQuery,
+  TicketListQuery
 } from "@projectproject/shared"
 import type { NotFound } from "@projectproject/shared"
 import type { MarkdownError } from "./Markdown"
@@ -18,6 +20,23 @@ export interface TicketIndexProject {
   readonly organizationId: string
   readonly projectId: string
   readonly projectSlug: string
+}
+
+export interface TicketIndexQueryOptions {
+  readonly viewerId: string
+  readonly ticketIds?: ReadonlyArray<string>
+  readonly excludeTicketIds?: ReadonlyArray<string>
+  readonly limit: number
+}
+
+export interface TicketIndexCountOptions {
+  readonly viewerId: string
+  readonly ticketIds?: ReadonlyArray<string>
+}
+
+export interface TicketIndexCounts {
+  readonly total: number
+  readonly byStatus: Readonly<Record<string, number>>
 }
 
 export interface TicketIndexEntry {
@@ -40,6 +59,11 @@ export interface TicketIndexEntry {
   readonly createdBy: string
   readonly createdAt: Date
   readonly updatedAt: Date
+}
+
+export interface TicketIndexQueryEntry {
+  readonly entry: TicketIndexEntry
+  readonly sortValue: string
 }
 
 export interface TicketIndexMatch extends TicketIndexProject {
@@ -89,9 +113,26 @@ export interface TicketIndexShape {
     project: TicketIndexProject,
     ticketIds?: ReadonlyArray<string>
   ) => Effect.Effect<ReadonlyArray<TicketIndexEntry>>
+  readonly query: (
+    project: TicketIndexProject,
+    query: TicketListQuery,
+    options: TicketIndexQueryOptions
+  ) => Effect.Effect<ReadonlyArray<TicketIndexQueryEntry>>
+  readonly count: (
+    project: TicketIndexProject,
+    query: TicketCountQuery,
+    options: TicketIndexCountOptions
+  ) => Effect.Effect<TicketIndexCounts>
   readonly listIds: (
     project: TicketIndexProject
   ) => Effect.Effect<ReadonlyArray<string>>
+  readonly existingIds: (
+    project: TicketIndexProject,
+    ticketIds: ReadonlyArray<string>
+  ) => Effect.Effect<ReadonlySet<string>>
+  readonly reserveTicketNumber: (
+    project: TicketIndexProject
+  ) => Effect.Effect<number>
   readonly tagUsageCounts: (
     project: TicketIndexProject
   ) => Effect.Effect<Readonly<Record<string, number>>>
@@ -107,6 +148,11 @@ export interface TicketIndexShape {
     projectId: string,
     branch: string
   ) => Effect.Effect<ReadonlyArray<TicketIndexMatch>>
+  readonly getBranchDeletedAt: (
+    orgSlug: string,
+    slug: string,
+    ticketId: string
+  ) => Effect.Effect<Date | null>
   readonly upsertTicket: (
     project: TicketIndexProject,
     document: TicketDocument

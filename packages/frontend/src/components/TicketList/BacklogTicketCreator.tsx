@@ -28,6 +28,7 @@ import {
 } from "@/atoms/sprints"
 import { quickCreateTicketAtom, ticketsListKeyForStatus } from "@/atoms/tickets"
 import { useGlobalShortcut } from "@/lib/use-global-shortcut"
+import { preloadTicketPage } from "@/lib/prefetch"
 import { cn } from "@/lib/utils"
 import { TYPE_LABELS, TYPE_META } from "@/lib/ticket-meta"
 import { m } from "@/paraglide/messages"
@@ -262,7 +263,10 @@ export function BacklogTicketCreator({
       inputRef={inputRef}
       value={title}
       onValueChange={setTitle}
-      onFocus={() => setFocused(true)}
+      onFocus={() => {
+        setFocused(true)
+        void preloadTicketPage()
+      }}
       onBlur={() => setFocused(false)}
       onSubmit={onSubmit}
       expanded={expanded}

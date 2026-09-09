@@ -2,7 +2,13 @@ import * as Result from "effect/unstable/reactivity/AsyncResult"
 import { useAtomValue } from "@effect/atom-react"
 import { useDebouncer } from "@tanstack/react-pacer"
 import * as DateTime from "effect/DateTime"
-import { useEffect, useMemo, useRef, useState } from "react"
+import {
+  type ComponentProps,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react"
 import { useNavigate, useRouter } from "@tanstack/react-router"
 import { AnimatePresence, motion } from "motion/react"
 import {
@@ -581,6 +587,9 @@ function FiltersMenu({
   onSprintChange: (s: SprintFilterValue) => void
   onArchivedChange: (on: boolean) => void
 }) {
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const [anchor, setAnchor] =
+    useState<ComponentProps<typeof DropdownMenuContent>["anchor"]>()
   const tags = useAtomValue(tagsAtom(tagsKey(orgSlug, slug)))
   const tagList = Result.isSuccess(tags) ? tags.value : []
   const sprintsList = useAtomValue(
@@ -609,8 +618,19 @@ function FiltersMenu({
     (archivedFilter ? 1 : 0)
   const active = activeCount > 0
   return (
-    <DropdownMenu>
+    <DropdownMenu
+      onOpenChange={(open) => {
+        const trigger = triggerRef.current
+        if (!open || !trigger) return
+        const bounds = trigger.getBoundingClientRect()
+        setAnchor({
+          getBoundingClientRect: () => bounds,
+          contextElement: trigger
+        })
+      }}
+    >
       <DropdownMenuTrigger
+        ref={triggerRef}
         render={
           <button
             type="button"
@@ -639,6 +659,7 @@ function FiltersMenu({
         }
       />
       <DropdownMenuContent
+        anchor={anchor}
         align="end"
         sideOffset={6}
         className="w-56"

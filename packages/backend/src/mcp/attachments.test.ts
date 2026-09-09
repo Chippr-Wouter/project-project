@@ -165,6 +165,7 @@ const fixture = Effect.fn("attachmentFixture")(function* (
               id: scope.ticketId,
               title: "Ticket",
               body: "Original description",
+              commentsRegion: "",
               status: Schema.decodeSync(TicketStatus)("todo"),
               type: "feat",
               priority: "med",

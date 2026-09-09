@@ -1,6 +1,8 @@
 import { it } from "@effect/vitest"
 import * as DateTime from "effect/DateTime"
+import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
+import * as Fiber from "effect/Fiber"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
 import { expect } from "vite-plus/test"
@@ -85,7 +87,8 @@ it.effect(
         lastTransitionedPr: null,
         assignees: ["user-1"],
         createdBy: "user-2",
-        body: "# Fix auth\n"
+        body: "# Fix auth\n",
+        commentsRegion: "<!-- pp:comments:start -->\n<!-- pp:comments:end -->"
       })
       expect(document.createdAt.toISOString()).toBe("2026-01-01T00:00:00.000Z")
       expect(document.updatedAt.toISOString()).toBe("2026-01-02T00:00:00.000Z")
@@ -108,13 +111,66 @@ it.effect(
                     updatedAt: "2026-01-02T00:00:00.000Z"
                   },
                   description: "# Fix auth\n",
-                  region: ""
+                  region: "<!-- pp:comments:start -->\n<!-- pp:comments:end -->"
                 })
             })
           )
         )
       )
     )
+)
+
+it.effect(
+  "TicketDocs preserves a comments region when creating a ticket",
+  () => {
+    let body: string | undefined
+
+    return Effect.gen(function* () {
+      const docs = yield* TicketDocs
+      yield* docs.create("org", "project", {
+        id: ticketId("T-2"),
+        title: "Write tests",
+        status: ticketStatus("todo"),
+        type: "chore",
+        priority: "med",
+        tags: [],
+        branch: null,
+        pr: null,
+        prState: null,
+        lastTransitionedPr: null,
+        assignees: [],
+        archivedAt: null,
+        createdBy: "user-1",
+        createdAt: isoDate("2026-02-01T10:00:00.000Z"),
+        updatedAt: isoDate("2026-02-01T10:00:00.000Z"),
+        body: "# Write tests\n",
+        commentsRegion: "<!-- pp:comments:start -->\n<!-- pp:comments:end -->"
+      })
+
+      expect(body).toBe(
+        "# Write tests\n\n<!-- pp:comments:start -->\n<!-- pp:comments:end -->"
+      )
+    }).pipe(
+      Effect.provide(
+        TicketDocsLive.pipe(
+          Layer.provide(
+            makeMarkdown({
+              createTicketFile: (
+                _org,
+                _slug,
+                _id,
+                _frontmatter,
+                createdBody
+              ) => {
+                body = createdBody
+                return Effect.void
+              }
+            })
+          )
+        )
+      )
+    )
+  }
 )
 
 it.effect(
@@ -146,7 +202,8 @@ it.effect(
         createdBy: "user-1",
         createdAt: isoDate("2026-02-01T10:00:00.000Z"),
         updatedAt: isoDate("2026-02-02T10:00:00.000Z"),
-        body: "# Write tests\n"
+        body: "# Write tests\n",
+        commentsRegion: "<!-- pp:comments:start -->\n<!-- pp:comments:end -->"
       })
 
       expect(written).toEqual({
@@ -175,12 +232,208 @@ it.effect(
         TicketDocsLive.pipe(
           Layer.provide(
             makeMarkdown({
-              readTicketParts: () =>
-                Effect.succeed({ data: {}, description: "", region: "" }),
-              writeTicketWithRegion: (_org, _slug, id, frontmatter, body) => {
+              writeTicketWithRegion: (
+                _org,
+                _slug,
+                id,
+                frontmatter,
+                body,
+                region
+              ) => {
                 written = { id, frontmatter, body }
+                expect(region).toBe(
+                  "<!-- pp:comments:start -->\n<!-- pp:comments:end -->"
+                )
                 return Effect.void
               }
+            })
+          )
+        )
+      )
+    )
+  }
+)
+
+it.effect("TicketDocs serializes concurrent document updates", () => {
+  let stored: {
+    data: Record<string, unknown>
+    description: string
+    region: string
+  } = {
+    data: {
+      id: "T-1",
+      title: "Concurrent updates",
+      status: "todo",
+      type: "chore",
+      priority: "med",
+      tags: [],
+      branch: null,
+      pr: null,
+      prState: null,
+      lastTransitionedPr: null,
+      assignees: [],
+      archivedAt: null,
+      createdBy: "user-1",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z"
+    },
+    description: "# Before\n",
+    region: ""
+  }
+
+  return Effect.gen(function* () {
+    const docs = yield* TicketDocs
+    const firstEntered = yield* Deferred.make<void>()
+    const releaseFirst = yield* Deferred.make<void>()
+
+    const first = yield* docs
+      .update("org", "project", "T-1", (document) =>
+        Effect.gen(function* () {
+          yield* Deferred.succeed(firstEntered, undefined)
+          yield* Deferred.await(releaseFirst)
+          return { ...document, body: "# Updated body\n" }
+        })
+      )
+      .pipe(Effect.forkChild)
+    yield* Deferred.await(firstEntered)
+    const second = yield* docs
+      .update("org", "project", "T-1", (document) =>
+        Effect.succeed({
+          ...document,
+          commentsRegion:
+            "<!-- pp:comments:start -->\ncomment\n<!-- pp:comments:end -->"
+        })
+      )
+      .pipe(Effect.forkChild)
+
+    yield* Deferred.succeed(releaseFirst, undefined)
+    yield* Fiber.join(first)
+    yield* Fiber.join(second)
+
+    const document = yield* docs.read("org", "project", "T-1")
+    expect(document.body).toBe("# Updated body\n")
+    expect(document.commentsRegion).toContain("comment")
+  }).pipe(
+    Effect.provide(
+      TicketDocsLive.pipe(
+        Layer.provide(
+          makeMarkdown({
+            readTicketParts: () => Effect.succeed(stored),
+            writeTicketWithRegion: (
+              _org,
+              _slug,
+              _id,
+              data,
+              description,
+              region
+            ) =>
+              Effect.sync(() => {
+                stored = { data, description, region }
+              })
+          })
+        )
+      )
+    )
+  )
+})
+
+it.effect(
+  "TicketDocs keeps delayed publication inside the mutation lock",
+  () => {
+    let stored: {
+      data: Record<string, unknown>
+      description: string
+      region: string
+    } = {
+      data: {
+        id: "T-1",
+        title: "Concurrent updates",
+        status: "todo",
+        type: "chore",
+        priority: "med",
+        tags: [],
+        branch: null,
+        pr: null,
+        prState: null,
+        lastTransitionedPr: null,
+        assignees: [],
+        archivedAt: null,
+        createdBy: "user-1",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z"
+      },
+      description: "# Before\n",
+      region: ""
+    }
+
+    return Effect.gen(function* () {
+      const docs = yield* TicketDocs
+      const published: string[] = []
+      const firstEntered = yield* Deferred.make<void>()
+      const releaseFirst = yield* Deferred.make<void>()
+
+      const first = yield* docs
+        .update(
+          "org",
+          "project",
+          "T-1",
+          (document) =>
+            Effect.succeed({ ...document, body: "# Updated body\n" }),
+          (document) =>
+            Effect.gen(function* () {
+              yield* Deferred.succeed(firstEntered, undefined)
+              yield* Deferred.await(releaseFirst)
+              published.push(document.body)
+            })
+        )
+        .pipe(Effect.forkChild)
+      yield* Deferred.await(firstEntered)
+      const second = yield* docs
+        .update(
+          "org",
+          "project",
+          "T-1",
+          (document) =>
+            Effect.succeed({
+              ...document,
+              body: "# Second update\n",
+              commentsRegion:
+                "<!-- pp:comments:start -->\ncomment\n<!-- pp:comments:end -->"
+            }),
+          (document) =>
+            Effect.sync(() => {
+              published.push(document.body)
+            })
+        )
+        .pipe(Effect.forkChild)
+
+      yield* Effect.yieldNow
+      expect(published).toEqual([])
+      yield* Deferred.succeed(releaseFirst, undefined)
+      yield* Fiber.join(first)
+      yield* Fiber.join(second)
+
+      const document = yield* docs.read("org", "project", "T-1")
+      expect(document.body).toBe("# Second update\n")
+      expect(published).toEqual(["# Updated body\n", "# Second update\n"])
+      expect(document.commentsRegion).toContain("comment")
+    }).pipe(
+      Effect.provide(
+        TicketDocsLive.pipe(
+          Layer.provide(
+            makeMarkdown({
+              readTicketParts: () => Effect.succeed(stored),
+              writeTicketWithRegion: (
+                _org,
+                _slug,
+                _id,
+                data,
+                description,
+                region
+              ) =>
+                Effect.sync(() => {
+                  stored = { data, description, region }
+                })
             })
           )
         )

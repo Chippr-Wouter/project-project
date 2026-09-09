@@ -12,6 +12,7 @@ import type {
   UpdateCommentInput
 } from "@projectproject/shared"
 import type { MarkdownError } from "./Markdown"
+import type { MalformedTicketDocument } from "./TicketDocs"
 
 export class InvalidCommentBody extends Data.TaggedError("InvalidCommentBody")<{
   readonly reason: string
@@ -23,7 +24,10 @@ export interface CommentsShape {
     userId: string,
     slug: string,
     ticketId: TicketId
-  ) => Effect.Effect<ReadonlyArray<Comment>, NotFound | MarkdownError>
+  ) => Effect.Effect<
+    ReadonlyArray<Comment>,
+    NotFound | MarkdownError | MalformedTicketDocument
+  >
   readonly create: (
     orgSlug: string,
     userId: string,
@@ -32,7 +36,11 @@ export interface CommentsShape {
     input: CreateCommentInput
   ) => Effect.Effect<
     Comment,
-    NotFound | InvalidCommentBody | MentionInvalid | MarkdownError
+    | NotFound
+    | InvalidCommentBody
+    | MentionInvalid
+    | MarkdownError
+    | MalformedTicketDocument
   >
   readonly edit: (
     orgSlug: string,
@@ -43,7 +51,12 @@ export interface CommentsShape {
     input: UpdateCommentInput
   ) => Effect.Effect<
     Comment,
-    NotFound | Forbidden | InvalidCommentBody | MentionInvalid | MarkdownError
+    | NotFound
+    | Forbidden
+    | InvalidCommentBody
+    | MentionInvalid
+    | MarkdownError
+    | MalformedTicketDocument
   >
   readonly remove: (
     orgSlug: string,
@@ -51,7 +64,10 @@ export interface CommentsShape {
     slug: string,
     ticketId: TicketId,
     commentId: CommentId
-  ) => Effect.Effect<void, NotFound | Forbidden | MarkdownError>
+  ) => Effect.Effect<
+    void,
+    NotFound | Forbidden | MarkdownError | MalformedTicketDocument
+  >
 }
 
 export class Comments extends Context.Service<Comments, CommentsShape>()(
