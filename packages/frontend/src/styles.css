@@ -652,9 +652,28 @@ html.dark .prose-md .token.coord {
   padding: 0.4em 0.7em;
   text-align: left;
 }
+.prose-md :is(th, td)[align="center"] {
+  text-align: center;
+}
+.prose-md :is(th, td)[align="right"] {
+  text-align: right;
+}
 .prose-md th {
   background: var(--muted);
   font-weight: 600;
+}
+.lexical-table-scroll {
+  overflow-x: auto;
+  margin-block: 1em;
+}
+.prose-md :is(th, td) > p {
+  margin: 0;
+}
+.prose-md .lexical-table-cell-selected {
+  background: var(--selected);
+}
+.lexical-table-selection ::selection {
+  background: transparent;
 }
 .prose-md input[type="checkbox"] {
   margin-right: 0.5em;

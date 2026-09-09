@@ -1,3 +1,5 @@
+import { TableExtension } from "@lexical/table"
+import { createTableTransformer } from "./Lexical/tableTransformer"
 import { useEffect, useRef, useState } from "react"
 import * as Effect from "effect/Effect"
 import { useDebouncer } from "@tanstack/react-pacer"
@@ -65,13 +67,18 @@ import "@/lib/prism-langs"
 import { cn } from "@/lib/utils"
 import { m } from "@/paraglide/messages"
 
-export const MARKDOWN_TRANSFORMERS = [
+const INLINE_AND_BLOCK_TRANSFORMERS = [
   MENTION_TRANSFORMER,
   CHECK_LIST,
   HORIZONTAL_RULE,
   PAPER_TRANSFORMER,
   FIGMA_TRANSFORMER,
   ...TRANSFORMERS
+]
+
+export const MARKDOWN_TRANSFORMERS = [
+  createTableTransformer(INLINE_AND_BLOCK_TRANSFORMERS),
+  ...INLINE_AND_BLOCK_TRANSFORMERS
 ]
 
 const ATTACHMENT_MARKDOWN_TRANSFORMERS = [
@@ -111,6 +118,9 @@ const EMAIL_MATCHER = createLinkMatcherWithRegExp(
 export const AUTO_LINK_MATCHERS = [URL_MATCHER, EMAIL_MATCHER]
 
 const lexicalTheme = {
+  tableScrollableWrapper: "lexical-table-scroll",
+  tableCellSelected: "lexical-table-cell-selected",
+  tableSelection: "lexical-table-selection",
   paragraph: "lexical-paragraph",
   heading: {
     h1: "lexical-h1",
@@ -341,6 +351,11 @@ export function LexicalEditor({
       },
       dependencies: [
         RichTextExtension,
+        configExtension(TableExtension, {
+          hasCellMerge: false,
+          hasCellBackgroundColor: false,
+          hasHorizontalScroll: true
+        }),
         HistoryExtension,
         ListExtension,
         CheckListExtension,
