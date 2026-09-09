@@ -174,7 +174,6 @@ function ProjectLayout() {
               waiting={waiting}
             />
             {!headerHidden && (
-
               <PageContainer>
                 <ProjectHeader
                   orgSlug={orgSlug}
