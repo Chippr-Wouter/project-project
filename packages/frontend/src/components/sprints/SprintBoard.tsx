@@ -19,8 +19,8 @@ import type {
   GroupId,
   Member,
   ProjectStatus,
-  Ticket,
-  TicketId
+  TicketId,
+  TicketListQuery
 } from "@projectproject/shared"
 import { cn } from "@/lib/utils"
 import {
@@ -33,12 +33,14 @@ import {
 import { ErrorPage } from "@/components/ErrorPage"
 import { DitherShell } from "@/components/ui/dither-shell"
 import { SprintBoardColumn } from "./SprintBoardColumn"
+import { useBoardTickets } from "./useBoardTickets"
 
 type SprintBoardProps = {
   orgSlug: string
   slug: string
   groupId: GroupId
   ticketIds: ReadonlyArray<TicketId>
+  query: TicketListQuery
   members: ReadonlyArray<Member>
   isCompleted: boolean
   reorderMode: boolean
@@ -74,7 +76,6 @@ export function SprintBoard(props: SprintBoardProps) {
     onSuccess: ({ value, waiting }) => (
       <SprintBoardContent
         {...props}
-        tickets={value.tickets}
         statuses={value.statuses}
         waiting={waiting}
       />
@@ -87,6 +88,7 @@ function SprintBoardContent({
   slug,
   groupId,
   ticketIds,
+  query,
   members,
   isCompleted,
   reorderMode,
@@ -94,11 +96,9 @@ function SprintBoardContent({
   onExitReorder,
   dragOrder,
   setDragOrder,
-  tickets,
   statuses,
   waiting
 }: SprintBoardProps & {
-  tickets: ReadonlyArray<Ticket>
   statuses: ReadonlyArray<ProjectStatus>
   waiting: boolean
 }) {
@@ -135,7 +135,14 @@ function SprintBoardContent({
     }
     update()
     const ro = new ResizeObserver(update)
-    ro.observe(container)
+    ro.observe(container, { box: "border-box" })
+    for (let node: Element | null = el; node && node !== paddingSource;) {
+      for (let prev = node.previousElementSibling; prev;) {
+        ro.observe(prev, { box: "border-box" })
+        prev = prev.previousElementSibling
+      }
+      node = node.parentElement
+    }
     window.addEventListener("resize", update)
     return () => {
       ro.disconnect()
@@ -182,18 +189,24 @@ function SprintBoardContent({
   const flash = (id: TicketId) =>
     setLastFlash((prev) => ({ id, tick: (prev?.tick ?? 0) + 1 }))
 
-  const ticketById = useMemo(() => {
-    const m = new Map<TicketId, Ticket>()
-    for (const ticket of tickets) m.set(ticket.id, ticket)
-    return m
-  }, [tickets])
+  const { ticketById, matchingTicketIds } = useBoardTickets(
+    orgSlug,
+    slug,
+    groupId,
+    ticketIds,
+    query
+  )
 
   const grouped = useMemo(
+    () => groupTicketsByStatus(matchingTicketIds, ticketById, overlay, order),
+    [matchingTicketIds, ticketById, overlay, order]
+  )
+  const unfilteredGrouped = useMemo(
     () => groupTicketsByStatus(ticketIds, ticketById, overlay, order),
     [ticketIds, ticketById, overlay, order]
   )
-  const groupedRef = useRef(grouped)
-  groupedRef.current = grouped
+  const unfilteredGroupedRef = useRef(unfilteredGrouped)
+  unfilteredGroupedRef.current = unfilteredGrouped
 
   useEffect(() => {
     const el = ref.current
@@ -208,7 +221,7 @@ function SprintBoardContent({
         if (src.type !== "card") return
         if (dst.type === "card" && dst.id === src.id) return
 
-        const current = groupedRef.current
+        const current = unfilteredGroupedRef.current
         let after: TicketId | null
         let nextStatus: string
         if (dst.type === "card") {
@@ -247,7 +260,7 @@ function SprintBoardContent({
       aria-busy={waiting}
       style={{ height: height ? `${height}px` : undefined }}
       className={cn(
-        "overflow-x-auto pt-2 pb-4",
+        "overflow-x-auto",
         waiting && "animate-pulse motion-reduce:animate-none",
         hasRightOverflow &&
           "[mask-image:linear-gradient(to_right,black_calc(100%-16px),transparent)]"

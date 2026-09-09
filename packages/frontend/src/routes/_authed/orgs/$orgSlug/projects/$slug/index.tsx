@@ -1,3 +1,4 @@
+import { useUpdateTicketQuery } from "@/components/TicketList/url"
 import { projectAtom } from "@/atoms/projects"
 import { projectStatusesAtom } from "@/atoms/projectStatuses"
 import { sprintsListAtom } from "@/atoms/sprints"
@@ -10,6 +11,7 @@ import {
   ticketListQueryToSearch
 } from "@projectproject/shared"
 import { TicketList } from "@/components/TicketList"
+import { BacklogToolbar } from "@/components/TicketList/toolbars"
 import { ArchiveTicketControl } from "@/components/TicketList/ArchiveControl"
 import { PageContainer } from "@/components/page"
 import { projectKey, sprintMembershipAtom } from "@/atoms/sprints"
@@ -37,6 +39,7 @@ export const Route = createFileRoute("/_authed/orgs/$orgSlug/projects/$slug/")({
 
 function TicketsTab() {
   const { orgSlug, slug } = Route.useParams()
+  const updateQuery = useUpdateTicketQuery()
   const search = Route.useSearch({ structuralSharing: true })
   const project = useProject()
   const query = useMemo(() => ticketListQueryFromSearch(search), [search])
@@ -51,7 +54,15 @@ function TicketsTab() {
         query={query}
         members={project.members}
         sprintMembership={sprintMembership}
-        showSprintFilter
+        toolbar={
+          <BacklogToolbar
+            onQueryChange={updateQuery}
+            orgSlug={orgSlug}
+            slug={slug}
+            query={query}
+            members={project.members}
+          />
+        }
         extraRowActions={(ticket) => (
           <ArchiveTicketControl
             orgSlug={orgSlug}

@@ -11,7 +11,6 @@ import {
 import { ErrorPage } from "@/components/ErrorPage"
 import { BacklogTicketCreator } from "./BacklogTicketCreator"
 import { SegmentedList } from "./SegmentedList"
-import { Toolbar } from "./Toolbar"
 import type {
   Group,
   Member,
@@ -28,7 +27,7 @@ export function TicketList({
   extraRowActions,
   sprintMembership,
   creator,
-  showSprintFilter
+  toolbar
 }: {
   orgSlug: string
   slug: string
@@ -37,7 +36,7 @@ export function TicketList({
   extraRowActions?: (ticket: Ticket) => ReactNode
   sprintMembership?: ReadonlyMap<TicketId, Group>
   creator?: ReactNode
-  showSprintFilter?: boolean
+  toolbar: ReactNode
 }) {
   const key = ticketsListKey(orgSlug, slug, query)
   const result = useAtomValue(
@@ -95,14 +94,7 @@ export function TicketList({
       )}
 
       <div className="flex flex-col gap-3 transition-opacity duration-200 ease-out group-has-[form[data-active]]/list:opacity-35">
-        <Toolbar
-          orgSlug={orgSlug}
-          slug={slug}
-          query={query}
-          members={members}
-          showSprintFilter={showSprintFilter}
-          ticketCounts={active?.value.counts}
-        />
+        {toolbar}
 
         <div
           aria-busy={result.waiting || Result.isInitial(result)}

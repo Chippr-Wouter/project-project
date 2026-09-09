@@ -1,3 +1,4 @@
+import { useUpdateTicketQuery } from "@/components/TicketList/url"
 import { useMemo } from "react"
 import { createFileRoute } from "@tanstack/react-router"
 import * as Schema from "effect/Schema"
@@ -75,11 +76,13 @@ export const Route = createFileRoute(
 
 function SprintDetailRoute() {
   const { orgSlug, slug, groupId } = Route.useParams()
+  const updateQuery = useUpdateTicketQuery()
   const search = Route.useSearch({ structuralSharing: true })
   const id = decodeGroupId(groupId)
   const scopedQuery = useMemo(() => sprintListQuery(search, id), [search, id])
   return (
     <SprintDetail
+      onQueryChange={updateQuery}
       orgSlug={orgSlug}
       slug={slug}
       groupId={id}

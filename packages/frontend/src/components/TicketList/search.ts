@@ -7,7 +7,7 @@ export function effectiveTicketSearch(draft: string) {
   return draft.length >= MIN_SEARCH_CHARS ? draft : undefined
 }
 
-interface SearchDraft {
+type SearchDraft = {
   readonly draft: string
   readonly query: string | undefined
   readonly submitted: { readonly query: string | undefined } | null
