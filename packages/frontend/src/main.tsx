@@ -29,6 +29,8 @@ document.head.appendChild(stateColorStyle)
 const router = createRouter({
   routeTree,
   defaultPreload: "intent",
+  scrollRestoration: true,
+  scrollToTopSelectors: ["[data-scroll-root]"],
   context: { registry }
 })
 
