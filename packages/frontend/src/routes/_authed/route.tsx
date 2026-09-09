@@ -1,11 +1,12 @@
 import * as Result from "effect/unstable/reactivity/AsyncResult"
-import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
+import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import {
   createFileRoute,
   Link,
   Navigate,
   Outlet,
-  useLocation
+  useLocation,
+  useParams
 } from "@tanstack/react-router"
 import {
   FolderKanban,
@@ -81,26 +82,10 @@ function AuthedLayout() {
       }
       return (
         <SidebarSlotProvider>
-          {value.activeOrgSlug ? (
-            <OrgShell user={value} orgSlug={value.activeOrgSlug} />
-          ) : (
-            <Shell user={value} />
-          )}
+          <Shell user={value} />
         </SidebarSlotProvider>
       )
     }
-  })
-}
-
-function OrgShell({ user, orgSlug }: { user: User; orgSlug: string }) {
-  const projects = useAtomValue(projectsListAtom(orgSlug))
-  const refresh = useAtomRefresh(projectsListAtom(orgSlug))
-
-  return Result.matchWithError(projects, {
-    onInitial: () => <LoaderOverlay active />,
-    onError: (error) => <ErrorPage error={error} reset={refresh} />,
-    onDefect: (defect) => <ErrorPage error={defect} reset={refresh} />,
-    onSuccess: () => <Shell user={user} />
   })
 }
 
@@ -136,7 +121,8 @@ function Sidebar({ user }: { user: User }) {
 }
 
 function SidebarContent({ user }: { user: User }) {
-  const orgSlug = user.activeOrgSlug
+  const { orgSlug: routeOrgSlug } = useParams({ strict: false })
+  const orgSlug = routeOrgSlug ?? user.activeOrgSlug
   const slot = useSidebarSlotContent()
   const section = useSidebarSectionContent()
   const reduceMotion = useReducedMotion()

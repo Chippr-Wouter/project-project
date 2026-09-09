@@ -3,13 +3,19 @@ import * as Cause from "effect/Cause"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
+import * as Registry from "effect/unstable/reactivity/AtomRegistry"
+import { projectsListAtom } from "@/atoms/projects"
 import { DeletedOrgPage } from "@/components/DeletedOrgPage"
 import { ApiClient } from "@/services/ApiClient"
 import { AppLayer } from "@/runtime"
 
 export const Route = createFileRoute("/_authed/orgs/$orgSlug")({
   component: OrgLayout,
-  loader: async ({ params }) => {
+  loader: async ({ params, context: { registry }, abortController }) => {
+    const projects = Effect.runPromiseExit(
+      Registry.getResult(registry, projectsListAtom(params.orgSlug)),
+      { signal: abortController.signal }
+    )
     const exit = await Effect.runPromiseExit(
       Effect.gen(function* () {
         const client = yield* ApiClient
@@ -25,6 +31,7 @@ export const Route = createFileRoute("/_authed/orgs/$orgSlug")({
       throw Cause.squash(exit.cause)
     }
 
+    await projects
     return { deleted: exit.value.deletedAt != null }
   }
 })
