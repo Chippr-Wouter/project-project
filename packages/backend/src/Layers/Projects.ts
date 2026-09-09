@@ -971,29 +971,39 @@ export const ProjectsLive = Layer.effect(
         const project = yield* ticketIndex
           .projectFor(orgSlug, slug)
           .pipe(Effect.orDie)
-        const ids = yield* ticketDocs.listIds(orgSlug, slug)
+        const tickets = yield* ticketIndex.list(project)
+        const ids = tickets
+          .filter(
+            (ticket) =>
+              ticket.status !== "done" && ticket.assignees.includes(userId)
+          )
+          .map((ticket) => ticket.id)
         yield* Effect.forEach(
           ids,
           (id) =>
-            Effect.gen(function* () {
-              const ticket = yield* ticketDocs
-                .read(orgSlug, slug, id)
-                .pipe(Effect.catchTag("NotFound", () => Effect.succeed(null)))
-              if (
-                ticket === null ||
-                ticket.status === "done" ||
-                !ticket.assignees.includes(userId)
-              ) {
-                return
-              }
-              const next = {
-                ...ticket,
-                assignees: ticket.assignees.filter((id) => id !== userId),
-                updatedAt: yield* DateTime.nowAsDate
-              }
-              yield* ticketDocs.write(orgSlug, slug, id, next)
-              yield* ticketIndex.upsertTicket(project, next)
-            }),
+            ticketDocs
+              .update(
+                orgSlug,
+                slug,
+                id,
+                (ticket) => {
+                  if (
+                    ticket.status === "done" ||
+                    !ticket.assignees.includes(userId)
+                  ) {
+                    return Effect.succeed(ticket)
+                  }
+                  return DateTime.nowAsDate.pipe(
+                    Effect.map((updatedAt) => ({
+                      ...ticket,
+                      assignees: ticket.assignees.filter((id) => id !== userId),
+                      updatedAt
+                    }))
+                  )
+                },
+                (next) => ticketIndex.upsertTicket(project, next)
+              )
+              .pipe(Effect.catchTag("NotFound", () => Effect.succeed(null))),
           { concurrency: 8 }
         )
       })
@@ -1006,12 +1016,44 @@ export const ProjectsLive = Layer.effect(
         const project = yield* ticketIndex
           .projectFor(orgSlug, slug)
           .pipe(Effect.orDie)
-        const ids = yield* ticketDocs.listIds(orgSlug, slug)
+        const tickets = yield* ticketIndex.list(project)
+        const ids = tickets
+          .filter(
+            (ticket) =>
+              ticket.pr !== null ||
+              ticket.prState !== null ||
+              ticket.lastTransitionedPr !== null
+          )
+          .map((ticket) => ticket.id)
         yield* Effect.forEach(
           ids,
           (id) =>
-            Effect.gen(function* () {
-              const ticket = yield* ticketDocs.read(orgSlug, slug, id).pipe(
+            ticketDocs
+              .update(
+                orgSlug,
+                slug,
+                id,
+                (ticket) => {
+                  if (
+                    ticket.pr === null &&
+                    ticket.prState === null &&
+                    ticket.lastTransitionedPr === null
+                  ) {
+                    return Effect.succeed(ticket)
+                  }
+                  return DateTime.nowAsDate.pipe(
+                    Effect.map((updatedAt) => ({
+                      ...ticket,
+                      pr: null,
+                      prState: null,
+                      lastTransitionedPr: null,
+                      updatedAt
+                    }))
+                  )
+                },
+                (next) => ticketIndex.upsertTicket(project, next)
+              )
+              .pipe(
                 Effect.catchTag("NotFound", () => Effect.succeed(null)),
                 Effect.catchTag("MalformedTicketDocument", (error) =>
                   Effect.logWarning(
@@ -1026,25 +1068,7 @@ export const ProjectsLive = Layer.effect(
                     Effect.as(null)
                   )
                 )
-              )
-              if (
-                ticket === null ||
-                (ticket.pr === null &&
-                  ticket.prState === null &&
-                  ticket.lastTransitionedPr === null)
-              ) {
-                return
-              }
-              const next = {
-                ...ticket,
-                pr: null,
-                prState: null,
-                lastTransitionedPr: null,
-                updatedAt: yield* DateTime.nowAsDate
-              }
-              yield* ticketDocs.write(orgSlug, slug, id, next)
-              yield* ticketIndex.upsertTicket(project, next)
-            }),
+              ),
           { concurrency: 8 }
         )
       })
