@@ -5,7 +5,6 @@ import {
   createFileRoute,
   Link,
   Outlet,
-  useLocation,
   useMatches,
   useNavigate
 } from "@tanstack/react-router"
@@ -52,6 +51,7 @@ import {
   sprintsListAtom
 } from "@/atoms/sprints"
 import { projectGitStatesAtom } from "@/atoms/github"
+import { everhourProjectStatusAtom } from "@/atoms/everhour"
 import {
   activeAndPlannedCount,
   pickActiveSprint,
@@ -75,6 +75,7 @@ import { PageContainer } from "@/components/page"
 import { m } from "@/paraglide/messages"
 import { TagRenamesProvider } from "@/components/TagRenamesProvider"
 import { ProjectContext } from "./-context"
+import type { FileRouteTypes } from "@/routeTree.gen"
 import type {
   Group,
   ProjectDetail as ProjectDetailType,
@@ -83,33 +84,47 @@ import type {
 
 export const Route = createFileRoute("/_authed/orgs/$orgSlug/projects/$slug")({
   component: ProjectLayout,
-  loader: ({ params }) => ({
-    crumb: [
-      {
-        type: "static" as const,
-        label: m.chrome_sidebar_projects(),
-        to: "/orgs/$orgSlug/projects",
-        params: { orgSlug: params.orgSlug }
-      },
-      {
-        type: "project" as const,
-        orgSlug: params.orgSlug,
-        slug: params.slug
-      }
-    ]
-  })
+  loader: ({ context, params }) => {
+    const { orgSlug, slug } = params
+    const { registry } = context
+    registry.mount(projectAtom(projectKey(orgSlug, slug)))()
+    registry.mount(ticketsCountAtom(ticketsCountKey(orgSlug, slug, {})))()
+    registry.mount(sprintsListAtom(sprintsProjectKey(orgSlug, slug)))()
+    registry.mount(projectStatusesAtom(projectStatusKey(orgSlug, slug)))()
+    registry.mount(everhourProjectStatusAtom(projectKey(orgSlug, slug)))()
+    return {
+      crumb: [
+        {
+          type: "static" as const,
+          label: m.chrome_sidebar_projects(),
+          to: "/orgs/$orgSlug/projects",
+          params: { orgSlug }
+        },
+        {
+          type: "project" as const,
+          orgSlug,
+          slug
+        }
+      ]
+    }
+  }
 })
+
+const TICKET_DETAIL_ROUTE_ID: FileRouteTypes["id"] =
+  "/_authed/orgs/$orgSlug/projects/$slug/tickets/$id"
+const PROJECT_SETTINGS_ROUTE_ID: FileRouteTypes["id"] =
+  "/_authed/orgs/$orgSlug/projects/$slug/settings"
 
 function ProjectLayout() {
   const { orgSlug, slug } = Route.useParams()
   const project = useAtomValue(projectAtom(projectKey(orgSlug, slug)))
-  const onTicketDetail = useLocation({
-    select: (location) =>
-      location.pathname.startsWith(`/orgs/${orgSlug}/projects/${slug}/tickets/`)
-  })
-  const onSettings = useLocation({
-    select: (location) =>
-      location.pathname.startsWith(`/orgs/${orgSlug}/projects/${slug}/settings`)
+  const headerHidden = useMatches({
+    select: (matches) =>
+      matches.some(
+        (match) =>
+          match.routeId === TICKET_DETAIL_ROUTE_ID ||
+          match.routeId === PROJECT_SETTINGS_ROUTE_ID
+      )
   })
 
   return Result.matchWithError(project, {
@@ -151,7 +166,7 @@ function ProjectLayout() {
           />
           <ProjectSetupSlot orgSlug={orgSlug} slug={slug} project={value} />
           <div className="flex flex-1 flex-col gap-6">
-            {!onTicketDetail && !onSettings && (
+            {!headerHidden && (
               <PageContainer>
                 <ProjectHeader
                   orgSlug={orgSlug}
