@@ -155,7 +155,7 @@ function RowImpl({
                 )}
               </AnimatePresence>
             </span>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 items-center justify-end gap-2">
               <TicketGitChip
                 orgSlug={orgSlug}
                 slug={slug}
