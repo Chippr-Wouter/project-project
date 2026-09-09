@@ -493,3 +493,13 @@ it("preserves mentions and fenced examples alongside an editable table", () => {
     "| Owner | Example |\n| --- | --- |\n| [Ticket](mention:ticket/T-157) | `a\\|b` |\n\n```md\n| literal | table |\n| --- | --- |\n```"
   expect(roundTripMarkdown(markdown)).toBe(markdown)
 })
+
+it.each(["---", "***", "___"])(
+  "keeps %s after a table as a separate horizontal rule",
+  (rule) => {
+    const table = "| A | B |\n| --- | --- |\n| one | two |"
+    expect(roundTripMarkdown(`${table}\n${rule}\nAfter`)).toBe(
+      `${table}\n\n---\n\nAfter`
+    )
+  }
+)

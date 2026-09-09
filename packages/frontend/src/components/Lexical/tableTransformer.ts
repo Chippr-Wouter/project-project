@@ -38,6 +38,21 @@ function splitRow(line: string) {
   return cells
 }
 
+function decodeCellMarkdown(value: string) {
+  return value
+    .replace(/\\([\\|])/g, (match, escaped: string) =>
+      escaped === "|" ? "|" : match
+    )
+    .replace(
+      /(^|[^\\`])(`)((?:\\`|[^`])+?)(`)(?!`)/g,
+      (_match, prefix: string, open: string, code: string, close: string) =>
+        prefix +
+        open +
+        code.replace(/&/g, "&#38;").replace(/\\(?!`)/g, "&#92;") +
+        close
+    )
+}
+
 export function createTableTransformer(
   transformers: readonly Transformer[]
 ): MultilineElementTransformer {
@@ -55,6 +70,7 @@ export function createTableTransformer(
       const header = splitRow(lines[startLineIndex])
       const delimiter = splitRow(lines[startLineIndex + 1] ?? "")
       if (
+        header.length === 0 ||
         header.length !== delimiter.length ||
         !delimiter.every((cell) => /^:?-+:?$/.test(cell))
       )
@@ -75,6 +91,8 @@ export function createTableTransformer(
         const line = lines[end + 1]
         if (
           !line.trim() ||
+          /^ {0,3}(?:(?:\*\s*){3,}|(?:-\s*){3,}|(?:_\s*){3,})$/.test(line) ||
+          /^ {0,3}<(?:!--|\/?[A-Za-z][\w-]*(?:\s|>|\/>))/.test(line) ||
           /^ {0,3}(?:#{1,6}\s|>|[-+*]\s|\d+[.)]\s|`{3}|~{3})/.test(line)
         )
           break
@@ -92,7 +110,7 @@ export function createTableTransformer(
           )
           cell.setFormat(alignment)
           $convertFromMarkdownString(
-            (values[columnIndex] ?? "").replace(/\\\|/g, "|"),
+            decodeCellMarkdown(values[columnIndex] ?? ""),
             inlineTransformers,
             cell
           )

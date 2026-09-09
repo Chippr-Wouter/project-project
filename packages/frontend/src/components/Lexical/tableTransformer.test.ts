@@ -102,3 +102,54 @@ it("leaves pipe text and malformed table delimiters as paragraphs", () => {
     { discrete: true }
   )
 })
+
+it("preserves backslashes next to pipes in inline code across repeated saves", () => {
+  const editor = createEditor({
+    nodes: [TableNode, TableRowNode, TableCellNode, LinkNode],
+    onError: (error) => {
+      throw error
+    }
+  })
+  const input =
+    "| Code | Value |\n| --- | --- |\n" +
+    String.raw`| \`a\\\|b\` | kept |`.replace(/\\`/g, "`")
+  editor.update(
+    () => {
+      $convertFromMarkdownString(input, transformers)
+      const first = $convertToMarkdownString(transformers)
+      expect(first).toBe(input)
+      $convertFromMarkdownString(first, transformers)
+      expect($convertToMarkdownString(transformers)).toBe(input)
+    },
+    { discrete: true }
+  )
+})
+
+it.each([
+  String.raw`| \`foo\` | kept |`.replace(/\\`/g, "\\`"),
+  "| ``a`b`` | kept |"
+])(
+  "does not interpret escaped or unsupported code delimiters during repeated saves: %s",
+  (row) => {
+    const editor = createEditor({
+      nodes: [TableNode, TableRowNode, TableCellNode, LinkNode],
+      onError: (error) => {
+        throw error
+      }
+    })
+    editor.update(
+      () => {
+        $convertFromMarkdownString(
+          "| Code | Value |\n| --- | --- |\n" + row,
+          transformers
+        )
+        const content = $getRoot().getTextContent()
+        const saved = $convertToMarkdownString(transformers)
+        $convertFromMarkdownString(saved, transformers)
+        expect($getRoot().getTextContent()).toBe(content)
+        expect($convertToMarkdownString(transformers)).toBe(saved)
+      },
+      { discrete: true }
+    )
+  }
+)
