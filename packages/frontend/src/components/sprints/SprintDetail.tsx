@@ -1,7 +1,7 @@
 import * as Result from "effect/unstable/reactivity/AsyncResult"
 import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import { generateKeyBetween } from "fractional-indexing"
-import { AnimatePresence, motion } from "motion/react"
+import { motion } from "motion/react"
 import { useCallback, useState } from "react"
 import { useProject } from "@/routes/_authed/orgs/$orgSlug/projects/$slug/-context"
 import { transitions } from "@/lib/springs"
@@ -161,25 +161,28 @@ export function SprintDetail({
       )
 
       const boardSlot = (
-        <AnimatePresence mode="wait" initial={false}>
-          {reorderMode ? (
-            <ReorderBoardBanner
-              key="banner"
-              onSave={saveReorder}
-              onCancel={cancelReorder}
-            />
-          ) : (
-            <motion.div
-              key="creator"
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={transitions.fade}
-            >
-              {creator}
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <div className="grid">
+          <motion.div
+            initial={false}
+            animate={{ opacity: reorderMode ? 1 : 0 }}
+            transition={transitions.fade}
+            inert={!reorderMode}
+            aria-hidden={!reorderMode}
+            className="col-start-1 row-start-1"
+          >
+            <ReorderBoardBanner onSave={saveReorder} onCancel={cancelReorder} />
+          </motion.div>
+          <motion.div
+            initial={false}
+            animate={{ opacity: reorderMode ? 0 : 1 }}
+            transition={transitions.fade}
+            inert={reorderMode}
+            aria-hidden={reorderMode}
+            className="col-start-1 row-start-1 self-center"
+          >
+            {creator}
+          </motion.div>
+        </div>
       )
 
       const body = isDescription ? (

@@ -9,7 +9,7 @@ export type LongPressHandlers = {
 }
 
 export function useLongPress(
-  onLongPress: () => void,
+  onLongPress: (event: PointerEvent) => void,
   delay = 500,
   moveThreshold = 6
 ): { holding: boolean; handlers: LongPressHandlers } {
@@ -38,7 +38,7 @@ export function useLongPress(
       startRef.current = { x: e.clientX, y: e.clientY }
       setHolding(true)
       timeoutRef.current = window.setTimeout(() => {
-        onLongPress()
+        onLongPress(e.nativeEvent)
         clear()
       }, delay)
     },
