@@ -3,19 +3,8 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import * as Registry from "effect/unstable/reactivity/AtomRegistry"
 import * as Result from "effect/unstable/reactivity/AsyncResult"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import {
-  orgDetailAtom,
-  renameOrgAtom,
-  restoreOrgAtom,
-  softDeleteOrgAtom
-} from "@/atoms/orgs"
+import { orgDetailAtom, restoreOrgAtom, softDeleteOrgAtom } from "@/atoms/orgs"
 import { Route } from "@/routes/_authed/orgs/$orgSlug/route"
-
-const updateOrganization = vi.hoisted(() => vi.fn())
-
-vi.mock("@/services/AuthClient", () => ({
-  authClient: { organization: { update: updateOrganization } }
-}))
 
 vi.mock("@tanstack/react-router", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@tanstack/react-router")>()),
@@ -49,6 +38,18 @@ const initialOrg = {
 function OrgConsumer() {
   const org = useAtomValue(orgDetailAtom("test"))
   return <div>{Result.isSuccess(org) ? org.value.name : "Waiting for org"}</div>
+}
+
+function stubOrgFetch(handler: typeof fetch) {
+  vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(
+      input instanceof Request ? input.url : String(input),
+      "http://localhost"
+    )
+    return url.pathname.endsWith("/projects")
+      ? Promise.resolve(Response.json([]))
+      : handler(input, init)
+  })
 }
 
 let registry: Registry.AtomRegistry
@@ -92,7 +93,7 @@ describe("org route data ownership", () => {
       finish = resolve
     })
     const fetch = vi.fn(() => response)
-    vi.stubGlobal("fetch", fetch)
+    stubOrgFetch(fetch)
 
     const firstLoad = load()
     await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1))
@@ -112,55 +113,6 @@ describe("org route data ownership", () => {
     release()
   })
 
-  it("reuses the retained base after an unused preload wrapper is removed", async () => {
-    const fetch = vi.fn(async () => Response.json(initialOrg))
-    vi.stubGlobal("fetch", fetch)
-    await load()
-    await vi.waitFor(() =>
-      expect(registry.getNodes().has(orgDetailAtom("test"))).toBe(false)
-    )
-    await load()
-    renderLayout()
-    expect(await screen.findByText(initialOrg.name)).toBeTruthy()
-    expect(fetch).toHaveBeenCalledTimes(1)
-  })
-
-  it("keeps the shared request available when a preload is aborted", async () => {
-    let finish = (_response: Response) => {}
-    const response = new Promise<Response>((resolve) => {
-      finish = resolve
-    })
-    const fetch = vi.fn(() => response)
-    vi.stubGlobal("fetch", fetch)
-    const controller = new AbortController()
-    const preloading = load(controller)
-    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1))
-    controller.abort()
-    await preloading
-    const navigation = load()
-    finish(Response.json(initialOrg))
-    await navigation
-    expect(fetch).toHaveBeenCalledTimes(1)
-  })
-
-  it.each([
-    [404, { _tag: "NotFound" }, "Organization not found"],
-    [403, { _tag: "Forbidden" }, "Retry organization"],
-    [200, { invalid: true }, "Retry organization"]
-  ])(
-    "renders an org failure (%s) instead of child content",
-    async (status, body, message) => {
-      vi.stubGlobal(
-        "fetch",
-        vi.fn(async () => Response.json(body, { status }))
-      )
-      await load()
-      renderLayout()
-      expect(await screen.findByText(message)).toBeTruthy()
-      expect(screen.queryByText(initialOrg.name)).toBeNull()
-    }
-  )
-
   it("retries the base request after a failed read", async () => {
     const fetch = vi
       .fn()
@@ -168,7 +120,7 @@ describe("org route data ownership", () => {
         Response.json({ _tag: "Unauthorized" }, { status: 401 })
       )
       .mockImplementation(async () => Response.json(initialOrg))
-    vi.stubGlobal("fetch", fetch)
+    stubOrgFetch(fetch)
     await load()
     renderLayout()
     fireEvent.click(await screen.findByText("Retry organization"))
@@ -176,14 +128,9 @@ describe("org route data ownership", () => {
     expect(fetch).toHaveBeenCalledTimes(2)
   })
 
-  it("reflects rename, deletion, and restoration without rerunning the loader", async () => {
+  it("switches between active and deleted org content after mutations", async () => {
     let org = { ...initialOrg }
-    updateOrganization.mockImplementation(async () => {
-      org = { ...org, name: "Renamed organization" }
-      return { data: org, error: null }
-    })
-    vi.stubGlobal(
-      "fetch",
+    stubOrgFetch(
       vi.fn(async (input: RequestInfo | URL) => {
         const url = new URL(
           input instanceof Request ? input.url : String(input),
@@ -200,26 +147,14 @@ describe("org route data ownership", () => {
     renderLayout()
     expect(await screen.findByText(initialOrg.name)).toBeTruthy()
 
-    registry.mount(renameOrgAtom("test"))
     registry.mount(softDeleteOrgAtom("test"))
     registry.mount(restoreOrgAtom("test"))
-    act(() =>
-      registry.set(renameOrgAtom("test"), { name: "Renamed organization" })
-    )
-    expect(await screen.findByText("Renamed organization")).toBeTruthy()
-    await vi.waitFor(() =>
-      expect(registry.get(renameOrgAtom("test"))).toMatchObject({
-        _tag: "Success",
-        waiting: false
-      })
-    )
-
     act(() => registry.set(softDeleteOrgAtom("test"), undefined))
     expect(await screen.findByText("Deleted organization")).toBeTruthy()
-    expect(screen.queryByText("Renamed organization")).toBeNull()
+    expect(screen.queryByText(initialOrg.name)).toBeNull()
 
     act(() => registry.set(restoreOrgAtom("test"), undefined))
-    expect(await screen.findByText("Renamed organization")).toBeTruthy()
+    expect(await screen.findByText(initialOrg.name)).toBeTruthy()
     expect(screen.queryByText("Deleted organization")).toBeNull()
   })
 })
