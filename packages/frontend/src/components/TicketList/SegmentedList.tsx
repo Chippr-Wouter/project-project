@@ -1,6 +1,6 @@
 import * as Result from "effect/unstable/reactivity/AsyncResult"
 import { useAtomValue } from "@effect/atom-react"
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react"
+import { useCallback, useMemo, useState, type ReactNode } from "react"
 import { FilterX, ListChecks } from "lucide-react"
 import * as Schema from "effect/Schema"
 import { useLocalStorageState } from "@/hooks/useLocalStorageState"
@@ -19,30 +19,19 @@ import {
   projectKey as projectStatusKey,
   projectStatusesAtom
 } from "@/atoms/projectStatuses"
-import { ticketsCountAtom, ticketsCountKey } from "@/atoms/tickets"
+import type { TicketSectionsValue } from "@/atoms/tickets"
 import { m } from "@/paraglide/messages"
 import type {
   Group,
   Member,
   ProjectStatus,
   Ticket,
-  TicketCountQuery,
-  TicketCounts,
   TicketId,
   TicketListQuery,
   TicketStatus
 } from "@projectproject/shared"
-import { cn } from "@/lib/utils"
 import { queryHasActiveFilter, useResetTicketSearch } from "./url"
 import { SectionList } from "./SectionList"
-
-const EMPTY_COUNTS: TicketCounts = { total: 0, byStatus: {} }
-
-type ActiveSnapshot = {
-  readonly key: string
-  readonly query: TicketListQuery
-  readonly counts: TicketCounts
-}
 
 const CollapsedSchema = Schema.Array(Schema.String)
 const EMPTY_STATUSES: ReadonlyArray<ProjectStatus> = []
@@ -55,7 +44,7 @@ export function SegmentedList({
   members,
   extraRowActions,
   sprintMembership,
-  hasActiveFilter
+  snapshot
 }: {
   orgSlug: string
   slug: string
@@ -63,7 +52,7 @@ export function SegmentedList({
   members: ReadonlyArray<Member>
   extraRowActions?: (ticket: Ticket) => ReactNode
   sprintMembership?: ReadonlyMap<TicketId, Group>
-  hasActiveFilter: boolean
+  snapshot: TicketSectionsValue
 }) {
   const resetFilters = useResetTicketSearch()
   const [activePreviewId, setActivePreviewId] = useState<TicketId | null>(null)
@@ -88,66 +77,36 @@ export function SegmentedList({
     ? statusesResult.value
     : EMPTY_STATUSES
 
-  const countQuery: TicketCountQuery = { filter: query.filter, q: query.q }
-  const currentCountsKey = ticketsCountKey(orgSlug, slug, countQuery)
-  const countsResult = useAtomValue(ticketsCountAtom(currentCountsKey))
-
-  const activeRef = useRef<ActiveSnapshot | null>(null)
-  if (Result.isSuccess(countsResult)) {
-    activeRef.current = {
-      key: currentCountsKey,
-      query,
-      counts: countsResult.value
-    }
-  }
-  const active = activeRef.current
-  const isStale = active === null || active.key !== currentCountsKey
-
-  if (active === null) {
-    if (Result.isFailure(statusesResult)) {
-      return Result.matchWithError(statusesResult, {
-        onInitial: () => null,
-        onError: (error) => <ErrorPage error={error} contained />,
-        onDefect: (defect) => <ErrorPage error={defect} contained />,
-        onSuccess: () => null
-      })
-    }
-    if (Result.isFailure(countsResult)) {
-      return Result.matchWithError(countsResult, {
-        onInitial: () => null,
-        onError: (error) => <ErrorPage error={error} contained />,
-        onDefect: (defect) => <ErrorPage error={defect} contained />,
-        onSuccess: () => null
-      })
-    }
-  }
-
-  const renderQuery = active?.query ?? query
-  const counts = active?.counts ?? EMPTY_COUNTS
+  const { counts, sections } = snapshot
   const byStatus = counts.byStatus
-  const renderHasActiveFilter = queryHasActiveFilter(renderQuery)
+  const hasActiveFilter = queryHasActiveFilter(query)
 
   const filteredStatuses: ReadonlyArray<TicketStatus> = useMemo(() => {
-    const requested = renderQuery.filter?.status
+    const requested = query.filter?.status
     const allOrdered = boardStatusesFor(statuses) as ReadonlyArray<TicketStatus>
     if (requested !== undefined && requested.length > 0) {
       return allOrdered.filter((s) => requested.includes(s))
     }
-    if (!renderHasActiveFilter) return allOrdered
+    if (!hasActiveFilter) return allOrdered
     return allOrdered.filter((s) => (byStatus[s] ?? 0) > 0)
-  }, [statuses, renderQuery.filter, renderHasActiveFilter, byStatus])
+  }, [statuses, query.filter, hasActiveFilter, byStatus])
 
   const [collapsedRaw, setCollapsedRaw] = useLocalStorageState(
     `projectproject:ticket-list-collapsed:${orgSlug}/${slug}`,
     CollapsedSchema,
     EMPTY_COLLAPSED
   )
-  const collapsedSet = useMemo(() => new Set(collapsedRaw), [collapsedRaw])
+  const [searchCollapsed, setSearchCollapsed] = useState<ReadonlyArray<string>>(
+    []
+  )
+  const collapsed = query.q ? searchCollapsed : collapsedRaw
+  const setCollapsed = query.q ? setSearchCollapsed : setCollapsedRaw
+  const collapsedSet = useMemo(() => new Set(collapsed), [collapsed])
   const toggleCollapsed = (status: TicketStatus) => {
     if (collapsedSet.has(status)) {
-      setCollapsedRaw(collapsedRaw.filter((s) => s !== status))
+      setCollapsed(collapsed.filter((s) => s !== status))
     } else {
-      setCollapsedRaw([...collapsedRaw, status])
+      setCollapsed([...collapsed, status])
     }
   }
 
@@ -155,14 +114,18 @@ export function SegmentedList({
     sprintMembership !== undefined && sprintMembership.size > 0
   const showExtraActionsCol = extraRowActions !== undefined
 
-  if (active === null) {
-    return (
-      <div
-        key="loading"
-        aria-busy="true"
-        className="h-96 animate-pulse rounded-lg bg-muted/40 motion-reduce:animate-none"
-      />
-    )
+  if (!Result.isSuccess(statusesResult)) {
+    return Result.matchWithError(statusesResult, {
+      onInitial: () => (
+        <div
+          aria-busy="true"
+          className="h-96 animate-pulse rounded-lg bg-muted/40 motion-reduce:animate-none"
+        />
+      ),
+      onError: (error) => <ErrorPage error={error} contained />,
+      onDefect: (defect) => <ErrorPage error={defect} contained />,
+      onSuccess: () => null
+    })
   }
 
   if (counts.total === 0 && !hasActiveFilter) {
@@ -182,7 +145,7 @@ export function SegmentedList({
     )
   }
 
-  if (filteredStatuses.length === 0 && hasActiveFilter && !isStale) {
+  if (filteredStatuses.length === 0 && hasActiveFilter) {
     return (
       <Empty>
         <EmptyHeader>
@@ -210,36 +173,30 @@ export function SegmentedList({
   return (
     <div
       key="sections"
-      className={cn(
-        "flex flex-col gap-1 has-[[data-creating]]:[&>:not([data-creating])]:opacity-35",
-        isStale && "animate-pulse"
-      )}
+      className="flex flex-col gap-1 has-[[data-creating]]:[&>:not([data-creating])]:opacity-35"
     >
-      {filteredStatuses.map((status) => {
-        const forceExpanded =
-          renderQuery.q !== undefined && (byStatus[status] ?? 0) > 0
-        return (
-          <SectionList
-            key={status}
-            orgSlug={orgSlug}
-            slug={slug}
-            status={status}
-            statuses={statuses}
-            query={renderQuery}
-            count={byStatus[status] ?? 0}
-            collapsed={!forceExpanded && collapsedSet.has(status)}
-            onToggleCollapsed={() => toggleCollapsed(status)}
-            members={members}
-            sprintMembership={sprintMembership}
-            extraRowActions={extraRowActions}
-            showSprintCol={showSprintCol}
-            showExtraActionsCol={showExtraActionsCol}
-            activePreviewId={activePreviewId}
-            onPreviewPointerEnter={handlePreviewPointerEnter}
-            onPreviewOpenChange={handlePreviewOpenChange}
-          />
-        )
-      })}
+      {filteredStatuses.map((status) => (
+        <SectionList
+          key={status}
+          orgSlug={orgSlug}
+          slug={slug}
+          status={status}
+          statuses={statuses}
+          query={query}
+          count={byStatus[status] ?? 0}
+          page={sections[status] ?? { items: [], nextCursor: null }}
+          collapsed={collapsedSet.has(status)}
+          onToggleCollapsed={() => toggleCollapsed(status)}
+          members={members}
+          sprintMembership={sprintMembership}
+          extraRowActions={extraRowActions}
+          showSprintCol={showSprintCol}
+          showExtraActionsCol={showExtraActionsCol}
+          activePreviewId={activePreviewId}
+          onPreviewPointerEnter={handlePreviewPointerEnter}
+          onPreviewOpenChange={handlePreviewOpenChange}
+        />
+      ))}
     </div>
   )
 }

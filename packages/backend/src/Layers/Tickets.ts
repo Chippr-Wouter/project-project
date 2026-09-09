@@ -37,6 +37,7 @@ import {
   type TicketFilter,
   type TicketListPage,
   type TicketListQuery,
+  type TicketSections,
   type TicketStatus
 } from "@projectproject/shared"
 import { Attachments } from "../Services/Attachments"
@@ -50,6 +51,7 @@ import { Projects } from "../Services/Projects"
 import {
   TicketIndex,
   type TicketIndexEntry,
+  type TicketIndexQueryEntry,
   type TicketIndexProject
 } from "../Services/TicketIndex"
 import { Db } from "../Services/Db"
@@ -137,6 +139,25 @@ function indexEntryToTicket(
   return {
     ...ticket,
     gitState: pendingGitState(entry, github, entry.branchDeletedAt)
+  }
+}
+
+function ticketPage(
+  entries: ReadonlyArray<TicketIndexQueryEntry>,
+  query: TicketListQuery,
+  github: ProjectGithubIntegration | null,
+  limit: number
+): TicketListPage {
+  const page = paginateSorted(entries, {
+    cursor: undefined,
+    limit,
+    sortKey: (row) => row.sortValue,
+    id: (row) => row.entry.id,
+    dir: query.sort.dir
+  })
+  return {
+    items: page.items.map(({ entry }) => indexEntryToTicket(entry, github)),
+    nextCursor: page.nextCursor
   }
 }
 
@@ -251,21 +272,7 @@ export const TicketsLive = Layer.effect(
           userId,
           slug
         )
-        const indexedTickets = queryEntries.map(({ entry, sortValue }) => ({
-          ticket: indexEntryToTicket(entry, projectGithub),
-          sortValue
-        }))
-        const page = paginateSorted(indexedTickets, {
-          cursor: undefined,
-          limit: pageLimit,
-          sortKey: (row) => row.sortValue,
-          id: (row) => row.ticket.id,
-          dir: query.sort.dir
-        })
-        return {
-          items: page.items.map((row) => row.ticket),
-          nextCursor: page.nextCursor
-        }
+        return ticketPage(queryEntries, query, projectGithub, pageLimit)
       })
 
     const listInGroup = (
@@ -386,6 +393,73 @@ export const TicketsLive = Layer.effect(
           byStatus: counts.byStatus
         }
       })
+
+    const sections = Effect.fn("Tickets.sections")(function* (
+      orgSlug: string,
+      userId: string,
+      slug: string,
+      query: TicketListQuery
+    ): Effect.fn.Return<TicketSections, NotFound | MarkdownError> {
+      yield* ensureAccess(orgSlug, userId, slug)
+      const project = yield* ticketIndex.projectFor(orgSlug, slug)
+      const groupMemberSet = yield* resolveGroupMembers(
+        project,
+        orgSlug,
+        userId,
+        slug,
+        query.filter?.groupId
+      )
+      const options = {
+        viewerId: userId,
+        ticketIds: groupMemberSet === null ? undefined : [...groupMemberSet]
+      }
+      const counts = yield* ticketIndex.count(
+        project,
+        {
+          filter: { ...query.filter, status: undefined },
+          q: query.q
+        },
+        options
+      )
+      const projectGithub = yield* projects.getGithubIntegration(
+        orgSlug,
+        userId,
+        slug
+      )
+      const statuses = Object.keys(counts.byStatus).filter(
+        (status) =>
+          !query.filter?.status?.length ||
+          query.filter.status.some((requested) => requested === status)
+      )
+      const pages = yield* Effect.forEach(
+        statuses,
+        (status) =>
+          ticketIndex
+            .query(
+              project,
+              {
+                ...query,
+                filter: {
+                  ...query.filter,
+                  status: [Schema.decodeSync(Ticket.fields.status)(status)]
+                },
+                cursor: undefined
+              },
+              { ...options, limit: TICKET_LIST_LIMIT + 1 }
+            )
+            .pipe(
+              Effect.map(
+                (entries) =>
+                  [
+                    status,
+                    ticketPage(entries, query, projectGithub, TICKET_LIST_LIMIT)
+                  ] as const
+              )
+            ),
+        { concurrency: 4 }
+      )
+      return { counts, sections: Object.fromEntries(pages) }
+    })
 
     const get = (
       orgSlug: string,
@@ -1539,6 +1613,7 @@ export const TicketsLive = Layer.effect(
 
     return {
       list,
+      sections,
       count,
       search,
       listInGroup,

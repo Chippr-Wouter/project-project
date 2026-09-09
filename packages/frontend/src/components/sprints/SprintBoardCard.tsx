@@ -1,6 +1,6 @@
-import { memo, useCallback } from "react"
+import { memo } from "react"
 import { DeferredDropdownMenus } from "@/components/ui/dropdown-menu"
-import { useNavigate } from "@tanstack/react-router"
+import { Link } from "@tanstack/react-router"
 import { useAtomValue } from "@effect/atom-react"
 import {
   applyOptimisticTicketPreview,
@@ -9,8 +9,6 @@ import {
 } from "@/atoms/tickets"
 import { TicketGitChip } from "@/components/TicketGit"
 import { cn } from "@/lib/utils"
-import { ticketPrefetchAtoms } from "@/lib/prefetch"
-import { usePrefetch } from "@/hooks/usePrefetch"
 import type { Member, Ticket } from "@projectproject/shared"
 import { AssigneeRowTrigger } from "@/components/TicketList/AssigneeField"
 import { PriorityButton } from "@/components/TicketList/PriorityField"
@@ -34,40 +32,26 @@ function SprintBoardCardImpl({
     ticket,
     updatePreview.input
   )
-  const navigate = useNavigate()
-  const prefetch = usePrefetch(
-    useCallback(
-      () => ticketPrefetchAtoms(orgSlug, slug, visibleTicket.id),
-      [orgSlug, slug, visibleTicket.id]
-    )
-  )
-  const open = () => {
-    void navigate({
-      to: "/orgs/$orgSlug/projects/$slug/tickets/$id",
-      params: { orgSlug, slug, id: visibleTicket.id }
-    })
-  }
 
   return (
     <DeferredDropdownMenus>
       <div
-        {...prefetch}
-        role="button"
-        tabIndex={0}
-        onClick={open}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault()
-            open()
-          }
-        }}
         className={cn(
-          "group/card flex cursor-pointer flex-col gap-2 rounded-md border border-border bg-background p-3 text-left outline-none transition-colors duration-100 hover:bg-accent/30 focus-visible:ring-1 focus-visible:ring-ring",
+          "group/card relative isolate flex flex-col gap-2 rounded-md border border-border bg-background p-3 text-left outline-none transition-colors duration-100 hover:bg-accent/30 [&_button]:relative [&_button]:z-20 [&_a:not([data-row-link])]:relative [&_a:not([data-row-link])]:z-20",
           updatePreview.waiting && "animate-pulse"
         )}
       >
         <div className="flex items-start gap-1.5 text-sm leading-snug">
-          <div className="-mt-[1.5px] grid h-[1lh] shrink-0 place-items-center">
+          <Link
+            to="/orgs/$orgSlug/projects/$slug/tickets/$id"
+            params={{ orgSlug, slug, id: visibleTicket.id }}
+            preload="intent"
+            data-row-link
+            className="min-w-0 font-medium outline-none after:absolute after:inset-0 after:z-10 after:rounded-md after:content-[''] focus-visible:after:ring-1 focus-visible:after:ring-ring focus-visible:after:ring-inset"
+          >
+            <span className="line-clamp-2">{visibleTicket.title}</span>
+          </Link>
+          <div className="order-first -mt-[1.5px] grid h-[1lh] shrink-0 place-items-center">
             <TypeButton
               orgSlug={orgSlug}
               slug={slug}
@@ -75,9 +59,6 @@ function SprintBoardCardImpl({
               iconOnly
             />
           </div>
-          <span className="line-clamp-2 min-w-0 font-medium">
-            {visibleTicket.title}
-          </span>
         </div>
         <div className="flex items-center gap-2">
           <PriorityButton

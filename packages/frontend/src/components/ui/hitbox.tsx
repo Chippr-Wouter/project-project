@@ -1,4 +1,5 @@
 import { forwardRef, type ButtonHTMLAttributes } from "react"
+import { useShape } from "@/lib/shape-context"
 import { cn } from "@/lib/utils"
 
 type Margin = "1" | "2" | "3" | "4"
@@ -17,20 +18,24 @@ interface HitboxProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export const Hitbox = forwardRef<HTMLButtonElement, HitboxProps>(
-  ({ mode = "inline", margin = "2", className, children, ...rest }, ref) => (
-    <button
-      ref={ref}
-      type="button"
-      className={cn(
-        "group/hitbox cursor-pointer",
-        mode === "absolute" ? "absolute inset-0" : "inline-flex items-center",
-        MARGIN[margin],
-        className
-      )}
-      {...rest}
-    >
-      {children}
-    </button>
-  )
+  ({ mode = "inline", margin = "2", className, children, ...rest }, ref) => {
+    const shape = useShape()
+    return (
+      <button
+        ref={ref}
+        type="button"
+        className={cn(
+          "group/hitbox cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-ring",
+          shape.button,
+          mode === "absolute" ? "absolute inset-0" : "inline-flex items-center",
+          MARGIN[margin],
+          className
+        )}
+        {...rest}
+      >
+        {children}
+      </button>
+    )
+  }
 )
 Hitbox.displayName = "Hitbox"

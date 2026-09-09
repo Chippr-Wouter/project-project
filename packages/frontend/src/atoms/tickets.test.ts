@@ -12,8 +12,8 @@ import {
   ticketAtom,
   ticketKey,
   ticketsCountKey,
-  ticketsListAtom,
-  ticketsListKey,
+  ticketsSectionsAtom,
+  ticketsSectionsKey,
   ticketsListKeyForStatus,
   ticketUpdatePreviewAtom,
   updateTicketAtom,
@@ -171,12 +171,16 @@ describe("applyOptimisticTicketUpdate", () => {
               Response.json({ total: 1, byStatus: { [server.status]: 1 } })
             )
           }
-          if (url.pathname.endsWith("/tickets")) {
-            const matches = url.searchParams.get("status") === server.status
+          if (url.pathname.endsWith("/sections")) {
             return Promise.resolve(
               Response.json({
-                items: matches ? [Schema.encodeSync(TicketDetail)(server)] : [],
-                nextCursor: null
+                counts: { total: 1, byStatus: { [server.status]: 1 } },
+                sections: {
+                  [server.status]: {
+                    items: [Schema.encodeSync(TicketDetail)(server)],
+                    nextCursor: null
+                  }
+                }
               })
             )
           }
@@ -388,11 +392,16 @@ it("refreshes one edited detail and its project lists without refetching unrelat
       const url = new URL(input instanceof Request ? input.url : String(input))
       requests.push(`${init?.method ?? "GET"} ${url.pathname}`)
       if (init?.method === "PATCH") server = { ...server, title: "Updated" }
-      if (url.pathname.endsWith("/tickets"))
+      if (url.pathname.endsWith("/sections"))
         return Promise.resolve(
           Response.json({
-            items: [Schema.encodeSync(TicketDetail)(server)],
-            nextCursor: null
+            counts: { total: 1, byStatus: { [server.status]: 1 } },
+            sections: {
+              [server.status]: {
+                items: [Schema.encodeSync(TicketDetail)(server)],
+                nextCursor: null
+              }
+            }
           })
         )
       const id = url.pathname.endsWith("T-2")
@@ -410,11 +419,11 @@ it("refreshes one edited detail and its project lists without refetching unrelat
       ticketKey("org", "project", Schema.decodeUnknownSync(TicketId)("T-2"))
     ),
     ticketAtom(ticketKey("org", "other", ticket.id)),
-    ticketsListAtom(
-      ticketsListKey("org", "project", { sort: { key: "id", dir: "asc" } })
+    ticketsSectionsAtom(
+      ticketsSectionsKey("org", "project", { sort: { key: "id", dir: "asc" } })
     ),
-    ticketsListAtom(
-      ticketsListKey("org", "other", { sort: { key: "id", dir: "asc" } })
+    ticketsSectionsAtom(
+      ticketsSectionsKey("org", "other", { sort: { key: "id", dir: "asc" } })
     )
   ]
   try {
@@ -436,7 +445,9 @@ it("refreshes one edited detail and its project lists without refetching unrelat
     )
     await vi.waitFor(() =>
       expect(
-        requests.filter((request) => request.endsWith("/project/tickets"))
+        requests.filter((request) =>
+          request.endsWith("/project/tickets/sections")
+        )
       ).toHaveLength(1)
     )
     expect(

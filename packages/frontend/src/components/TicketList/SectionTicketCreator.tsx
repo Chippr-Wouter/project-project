@@ -1,3 +1,5 @@
+import * as Random from "effect/Random"
+import * as Effect from "effect/Effect"
 import * as Result from "effect/unstable/reactivity/AsyncResult"
 import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as Exit from "effect/Exit"
@@ -32,7 +34,6 @@ import {
   useAddTicketsToSprint
 } from "@/atoms/sprints"
 import { quickCreateTicketAtom, ticketsListKeyForStatus } from "@/atoms/tickets"
-import { preloadTicketPage } from "@/lib/prefetch"
 import { cn } from "@/lib/utils"
 import { TYPE_LABELS, TYPE_META } from "@/lib/ticket-meta"
 import { m } from "@/paraglide/messages"
@@ -176,6 +177,7 @@ export function SectionTicketCreator({
     setTitle("")
     inputRef.current?.focus()
     const exit = await create({
+      clientId: Effect.runSync(Random.next).toString(36),
       ticket: { title: submittedTitle, type, status },
       viewerId,
       projectPrefix
@@ -329,7 +331,6 @@ export function SectionTicketCreator({
         type="text"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        onFocus={() => void preloadTicketPage()}
         onKeyDown={onKeyDown}
         placeholder={m.tickets_section_create_placeholder()}
         aria-label={m.tickets_section_create_placeholder()}

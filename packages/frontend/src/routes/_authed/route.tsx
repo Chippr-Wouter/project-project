@@ -52,9 +52,7 @@ import {
   SheetTrigger
 } from "@/components/ui/sheet"
 import { useCallback, useEffect, useRef, useState } from "react"
-import { usePrefetch } from "@/hooks/usePrefetch"
 import { authedRouteRedirect } from "@/lib/authRedirect"
-import { projectPrefetchAtoms } from "@/lib/prefetch"
 import { transitions } from "@/lib/springs"
 import { cn } from "@/lib/utils"
 import { m } from "@/paraglide/messages"
@@ -279,9 +277,6 @@ function ProjectsGroupRow({
 }) {
   const reduceMotion = useReducedMotion()
   const settingsLabel = m.project_sidebar_settings_aria_label({ name })
-  const prefetch = usePrefetch(
-    useCallback(() => projectPrefetchAtoms(orgSlug, slug), [orgSlug, slug])
-  )
 
   return (
     <motion.li
@@ -294,7 +289,6 @@ function ProjectsGroupRow({
       <Link
         to="/orgs/$orgSlug/projects/$slug"
         params={{ orgSlug, slug }}
-        {...prefetch}
         className={cn(
           "flex min-w-0 flex-1 items-center gap-2.5 rounded-lg py-2 pl-3 pr-1 text-[13px] transition-colors",
           active

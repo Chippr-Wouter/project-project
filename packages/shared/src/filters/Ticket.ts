@@ -86,3 +86,9 @@ export const TicketCountQuery = Schema.Struct({
   q: Schema.optional(Schema.String)
 })
 export type TicketCountQuery = typeof TicketCountQuery.Type
+
+export const TicketSections = Schema.Struct({
+  counts: TicketCounts,
+  sections: Schema.Record(TicketStatus, TicketListPage)
+})
+export type TicketSections = typeof TicketSections.Type

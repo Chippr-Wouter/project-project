@@ -1,3 +1,5 @@
+import * as Random from "effect/Random"
+import * as Effect from "effect/Effect"
 import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as Result from "effect/unstable/reactivity/AsyncResult"
 import { useNavigate } from "@tanstack/react-router"
@@ -33,7 +35,6 @@ import {
   ticketsListKeyForStatus
 } from "@/atoms/tickets"
 import { cn } from "@/lib/utils"
-import { preloadTicketPage } from "@/lib/prefetch"
 import { TYPE_LABELS, TYPE_META } from "@/lib/ticket-meta"
 import { m } from "@/paraglide/messages"
 import type {
@@ -159,6 +160,7 @@ export function SprintTicketCreator({
     }
     if (submitting) return
     const exit = await create({
+      clientId: Effect.runSync(Random.next).toString(36),
       ticket: { title: item.label, type },
       viewerId,
       projectPrefix
@@ -179,6 +181,7 @@ export function SprintTicketCreator({
     }
     if (!trimmed || submitting) return
     const exit = await create({
+      clientId: Effect.runSync(Random.next).toString(36),
       ticket: { title: trimmed, type },
       viewerId,
       projectPrefix
@@ -316,10 +319,7 @@ export function SprintTicketCreator({
         setTitle(v)
         setHighlight(0)
       }}
-      onFocus={() => {
-        setFocused(true)
-        void preloadTicketPage()
-      }}
+      onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       onKeyDown={onKeyDown}
       onSubmit={onSubmit}

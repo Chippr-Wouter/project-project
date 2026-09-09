@@ -7,6 +7,9 @@ import { TicketPage, TicketPageSkeleton } from "@/components/TicketPage"
 import { ErrorPage } from "@/components/ErrorPage"
 import { NotFoundPage } from "@/components/NotFoundPage"
 import { TicketId } from "@projectproject/shared"
+import { commentsAtom, commentsKey } from "@/atoms/comments"
+import { orgDetailAtom } from "@/atoms/orgs"
+import { orgStorageAtom } from "@/atoms/storage"
 import { ticketAtom, ticketKey } from "@/atoms/tickets"
 import { m } from "@/paraglide/messages"
 import { useProject } from "../-context"
@@ -30,6 +33,11 @@ export const Route = createFileRoute(
     context.registry.mount(
       ticketAtom(ticketKey(params.orgSlug, params.slug, id))
     )()
+    context.registry.mount(
+      commentsAtom(commentsKey(params.orgSlug, params.slug, id))
+    )()
+    context.registry.mount(orgStorageAtom(params.orgSlug))()
+    context.registry.mount(orgDetailAtom(params.orgSlug))()
     return {
       crumb: {
         type: "ticket" as const,

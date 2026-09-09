@@ -1,3 +1,5 @@
+import * as Random from "effect/Random"
+import * as Effect from "effect/Effect"
 import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as Result from "effect/unstable/reactivity/AsyncResult"
 import { useNavigate } from "@tanstack/react-router"
@@ -28,7 +30,6 @@ import {
 } from "@/atoms/sprints"
 import { quickCreateTicketAtom, ticketsListKeyForStatus } from "@/atoms/tickets"
 import { useGlobalShortcut } from "@/lib/use-global-shortcut"
-import { preloadTicketPage } from "@/lib/prefetch"
 import { cn } from "@/lib/utils"
 import { TYPE_LABELS, TYPE_META } from "@/lib/ticket-meta"
 import { m } from "@/paraglide/messages"
@@ -108,6 +109,7 @@ export function BacklogTicketCreator({
     inputRef.current?.blur()
     setFocused(false)
     const exit = await create({
+      clientId: Effect.runSync(Random.next).toString(36),
       ticket: { title: trimmed, type },
       viewerId,
       projectPrefix
@@ -263,10 +265,7 @@ export function BacklogTicketCreator({
       inputRef={inputRef}
       value={title}
       onValueChange={setTitle}
-      onFocus={() => {
-        setFocused(true)
-        void preloadTicketPage()
-      }}
+      onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       onSubmit={onSubmit}
       expanded={expanded}
