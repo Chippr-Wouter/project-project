@@ -7,7 +7,11 @@ import {
   Search as SearchIcon,
   X
 } from "lucide-react"
-import type { ReactNode } from "react"
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import { useAtomValue } from "@effect/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import { projectStatusesAtom, projectKey } from "@/atoms/projectStatuses"
+import { MIN_SEARCH_CHARS, useTicketSearch } from "../search"
 import { CollapsingLabel } from "@/components/SegmentedTabs"
 import {
   InputGroup,
@@ -28,26 +32,54 @@ import { useGlobalShortcut } from "@/lib/use-global-shortcut"
 import { cn } from "@/lib/utils"
 import { transitions } from "@/lib/springs"
 import { m } from "@/paraglide/messages"
-import type { SortKey, TicketStatus } from "@projectproject/shared"
-import { SORT_LABELS } from "../sort"
 import {
-  ControlsLayoutProvider,
-  useControlsLayout,
-  useToolbar
-} from "./context"
-import { ControlSlot, TOOLBAR_BUTTON_CLASS } from "./shared"
+  NATURAL_SORT_DIR,
+  type SortKey,
+  type TicketStatus
+} from "@projectproject/shared"
+import { SORT_LABELS } from "../sort"
+import { activeFilterCount, useToolbar } from "./context"
+import {
+  ControlSlot,
+  TOOLBAR_BUTTON_CLASS,
+  ControlsLayoutContext,
+  useControlsLayout
+} from "./shared"
 
 export function Root({ children }: { children: ReactNode }) {
-  const {
-    meta: { containerRef }
-  } = useToolbar()
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(0)
+  const [compact, setSearchActive] = useState(false)
+  useLayoutEffect(() => {
+    const element = containerRef.current
+    if (!element) return
+    setWidth(Math.round(element.getBoundingClientRect().width))
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setWidth(Math.round(entry.contentRect.width))
+    })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+  const measured = width > 0
+  const controlsCompact =
+    measured && (width >= 460 ? compact || width < 720 : width < 360)
   return (
-    <div
-      ref={containerRef}
-      className="flex flex-wrap items-center gap-x-2 gap-y-2"
+    <ControlsLayoutContext
+      value={{
+        layout: "hug",
+        measured,
+        compact,
+        controlsCompact,
+        setSearchActive
+      }}
     >
-      {children}
-    </div>
+      <div
+        ref={containerRef}
+        className="flex flex-wrap items-center gap-x-2 gap-y-2"
+      >
+        {children}
+      </div>
+    </ControlsLayoutContext>
   )
 }
 
@@ -58,12 +90,11 @@ export function Controls({
   layout?: "hug" | "fill"
   children: ReactNode
 }) {
-  const {
-    state: { measured }
-  } = useToolbar()
+  const context = useControlsLayout()
+  const { measured } = context
   if (!measured) return null
   return (
-    <ControlsLayoutProvider value={layout}>
+    <ControlsLayoutContext value={{ ...context, layout }}>
       <div
         className={cn(
           "relative flex flex-wrap items-center gap-2",
@@ -72,16 +103,31 @@ export function Controls({
       >
         {children}
       </div>
-    </ControlsLayoutProvider>
+    </ControlsLayoutContext>
   )
 }
 
 export function Search() {
-  const {
-    state: { searchInput, compact, searchBelowMinChars },
-    actions: { setSearchQuery, setSearchFocused, flushSearch, clearSearch },
-    meta: { searchRef }
-  } = useToolbar()
+  const { searchRevision } = useToolbar()
+  return <SearchInput key={searchRevision} />
+}
+
+function SearchInput() {
+  const { query, updateQuery } = useToolbar()
+  const { setSearchActive } = useControlsLayout()
+  const search = useTicketSearch(query.q, (q) => updateQuery({ ...query, q }))
+  const searchInput = search.draft
+  const setSearchQuery = search.change
+  const flushSearch = search.flush
+  const clearSearch = search.clear
+  const searchRef = useRef<HTMLInputElement>(null)
+  const [focused, setSearchFocused] = useState(false)
+  const compact = focused || searchInput.length > 0
+  const searchBelowMinChars =
+    searchInput.length > 0 && searchInput.length < MIN_SEARCH_CHARS
+  useLayoutEffect(() => {
+    setSearchActive(compact)
+  }, [compact, setSearchActive])
   useGlobalShortcut("/", searchRef)
   return (
     <InputGroup className="min-w-0 flex-1 basis-[220px]">
@@ -124,11 +170,14 @@ export function Search() {
 }
 
 export function Status() {
-  const {
-    state: { status, counts, statuses, controlsCompact },
-    actions: { setStatus }
-  } = useToolbar()
-  const layout = useControlsLayout()
+  const { query, counts, patchFilter, orgSlug, slug } = useToolbar()
+  const selected = query.filter?.status
+  const status = selected?.length === 1 ? selected[0] : "all"
+  const setStatus = (status: TicketStatus | "all") =>
+    patchFilter({ status: status === "all" ? undefined : [status] })
+  const result = useAtomValue(projectStatusesAtom(projectKey(orgSlug, slug)))
+  const statuses = Result.isSuccess(result) ? result.value : []
+  const { layout, controlsCompact } = useControlsLayout()
   const stretch = layout === "fill"
   const slugs = boardStatusesFor(statuses)
   const active = status !== "all"
@@ -238,10 +287,11 @@ export function Status() {
 }
 
 export function Sort() {
-  const {
-    state: { sortKey, controlsCompact },
-    actions: { setSortKey }
-  } = useToolbar()
+  const { query, updateQuery } = useToolbar()
+  const { controlsCompact } = useControlsLayout()
+  const sortKey = query.sort.key
+  const setSortKey = (key: SortKey) =>
+    updateQuery({ ...query, sort: { key, dir: NATURAL_SORT_DIR[key] } })
   return (
     <motion.div layout="position" transition={transitions.layout}>
       <DropdownMenu>
@@ -282,10 +332,11 @@ export function Sort() {
 }
 
 export function ClearAll() {
-  const {
-    state: { hasActiveFilters },
-    actions: { clearAll }
-  } = useToolbar()
+  const { query, filters, clearAll } = useToolbar()
+  const hasActiveFilters =
+    !!query.filter?.status?.length ||
+    activeFilterCount(query, filters) > 0 ||
+    !!query.q
   return (
     <AnimatePresence initial={false} mode="popLayout">
       {hasActiveFilters && (

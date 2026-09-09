@@ -8,16 +8,8 @@ import {
   SlidersHorizontal,
   UserRound
 } from "lucide-react"
-import {
-  Children,
-  isValidElement,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ComponentProps,
-  type ReactNode
-} from "react"
+import { useRef, useState, type ComponentProps } from "react"
+import { meAtom } from "@/atoms/auth"
 import { CollapsingLabel } from "@/components/SegmentedTabs"
 import { MemberAvatar } from "@/components/MemberAvatar"
 import {
@@ -37,7 +29,12 @@ import { TYPE_LABELS, TYPE_META } from "@/lib/ticket-meta"
 import { cn } from "@/lib/utils"
 import { m } from "@/paraglide/messages"
 import { sprintState, type TicketType } from "@projectproject/shared"
-import { useControlsLayout, useToolbar, type FilterDimension } from "./context"
+import {
+  activeFilterCount as countActiveFilters,
+  useToolbar,
+  type SprintFilterValue
+} from "./context"
+import { useControlsLayout } from "./shared"
 import {
   ControlSlot,
   FilterSection,
@@ -45,13 +42,10 @@ import {
   TOOLBAR_BUTTON_CLASS
 } from "./shared"
 
-export function Filters({ children }: { children: ReactNode }) {
-  const {
-    state: { compact, activeFilterCount },
-    actions: { declareDimensions }
-  } = useToolbar()
-  useDeclaredDimensions(children, declareDimensions)
-  const layout = useControlsLayout()
+export function Filters() {
+  const { query, filters } = useToolbar()
+  const activeFilterCount = countActiveFilters(query, filters)
+  const { compact, layout } = useControlsLayout()
   const stretch = layout === "fill"
   const triggerRef = useRef<HTMLButtonElement>(null)
   const [anchor, setAnchor] =
@@ -113,7 +107,10 @@ export function Filters({ children }: { children: ReactNode }) {
           className="w-56"
           finalFocus={false}
         >
-          {children}
+          {filters.map((dimension) => {
+            const Part = FILTER_PARTS[dimension]
+            return <Part key={dimension} />
+          })}
         </DropdownMenuContent>
       </DropdownMenu>
     </ControlSlot>
@@ -121,10 +118,10 @@ export function Filters({ children }: { children: ReactNode }) {
 }
 
 export function FilterArchived() {
-  const {
-    state: { archivedFilter },
-    actions: { setArchivedFilter }
-  } = useToolbar()
+  const { query, patchFilter } = useToolbar()
+  const archivedFilter = query.filter?.archived === true
+  const setArchivedFilter = (on: boolean) =>
+    patchFilter({ archived: on ? true : undefined })
   return (
     <FilterSection>
       <SectionLabel>{m.tickets_filters_section_archived()}</SectionLabel>
@@ -144,10 +141,11 @@ export function FilterArchived() {
 }
 
 export function FilterType() {
-  const {
-    state: { typeFilter },
-    actions: { setTypeFilter }
-  } = useToolbar()
+  const { query, patchFilter } = useToolbar()
+  const types = query.filter?.type
+  const typeFilter = types?.length === 1 ? types[0] : "all"
+  const setTypeFilter = (type: TicketType | "all") =>
+    patchFilter({ type: type === "all" ? undefined : [type] })
   return (
     <FilterSection>
       <SectionLabel>{m.tickets_filters_section_type()}</SectionLabel>
@@ -183,10 +181,19 @@ export function FilterType() {
 }
 
 export function FilterAssignee() {
-  const {
-    state: { assigneeFilter, members, viewerId },
-    actions: { setAssigneeFilter }
-  } = useToolbar()
+  const { query, patchFilter, members } = useToolbar()
+  const me = useAtomValue(meAtom)
+  const viewerId = Result.isSuccess(me) ? me.value.id : null
+  const assignees = query.filter?.assignee
+  const assigneeFilter =
+    assignees?.length === 1 ? (assignees[0] ?? "unassigned") : "all"
+  const setAssigneeFilter = (assignee: string) =>
+    patchFilter({
+      assignee:
+        assignee === "all"
+          ? undefined
+          : [assignee === "unassigned" ? null : assignee]
+    })
   return (
     <FilterSection>
       <SectionLabel>{m.tickets_filters_section_assignee()}</SectionLabel>
@@ -243,11 +250,15 @@ export function FilterAssignee() {
 }
 
 export function FilterSprint() {
-  const {
-    state: { sprintFilter },
-    actions: { setSprintFilter },
-    meta: { orgSlug, slug }
-  } = useToolbar()
+  const { query, patchFilter, orgSlug, slug } = useToolbar()
+  const groups = query.filter?.groupId
+  const sprintFilter =
+    groups?.length === 1 ? (groups[0] ?? "unassigned") : "all"
+  const setSprintFilter = (sprint: SprintFilterValue) =>
+    patchFilter({
+      groupId:
+        sprint === "all" ? undefined : [sprint === "unassigned" ? null : sprint]
+    })
   const sprintsList = useAtomValue(
     sprintsListAtom(sprintsProjectKey(orgSlug, slug))
   )
@@ -307,11 +318,10 @@ export function FilterSprint() {
 }
 
 export function FilterTags() {
-  const {
-    state: { selectedTags },
-    actions: { setSelectedTags },
-    meta: { orgSlug, slug }
-  } = useToolbar()
+  const { query, patchFilter, orgSlug, slug } = useToolbar()
+  const selectedTags = query.filter?.tags ?? []
+  const setSelectedTags = (tags: typeof selectedTags) =>
+    patchFilter({ tags: tags.length ? tags : undefined })
   const tags = useAtomValue(tagsAtom(tagsKey(orgSlug, slug)))
   const tagList = Result.isSuccess(tags) ? tags.value : []
   if (tagList.length === 0) return null
@@ -351,30 +361,10 @@ export function FilterTags() {
   )
 }
 
-const DIMENSION_BY_PART = new Map<unknown, FilterDimension>()
-
-function useDeclaredDimensions(
-  children: ReactNode,
-  declare: (dimensions: ReadonlySet<FilterDimension>) => void
-) {
-  const declared = useMemo(() => {
-    const set = new Set<FilterDimension>()
-    for (const child of Children.toArray(children)) {
-      if (!isValidElement(child)) continue
-      const dimension = DIMENSION_BY_PART.get(child.type)
-      if (dimension) set.add(dimension)
-    }
-    return set
-  }, [children])
-  const key = [...declared].sort().join(",")
-  useEffect(() => {
-    declare(declared)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [declare, key])
+const FILTER_PARTS = {
+  archived: FilterArchived,
+  type: FilterType,
+  assignee: FilterAssignee,
+  sprint: FilterSprint,
+  tags: FilterTags
 }
-
-DIMENSION_BY_PART.set(FilterArchived, "archived")
-DIMENSION_BY_PART.set(FilterType, "type")
-DIMENSION_BY_PART.set(FilterAssignee, "assignee")
-DIMENSION_BY_PART.set(FilterSprint, "sprint")
-DIMENSION_BY_PART.set(FilterTags, "tags")

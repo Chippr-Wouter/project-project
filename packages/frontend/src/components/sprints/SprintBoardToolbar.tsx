@@ -30,16 +30,13 @@ export function SprintBoardToolbar({
       query={query}
       members={members}
       counts={counts}
+      filters={["type", "assignee", "tags"]}
     >
       <TicketToolbar.Root>
         <TicketToolbar.Search />
         <TicketToolbar.Controls>
           <TicketToolbar.Status />
-          <TicketToolbar.Filters>
-            <TicketToolbar.FilterType />
-            <TicketToolbar.FilterAssignee />
-            <TicketToolbar.FilterTags />
-          </TicketToolbar.Filters>
+          <TicketToolbar.Filters />
           <TicketToolbar.ClearAll />
         </TicketToolbar.Controls>
       </TicketToolbar.Root>

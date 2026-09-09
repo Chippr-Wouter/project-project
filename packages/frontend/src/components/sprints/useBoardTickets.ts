@@ -18,7 +18,7 @@ import type {
 } from "@projectproject/shared"
 import { boardStatusesFor, effectiveStatus } from "./board-utils"
 
-export interface BoardTickets {
+export type BoardTickets = {
   readonly ticketById: ReadonlyMap<TicketId, Ticket>
   readonly matchingTicketIds: ReadonlyArray<TicketId>
   readonly counts: Record<string, number>

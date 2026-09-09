@@ -1,8 +1,21 @@
 import { motion } from "motion/react"
-import type { ReactNode } from "react"
+import { createContext, use, type ReactNode } from "react"
 import { cn } from "@/lib/utils"
 import { transitions } from "@/lib/springs"
-import { useControlsLayout } from "./context"
+type ControlsLayout = {
+  layout: "hug" | "fill"
+  measured: boolean
+  compact: boolean
+  controlsCompact: boolean
+  setSearchActive: (active: boolean) => void
+}
+export const ControlsLayoutContext = createContext<ControlsLayout | null>(null)
+export function useControlsLayout() {
+  const value = use(ControlsLayoutContext)
+  if (!value)
+    throw new Error("Toolbar controls must render inside Toolbar.Root")
+  return value
+}
 
 export const TOOLBAR_BUTTON_CLASS = cn(
   "inline-flex h-9 items-center gap-2 rounded-xl border border-border bg-background px-3 text-sm",
@@ -27,7 +40,7 @@ export function FilterSection({ children }: { children: ReactNode }) {
 }
 
 export function ControlSlot({ children }: { children: ReactNode }) {
-  const layout = useControlsLayout()
+  const { layout } = useControlsLayout()
   return (
     <motion.div
       layout="position"

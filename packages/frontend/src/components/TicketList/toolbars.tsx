@@ -1,7 +1,7 @@
 import type { Member, TicketListQuery } from "@projectproject/shared"
 import { TicketToolbar, useServerTicketCounts } from "./toolbar"
 
-interface ToolbarVariantProps {
+type ToolbarVariantProps = {
   orgSlug: string
   slug: string
   query: TicketListQuery
@@ -22,18 +22,13 @@ export function BacklogToolbar({
       query={query}
       members={members}
       counts={counts}
+      filters={["archived", "type", "assignee", "sprint", "tags"]}
     >
       <TicketToolbar.Root>
         <TicketToolbar.Search />
         <TicketToolbar.Controls>
           <TicketToolbar.Status />
-          <TicketToolbar.Filters>
-            <TicketToolbar.FilterArchived />
-            <TicketToolbar.FilterType />
-            <TicketToolbar.FilterAssignee />
-            <TicketToolbar.FilterSprint />
-            <TicketToolbar.FilterTags />
-          </TicketToolbar.Filters>
+          <TicketToolbar.Filters />
           <TicketToolbar.Sort />
           <TicketToolbar.ClearAll />
         </TicketToolbar.Controls>
@@ -56,17 +51,13 @@ export function SprintListToolbar({
       query={query}
       members={members}
       counts={counts}
+      filters={["archived", "type", "assignee", "tags"]}
     >
       <TicketToolbar.Root>
         <TicketToolbar.Search />
         <TicketToolbar.Controls>
           <TicketToolbar.Status />
-          <TicketToolbar.Filters>
-            <TicketToolbar.FilterArchived />
-            <TicketToolbar.FilterType />
-            <TicketToolbar.FilterAssignee />
-            <TicketToolbar.FilterTags />
-          </TicketToolbar.Filters>
+          <TicketToolbar.Filters />
           <TicketToolbar.Sort />
           <TicketToolbar.ClearAll />
         </TicketToolbar.Controls>
