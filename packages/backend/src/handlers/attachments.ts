@@ -8,6 +8,32 @@ export const AttachmentsHandlerLive = HttpApiBuilder.group(
   "attachments",
   (handlers) =>
     handlers
+      .handle("prepareProject", ({ params, payload }) =>
+        Effect.gen(function* () {
+          const user = yield* CurrentUser
+          const attachments = yield* Attachments
+          return yield* attachments.prepare(
+            params.orgSlug,
+            params.slug,
+            null,
+            user.id,
+            payload
+          )
+        })
+      )
+      .handle("commitProject", ({ params }) =>
+        Effect.gen(function* () {
+          const user = yield* CurrentUser
+          const attachments = yield* Attachments
+          return yield* attachments.commit(
+            params.orgSlug,
+            params.slug,
+            null,
+            user.id,
+            params.attachmentId
+          )
+        })
+      )
       .handle("prepare", ({ params, payload }) =>
         Effect.gen(function* () {
           const user = yield* CurrentUser

@@ -29,6 +29,8 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
+        "image-option":
+          "overflow-hidden bg-muted ring-1 ring-border hover:ring-ring aria-pressed:ring-2 aria-pressed:ring-foreground",
         primary:
           "bg-foreground text-background hover:bg-foreground/90 active:bg-foreground/80",
         secondary:
@@ -51,6 +53,9 @@ const buttonVariants = cva(
         dither: "bg-transparent overflow-hidden"
       },
       size: {
+        "image-option": "aspect-[3/1] h-auto w-full p-0",
+        "image-strip": "h-12 w-full p-0",
+        "banner-add": "h-12 w-full justify-start px-4 text-[13px] gap-1.5",
         xs: "h-5 px-1.5 text-[11px] gap-1",
         sm: "h-7 px-3 text-[12px] gap-1",
         md: "h-8 px-4 text-[13px] gap-1.5",
@@ -64,6 +69,7 @@ const buttonVariants = cva(
       iconRight: { true: "" }
     },
     compoundVariants: [
+      { size: "banner-add", className: "text-muted-foreground" },
       { variant: "sidebar-link", className: "gap-2 px-1.5" },
       { size: "xs", iconLeft: true, className: "pl-1" },
       { size: "sm", iconLeft: true, className: "pl-[6px]" },

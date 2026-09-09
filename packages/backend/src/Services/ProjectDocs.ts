@@ -2,6 +2,7 @@ import * as Context from "effect/Context"
 import type * as Effect from "effect/Effect"
 import type {
   GithubConnection,
+  ProjectBanner,
   NotFound,
   ProjectKey,
   ProjectSetup,
@@ -27,6 +28,7 @@ export interface ProjectDocument {
   readonly members: ReadonlyArray<ProjectDocMember>
   readonly github: GithubConnection | null
   readonly setup: ProjectSetup
+  readonly banner?: ProjectBanner | null
   readonly body: string
 }
 
@@ -42,6 +44,7 @@ export interface ProjectDocumentWrite {
   readonly members: ReadonlyArray<ProjectDocMember>
   readonly github: GithubConnection | null
   readonly setup: ProjectSetup
+  readonly banner?: ProjectBanner | null
   readonly body: string
 }
 

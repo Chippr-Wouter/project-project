@@ -16,7 +16,9 @@ import {
 export const projectKey = (orgSlug: string, slug: string) =>
   `${orgSlug}/${slug}`
 
-const splitProjectKey = (key: string): { orgSlug: string; slug: string } => {
+export const splitProjectKey = (
+  key: string
+): { orgSlug: string; slug: string } => {
   const sep = key.indexOf("/")
   return { orgSlug: key.slice(0, sep), slug: key.slice(sep + 1) }
 }
@@ -223,4 +225,11 @@ export const createProjectAtom = Atom.family((orgSlug: string) =>
       return project
     })
   )
+)
+
+export const projectBannerPreviewAtom = Atom.family((_key: string) =>
+  Atom.make<{
+    source: string | null
+    crop: { x: number; y: number; zoom: number }
+  } | null>(null)
 )

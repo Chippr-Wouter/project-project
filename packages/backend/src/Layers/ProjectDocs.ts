@@ -5,6 +5,7 @@ import * as Schema from "effect/Schema"
 import {
   deriveProjectIdentity,
   GithubConnection,
+  ProjectBanner,
   NotFound,
   ProjectKey,
   Role,
@@ -67,6 +68,9 @@ const ProjectDocSetup = Schema.Struct({
 })
 
 const ProjectFrontmatter = Schema.Struct({
+  banner: Schema.NullOr(ProjectBanner).pipe(
+    Schema.withDecodingDefaultTypeKey(Effect.succeed(null))
+  ),
   org: Schema.optional(Slug),
   slug: Slug,
   key: Schema.optional(ProjectKey),
@@ -98,6 +102,7 @@ function toFrontmatter(
   document: ProjectDocumentWrite
 ): Record<string, unknown> {
   const frontmatter: Record<string, unknown> = {
+    banner: document.banner ?? null,
     org: document.org,
     slug: document.slug,
     key: document.key,

@@ -5,7 +5,7 @@ import type { ConnectStorageInput } from "@projectproject/shared"
 import { runtime } from "@/runtime"
 import { ApiClient } from "@/services/ApiClient"
 
-const orgStorageBaseAtom = Atom.family((orgSlug: string) =>
+export const orgStorageBaseAtom = Atom.family((orgSlug: string) =>
   runtime
     .atom(
       Effect.gen(function* () {
