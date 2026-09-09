@@ -56,7 +56,7 @@ export function TicketPage({
   const locale = getLocale()
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
         <BackButton
           fallback={{
@@ -64,21 +64,54 @@ export function TicketPage({
             params: { orgSlug, slug }
           }}
         />
-        <MarkdownSaveIndicator status={bodyStatus} />
+        <div className="flex items-center gap-2">
+          <MarkdownSaveIndicator status={bodyStatus} />
+          <ArchiveTicketControl
+            orgSlug={orgSlug}
+            slug={slug}
+            id={ticket.id}
+            archived={ticket.archivedAt !== null}
+          />
+          <ConfirmDeleteIcon
+            ariaLabel={m.tickets_detail_delete_aria_label()}
+            message={m.tickets_detail_delete_confirm()}
+            disabled={deleting}
+            onConfirm={async () => {
+              setDeleting(true)
+              const exit = await remove()
+              if (Exit.isSuccess(exit)) {
+                void navigate({
+                  to: "/orgs/$orgSlug/projects/$slug",
+                  params: { orgSlug, slug }
+                })
+                return
+              }
+              setDeleting(false)
+              throw Cause.squash(exit.cause)
+            }}
+          />
+        </div>
       </div>
-      <header className="flex items-start gap-3">
-        <StatusButton
-          orgSlug={orgSlug}
-          slug={slug}
-          ticket={ticket}
-          query={{ sort: { key: "updated", dir: "desc" } }}
-          size="lg"
-        />
+      <header className="flex items-start gap-2">
+        <div className="mt-1.5 flex h-[1lh] shrink-0 items-center text-xl">
+          <StatusButton
+            orgSlug={orgSlug}
+            slug={slug}
+            ticket={ticket}
+            query={{ sort: { key: "updated", dir: "desc" } }}
+            size="lg"
+          />
+        </div>
         <div className="flex min-w-0 flex-1 flex-col items-start gap-1">
           <h1 className="w-full">
-            <TitleField orgSlug={orgSlug} slug={slug} ticket={ticket} />
+            <TitleField
+              key={ticket.id}
+              orgSlug={orgSlug}
+              slug={slug}
+              ticket={ticket}
+            />
           </h1>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 px-2">
             <span className="font-mono text-xs tabular-nums text-muted-foreground">
               {ticket.id}
             </span>
@@ -91,36 +124,12 @@ export function TicketPage({
             )}
           </div>
         </div>
-        <ArchiveTicketControl
-          orgSlug={orgSlug}
-          slug={slug}
-          id={ticket.id}
-          archived={ticket.archivedAt !== null}
-        />
-        <ConfirmDeleteIcon
-          ariaLabel={m.tickets_detail_delete_aria_label()}
-          message={m.tickets_detail_delete_confirm()}
-          disabled={deleting}
-          onConfirm={async () => {
-            setDeleting(true)
-            const exit = await remove()
-            if (Exit.isSuccess(exit)) {
-              void navigate({
-                to: "/orgs/$orgSlug/projects/$slug",
-                params: { orgSlug, slug }
-              })
-              return
-            }
-            setDeleting(false)
-            throw Cause.squash(exit.cause)
-          }}
-        />
       </header>
 
       <div className="h-px bg-border/60" />
 
-      <div className="grid grid-cols-1 gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <main className="flex min-w-0 flex-col gap-8">
+      <div className="grid grid-cols-1 gap-x-8 gap-y-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <main className="flex min-w-0 flex-col gap-6">
           <DescriptionField
             orgSlug={orgSlug}
             slug={slug}
@@ -133,7 +142,7 @@ export function TicketPage({
           <CommentsSection orgSlug={orgSlug} slug={slug} ticketId={ticket.id} />
         </main>
 
-        <aside className="flex flex-col gap-5 lg:sticky lg:top-6 lg:max-h-[calc(100vh-8rem)] lg:self-start lg:overflow-y-auto lg:border-l lg:border-border/60 lg:pl-6 lg:[scrollbar-gutter:stable]">
+        <aside className="flex flex-col gap-4 lg:sticky lg:top-6 lg:max-h-[calc(100vh-8rem)] lg:self-start lg:overflow-y-auto lg:border-l lg:border-border/60 lg:pl-5 lg:[scrollbar-gutter:stable]">
           <MetaRow label={m.tickets_page_meta_priority()}>
             <PriorityBadgeTrigger
               orgSlug={orgSlug}
