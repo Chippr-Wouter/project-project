@@ -1,3 +1,4 @@
+import { useMemo } from "react"
 import { createFileRoute } from "@tanstack/react-router"
 import * as Schema from "effect/Schema"
 import { SprintDetail } from "@/components/sprints/SprintDetail"
@@ -42,16 +43,15 @@ export const Route = createFileRoute(
 
 function SprintDetailRoute() {
   const { orgSlug, slug, groupId } = Route.useParams()
-  const search = Route.useSearch()
+  const search = Route.useSearch({ structuralSharing: true })
   const id = decodeGroupId(groupId)
-  const baseQuery = ticketListQueryFromSearch(search)
-  const scopedQuery: TicketListQuery = {
-    ...baseQuery,
-    filter: {
-      ...baseQuery.filter,
-      groupId: [id]
+  const scopedQuery = useMemo<TicketListQuery>(() => {
+    const query = ticketListQueryFromSearch(search)
+    return {
+      ...query,
+      filter: { ...query.filter, groupId: [id] }
     }
-  }
+  }, [search, id])
   return (
     <SprintDetail
       orgSlug={orgSlug}

@@ -67,6 +67,9 @@ export function SegmentedList({
 }) {
   const resetFilters = useResetTicketSearch()
   const [activePreviewId, setActivePreviewId] = useState<TicketId | null>(null)
+  const handlePreviewPointerEnter = useCallback((ticketId: TicketId) => {
+    setActivePreviewId((current) => (current === ticketId ? current : null))
+  }, [])
   const handlePreviewOpenChange = useCallback(
     (ticketId: TicketId, open: boolean) => {
       setActivePreviewId((current) =>
@@ -232,6 +235,7 @@ export function SegmentedList({
             showSprintCol={showSprintCol}
             showExtraActionsCol={showExtraActionsCol}
             activePreviewId={activePreviewId}
+            onPreviewPointerEnter={handlePreviewPointerEnter}
             onPreviewOpenChange={handlePreviewOpenChange}
           />
         )
