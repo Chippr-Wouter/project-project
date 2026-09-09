@@ -7,8 +7,9 @@ import {
   Validation
 } from "@projectproject/shared"
 import {
-  statusCreateErrorMessage,
-  oauthConsentErrorMessage
+  figmaStatusErrorMessage,
+  oauthConsentErrorMessage,
+  statusCreateErrorMessage
 } from "./errorMessage"
 
 describe("statusCreateErrorMessage", () => {
@@ -42,6 +43,17 @@ describe("statusCreateErrorMessage", () => {
     )
     expect(statusCreateErrorMessage(new NotFound())).toBe(
       "Couldn't add this status. Try again."
+    )
+  })
+})
+
+describe("figmaStatusErrorMessage", () => {
+  it("maps persisted status keys through the localized error mapper", () => {
+    expect(figmaStatusErrorMessage("figma_file_not_found")).toBe(
+      "That Figma file no longer exists, or this connection cannot see it."
+    )
+    expect(figmaStatusErrorMessage("figma_unavailable")).toBe(
+      "Figma could not be reached. Try again in a moment."
     )
   })
 })

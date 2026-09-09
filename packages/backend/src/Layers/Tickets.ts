@@ -40,6 +40,7 @@ import {
   type TicketStatus
 } from "@projectproject/shared"
 import { Attachments } from "../Services/Attachments"
+import { FigmaLinks } from "../Services/FigmaLinks"
 import { validateBodyMentionsWithLookups } from "../Services/BodyMentions"
 import { Comments, type InvalidCommentBody } from "../Services/Comments"
 import { GitHub } from "../Services/GitHub"
@@ -157,6 +158,7 @@ export const TicketsLive = Layer.effect(
     const comments = yield* Comments
     const db = yield* Db
     const attachments = yield* Attachments
+    const figmaLinks = yield* FigmaLinks
 
     const ensureAccess = (
       orgSlug: string,
@@ -547,6 +549,15 @@ export const TicketsLive = Layer.effect(
                 .reconcileTicket(orgSlug, slug, created.id, created.body)
                 .pipe(
                   Effect.andThen(
+                    figmaLinks.reconcileTicket(
+                      orgSlug,
+                      slug,
+                      created.id,
+                      created.title,
+                      created.body
+                    )
+                  ),
+                  Effect.andThen(
                     ticketIndex.upsertTicket(indexProject, created)
                   )
                 )
@@ -725,7 +736,19 @@ export const TicketsLive = Layer.effect(
           (next) =>
             (input.body === undefined
               ? Effect.void
-              : attachments.reconcileTicket(orgSlug, slug, id, next.body)
+              : attachments
+                  .reconcileTicket(orgSlug, slug, id, next.body)
+                  .pipe(
+                    Effect.andThen(
+                      figmaLinks.reconcileTicket(
+                        orgSlug,
+                        slug,
+                        id,
+                        next.title,
+                        next.body
+                      )
+                    )
+                  )
             ).pipe(Effect.andThen(ticketIndex.upsertTicket(indexProject, next)))
         )
 
@@ -751,7 +774,12 @@ export const TicketsLive = Layer.effect(
           id,
           attachments
             .reconcileTicket(orgSlug, slug, id, "")
-            .pipe(Effect.andThen(ticketIndex.deleteTicket(indexProject, id)))
+            .pipe(
+              Effect.andThen(
+                figmaLinks.reconcileTicket(orgSlug, slug, id, "", "")
+              ),
+              Effect.andThen(ticketIndex.deleteTicket(indexProject, id))
+            )
         )
       })
 

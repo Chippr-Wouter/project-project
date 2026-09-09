@@ -78,6 +78,9 @@ import { AuthHandlerLive } from "./handlers/auth"
 import { CommentsHandlerLive } from "./handlers/comments"
 import { GroupsHandlerLive } from "./handlers/groups"
 import { EverhourHandlerLive } from "./handlers/everhour"
+import { FigmaHandlerLive } from "./handlers/figma"
+import { figmaOauthRoutes } from "./http/figmaOauthRoutes"
+import { figmaThumbnailRoutes } from "./http/figmaThumbnailRoutes"
 import { OAuthApplicationsHandlerLive } from "./handlers/oauthApplications"
 import { StorageHandlerLive } from "./handlers/storage"
 import { OrgHandlerLive } from "./handlers/org"
@@ -141,6 +144,7 @@ export const ApiLive = HttpApiBuilder.layer(AppApi).pipe(
   Layer.provide(OrgHandlerLive),
   Layer.provide(ProjectsHandlerLive),
   Layer.provide(EverhourHandlerLive),
+  Layer.provide(FigmaHandlerLive),
   Layer.provide(TicketsHandlerLive),
   Layer.provide(CommentsHandlerLive),
   Layer.provide(TagsHandlerLive),
@@ -407,6 +411,12 @@ const RouteLive = Layer.mergeAll(
   HttpRouter.add("*", "/.well-known/*", betterAuthApp),
   githubIntegrationRoutes,
   everhourIntegrationRoutes,
+  figmaOauthRoutes,
+  HttpRouter.add(
+    "GET",
+    "/api/figma-thumbnails/:orgSlug/:linkId",
+    figmaThumbnailRoutes
+  ),
   HttpRouter.add(
     "GET",
     "/api/attachments/:orgSlug/:attachmentId",

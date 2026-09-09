@@ -202,7 +202,7 @@ export const organizationIntegration = pgTable(
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
     provider: text("provider", {
-      enum: ["github", "everhour", "s3"]
+      enum: ["github", "everhour", "s3", "figma"]
     }).notNull(),
     status: text("status", {
       enum: ["active", "disconnected", "broken"]
@@ -308,7 +308,9 @@ export const projectIntegrationLink = pgTable(
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
     organizationIntegrationId: uuid("organization_integration_id").notNull(),
-    provider: text("provider", { enum: ["github", "everhour"] }).notNull(),
+    provider: text("provider", {
+      enum: ["github", "everhour", "figma"]
+    }).notNull(),
     status: text("status", {
       enum: ["active", "disconnected", "broken"]
     }).notNull(),
@@ -683,9 +685,141 @@ export const attachmentReference = pgTable(
   ]
 )
 
+export const userFigmaIntegration = pgTable("user_figma_integration", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  encryptedAccessToken: text("encrypted_access_token").notNull(),
+  accessTokenNonce: text("access_token_nonce").notNull(),
+  accessTokenTag: text("access_token_tag").notNull(),
+  encryptedRefreshToken: text("encrypted_refresh_token").notNull(),
+  refreshTokenNonce: text("refresh_token_nonce").notNull(),
+  refreshTokenTag: text("refresh_token_tag").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  figmaUserId: text("figma_user_id").notNull(),
+  handle: text("handle"),
+  email: text("email"),
+  connectedAt: timestamp("connected_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  lastVerifiedAt: timestamp("last_verified_at", { withTimezone: true }),
+  lastCheckStatus: text("last_check_status", { enum: ["ok", "error"] }),
+  lastCheckError: text("last_check_error")
+})
+
+export const userFigmaOauthState = pgTable(
+  "user_figma_oauth_state",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    stateHash: text("state_hash").notNull().unique(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+  },
+  (t) => [index("user_figma_oauth_state_user_idx").on(t.userId)]
+)
+
+export const projectFigmaIntegration = pgTable(
+  "project_figma_integration",
+  {
+    projectIntegrationLinkId: uuid("project_integration_link_id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    status: text("status", {
+      enum: ["active", "disconnected", "broken"]
+    }).notNull(),
+    encryptedAccessToken: text("encrypted_access_token").notNull(),
+    accessTokenNonce: text("access_token_nonce").notNull(),
+    accessTokenTag: text("access_token_tag").notNull(),
+    handle: text("handle"),
+    lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
+    lastCheckStatus: text("last_check_status", { enum: ["ok", "error"] }),
+    lastCheckError: text("last_check_error")
+  },
+  (t) => [
+    foreignKey({
+      name: "project_figma_integration_link_id_organization_id_fkey",
+      columns: [t.projectIntegrationLinkId, t.organizationId],
+      foreignColumns: [
+        projectIntegrationLink.id,
+        projectIntegrationLink.organizationId
+      ]
+    }).onDelete("cascade")
+  ]
+)
+
+export const figmaLinkIndex = pgTable(
+  "figma_link_index",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    orgSlug: text("org_slug").notNull(),
+    projectSlug: text("project_slug")
+      .notNull()
+      .references(() => projectIndex.slug, { onDelete: "cascade" }),
+    fileKey: text("file_key").notNull(),
+    nodeId: text("node_id"),
+    kind: text("kind", {
+      enum: ["design", "board", "slides", "proto"]
+    }).notNull(),
+    name: text("name"),
+    fileName: text("file_name"),
+    thumbnailKey: text("thumbnail_key"),
+    lastModified: timestamp("last_modified", { withTimezone: true }),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }),
+    lastCheckStatus: text("last_check_status", { enum: ["ok", "error"] }),
+    lastCheckError: text("last_check_error"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+  },
+  (t) => [
+    unique("figma_link_index_node_uidx")
+      .on(t.projectSlug, t.fileKey, t.nodeId)
+      .nullsNotDistinct(),
+    index("figma_link_index_org_idx").on(t.organizationId),
+    index("figma_link_index_file_idx").on(t.projectSlug, t.fileKey)
+  ]
+)
+
+export const figmaReference = pgTable(
+  "figma_reference",
+  {
+    linkId: text("link_id")
+      .notNull()
+      .references(() => figmaLinkIndex.id, { onDelete: "cascade" }),
+    orgSlug: text("org_slug").notNull(),
+    projectSlug: text("project_slug").notNull(),
+    ticketId: text("ticket_id").notNull(),
+    devResourceId: text("dev_resource_id"),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 3 })
+      .notNull()
+      .defaultNow()
+  },
+  (t) => [
+    primaryKey({ columns: [t.linkId, t.projectSlug, t.ticketId] }),
+    index("figma_reference_ticket_idx").on(t.orgSlug, t.projectSlug, t.ticketId)
+  ]
+)
+
 export const relations = defineRelations(
   {
     ...authSchema,
+    userFigmaIntegration,
+    projectFigmaIntegration,
+    figmaLinkIndex,
+    figmaReference,
     projectIndex,
     projectMember,
     projectInviteGrant,

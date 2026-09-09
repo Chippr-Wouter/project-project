@@ -20,6 +20,7 @@ import {
 } from "@projectproject/shared"
 import { TicketsLive } from "../Layers/Tickets"
 import { Attachments, type AttachmentsShape } from "./Attachments"
+import { FigmaLinks, type FigmaLinksShape } from "./FigmaLinks"
 import { Comments, type CommentsShape } from "./Comments"
 import { Db } from "./Db"
 import { GitHub, type GitHubShape } from "./GitHub"
@@ -228,6 +229,35 @@ const makeFakeAttachments = (
     dedupeOnce: () => unexpected("Attachments.dedupeOnce"),
     ...overrides
   } satisfies AttachmentsShape)
+
+const makeFakeFigmaLinks = (
+  overrides: Partial<FigmaLinksShape> = {}
+): Layer.Layer<FigmaLinks> =>
+  Layer.succeed(FigmaLinks, {
+    reconcileTicket: () => Effect.void,
+    listForTicket: () => unexpected("FigmaLinks.listForTicket"),
+    resolveThumbnailUrl: () => unexpected("FigmaLinks.resolveThumbnailUrl"),
+    ...overrides
+  } satisfies FigmaLinksShape)
+
+const makeRecordingFigmaLinks = () => {
+  const calls: Array<{
+    readonly orgSlug: string
+    readonly slug: string
+    readonly ticketId: string
+    readonly title: string
+    readonly body: string
+  }> = []
+  return {
+    calls,
+    layer: makeFakeFigmaLinks({
+      reconcileTicket: (orgSlug, slug, ticketId, title, body) =>
+        Effect.sync(() => {
+          calls.push({ orgSlug, slug, ticketId, title, body })
+        })
+    })
+  }
+}
 
 const makeRecordingAttachments = () => {
   const calls: Array<{
@@ -508,6 +538,7 @@ function makeTicketsLayer(
     readonly github?: Layer.Layer<GitHub>
     readonly ticketIndex?: Layer.Layer<TicketIndex>
     readonly attachments?: Layer.Layer<Attachments>
+    readonly figmaLinks?: Layer.Layer<FigmaLinks>
   } = {}
 ) {
   return TicketsLive.pipe(
@@ -516,6 +547,7 @@ function makeTicketsLayer(
     Layer.provide(FakeGroups),
     Layer.provide(FakeComments),
     Layer.provide(options.attachments ?? makeFakeAttachments()),
+    Layer.provide(options.figmaLinks ?? makeFakeFigmaLinks()),
     Layer.provide(options.github ?? makeFakeGitHub()),
     Layer.provide(options.ticketIndex ?? makeFakeTicketIndex(new Map())),
     Layer.provide(FakeDb)
@@ -549,6 +581,7 @@ it.effect("listGitStates fetches only distinct ticket branches", () => {
     Layer.provide(FakeGroups),
     Layer.provide(FakeComments),
     Layer.provide(makeFakeAttachments()),
+    Layer.provide(makeFakeFigmaLinks()),
     Layer.provide(
       makeFakeGitHub({
         fetchInstallationProjectStates: (
@@ -642,8 +675,10 @@ it.effect(
   () => {
     const docs = makeFakeTicketDocs(["T-1"])
     const attachments = makeRecordingAttachments()
+    const figmaLinks = makeRecordingFigmaLinks()
     const layer = makeTicketsLayer("T", docs.layer, {
       attachments: attachments.layer,
+      figmaLinks: figmaLinks.layer,
       ticketIndex: makeFakeTicketIndex(docs.documents)
     })
 
@@ -654,6 +689,43 @@ it.effect(
       expect(attachments.calls).toEqual([
         { orgSlug: "org", slug: "p", ticketId: "T-1", body: "" }
       ])
+      expect(figmaLinks.calls).toEqual([
+        { orgSlug: "org", slug: "p", ticketId: "T-1", title: "", body: "" }
+      ])
+    }).pipe(Effect.provide(layer))
+  }
+)
+
+it.effect(
+  "create, quickCreate and update reconcile figma references with the saved body",
+  () => {
+    const docs = makeFakeTicketDocs([])
+    const figmaLinks = makeRecordingFigmaLinks()
+    const layer = makeTicketsLayer("T", docs.layer, {
+      figmaLinks: figmaLinks.layer,
+      ticketIndex: makeFakeTicketIndex(docs.documents)
+    })
+
+    return Effect.gen(function* () {
+      const tickets = yield* Tickets
+      const created = yield* tickets.create("org", "user-1", "p", {
+        title: "One",
+        body: "# One\nhttps://www.figma.com/design/FILEKEY123/Spec\n"
+      })
+      const quick = yield* tickets.quickCreate("org", "user-1", "p", {
+        title: "Two"
+      })
+      yield* tickets.update("org", "user-1", "p", created.id, {
+        body: "# One\nedited\n"
+      })
+
+      expect(figmaLinks.calls.map((call) => call.ticketId)).toEqual([
+        created.id,
+        quick.id,
+        created.id
+      ])
+      expect(figmaLinks.calls[0]!.body).toContain("figma.com")
+      expect(figmaLinks.calls[2]!.body).toContain("edited")
     }).pipe(Effect.provide(layer))
   }
 )

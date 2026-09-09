@@ -1,4 +1,11 @@
 import * as Match from "effect/Match"
+import {
+  FigmaAuthInvalid,
+  FigmaError,
+  FigmaFileNotFound,
+  FigmaNotConnected,
+  FigmaRateLimited
+} from "@projectproject/shared"
 import type {
   AttachmentNotUploaded,
   AttachmentTooLarge,
@@ -58,6 +65,11 @@ export type AppError =
   | AttachmentTooLarge
   | AttachmentTypeRejected
   | AttachmentNotUploaded
+  | FigmaNotConnected
+  | FigmaAuthInvalid
+  | FigmaRateLimited
+  | FigmaFileNotFound
+  | FigmaError
 
 export const errorMessage = (error: AppError): string =>
   Match.value(error)
@@ -111,8 +123,31 @@ export const errorMessage = (error: AppError): string =>
       Match.tag("AttachmentNotUploaded", () =>
         m.editor_attachment_upload_failed()
       ),
+      Match.tag("FigmaNotConnected", () => m.figma_error_not_connected()),
+      Match.tag("FigmaAuthInvalid", () => m.figma_error_auth_invalid()),
+      Match.tag("FigmaRateLimited", () => m.figma_error_rate_limited()),
+      Match.tag("FigmaFileNotFound", () => m.figma_error_file_not_found()),
+      Match.tag("FigmaError", () => m.figma_error_generic()),
       Match.orElse(() => m.error_unknown())
     )
+
+export const figmaStatusErrorMessage = (reason: string): string => {
+  const error: AppError = (() => {
+    switch (reason) {
+      case "figma_not_connected":
+        return new FigmaNotConnected()
+      case "figma_auth_invalid":
+        return new FigmaAuthInvalid()
+      case "figma_rate_limited":
+        return new FigmaRateLimited({ retryAfterSeconds: 60 })
+      case "figma_file_not_found":
+        return new FigmaFileNotFound({ fileKey: "" })
+      default:
+        return new FigmaError({ reason })
+    }
+  })()
+  return errorMessage(error)
+}
 
 const conflictReason = (error: unknown): string | null => {
   if (

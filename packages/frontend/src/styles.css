@@ -255,7 +255,7 @@
 /* Tailwind preflight already zeroes UA paragraph margins; the `> * + *` rule
    above provides spacing between sibling blocks. No explicit `margin: 0` here
    — that would override the spacing rule via specificity. */
-.prose-md a,
+.prose-md a:not([data-slot="button"]),
 .prose-md .lexical-link {
   color: var(--foreground);
   text-decoration: underline;
@@ -280,12 +280,12 @@
 .prose-md .lexical-link {
   cursor: pointer;
 }
-.prose-md a:hover,
+.prose-md a:not([data-slot="button"]):hover,
 .prose-md .lexical-link:hover {
   background-color: color-mix(in oklch, var(--foreground) 6%, transparent);
   text-decoration-color: var(--foreground);
 }
-.prose-md a:focus-visible,
+.prose-md a:not([data-slot="button"]):focus-visible,
 .prose-md .lexical-link:focus-visible {
   outline: none;
   background-color: color-mix(in oklch, var(--foreground) 8%, transparent);

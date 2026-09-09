@@ -280,6 +280,7 @@ function Button({
     props: {
       ...props,
       ref,
+      "data-slot": "button",
       className: compClassName,
       disabled: disabled || loading,
       style,
