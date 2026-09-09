@@ -14,6 +14,9 @@ describe("Button", () => {
 
     expect(button.classList.contains("px-1.5")).toBe(true)
     expect(button.classList.contains("px-3")).toBe(false)
+    expect(button.classList.contains("w-fit")).toBe(true)
+    expect(button.classList.contains("max-w-full")).toBe(true)
+    expect(button.classList.contains("w-full")).toBe(false)
   })
 
   it.each([

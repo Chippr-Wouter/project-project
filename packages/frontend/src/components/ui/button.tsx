@@ -40,7 +40,7 @@ const buttonVariants = cva(
         ghost:
           "text-muted-foreground bg-transparent hover:bg-muted hover:text-foreground active:bg-muted/60",
         "sidebar-link":
-          "w-full justify-start bg-transparent text-muted-foreground hover:bg-accent/60 hover:text-foreground active:bg-accent",
+          "w-fit max-w-full justify-start bg-transparent text-muted-foreground hover:bg-accent/60 hover:text-foreground active:bg-accent",
         "inline-help":
           "ml-1 bg-transparent align-middle text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground active:bg-muted/60",
         chip: "text-foreground bg-transparent hover:bg-accent hover:text-foreground active:bg-accent/80",

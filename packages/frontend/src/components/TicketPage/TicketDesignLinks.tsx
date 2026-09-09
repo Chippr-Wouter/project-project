@@ -91,7 +91,7 @@ function LinkContents({
         <span className="truncate">{name}</span>
       </span>
       <ExternalLink
-        className="size-3 shrink-0 text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
+        className="size-3 shrink-0 text-muted-foreground"
         strokeWidth={1.75}
         aria-hidden="true"
       />
