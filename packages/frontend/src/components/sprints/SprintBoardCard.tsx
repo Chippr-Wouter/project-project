@@ -1,4 +1,4 @@
-import { memo, type HTMLAttributes } from "react"
+import { memo, useMemo, type HTMLAttributes } from "react"
 import { useLinkProps, useNavigate } from "@tanstack/react-router"
 import { useAtomValue } from "@effect/atom-react"
 import {
@@ -32,10 +32,14 @@ function SprintBoardCardImpl({
     updatePreview.input
   )
   const navigate = useNavigate()
+  const linkParams = useMemo(
+    () => ({ orgSlug, slug, id: visibleTicket.id }),
+    [orgSlug, slug, visibleTicket.id]
+  )
   const { onMouseEnter, onMouseLeave, onFocus, onBlur, onTouchStart } =
     useLinkProps({
       to: "/orgs/$orgSlug/projects/$slug/tickets/$id",
-      params: { orgSlug, slug, id: visibleTicket.id },
+      params: linkParams,
       preload: "intent"
     })
   const preload: HTMLAttributes<HTMLElement> = {

@@ -71,6 +71,7 @@ import { PageContainer } from "@/components/page"
 import { m } from "@/paraglide/messages"
 import { TagRenamesProvider } from "@/components/TagRenamesProvider"
 import { ProjectContext } from "./-context"
+import type { FileRouteTypes } from "@/routeTree.gen"
 import type {
   Group,
   ProjectDetail as ProjectDetailType,
@@ -104,9 +105,9 @@ export const Route = createFileRoute("/_authed/orgs/$orgSlug/projects/$slug")({
   }
 })
 
-const TICKET_DETAIL_ROUTE_ID =
+const TICKET_DETAIL_ROUTE_ID: FileRouteTypes["id"] =
   "/_authed/orgs/$orgSlug/projects/$slug/tickets/$id"
-const PROJECT_SETTINGS_ROUTE_ID =
+const PROJECT_SETTINGS_ROUTE_ID: FileRouteTypes["id"] =
   "/_authed/orgs/$orgSlug/projects/$slug/settings"
 
 function ProjectLayout() {
@@ -117,8 +118,7 @@ function ProjectLayout() {
       matches.some(
         (match) =>
           match.routeId === TICKET_DETAIL_ROUTE_ID ||
-          match.routeId === PROJECT_SETTINGS_ROUTE_ID ||
-          match.routeId.startsWith(`${PROJECT_SETTINGS_ROUTE_ID}/`)
+          match.routeId === PROJECT_SETTINGS_ROUTE_ID
       )
   })
 

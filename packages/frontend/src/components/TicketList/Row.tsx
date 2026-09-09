@@ -1,5 +1,6 @@
 import {
   memo,
+  useMemo,
   useRef,
   useState,
   type HTMLAttributes,
@@ -74,10 +75,14 @@ function RowImpl({
   const rowElement = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const [previewMounted, setPreviewMounted] = useState(false)
+  const linkParams = useMemo(
+    () => ({ orgSlug, slug, id: ticket.id }),
+    [orgSlug, slug, ticket.id]
+  )
   const { onMouseEnter, onMouseLeave, onFocus, onBlur, onTouchStart } =
     useLinkProps({
       to: "/orgs/$orgSlug/projects/$slug/tickets/$id",
-      params: { orgSlug, slug, id: ticket.id },
+      params: linkParams,
       preload: "intent"
     })
   const preload: HTMLAttributes<HTMLElement> = {
