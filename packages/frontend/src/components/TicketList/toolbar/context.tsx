@@ -50,6 +50,7 @@ type SearchValue = string | ReadonlyArray<string> | undefined
 type SearchRecord = { readonly [k: string]: SearchValue }
 
 const EMPTY_STATUSES: ReadonlyArray<ProjectStatus> = []
+const EMPTY_TAGS: ReadonlyArray<TagName> = []
 
 const FULL_FITS_ROW = 720
 const ALL_COMPACT_FITS_ROW = 460
@@ -188,7 +189,10 @@ export function ToolbarProvider({
         ? "unassigned"
         : filter.assignee[0]
       : "all"
-  const selectedTags: ReadonlyArray<TagName> = filter?.tags ?? []
+  const selectedTags = useMemo<ReadonlyArray<TagName>>(
+    () => filter?.tags ?? EMPTY_TAGS,
+    [filter?.tags]
+  )
   const sprintFilter: SprintFilterValue =
     filter?.groupId?.length === 1
       ? filter.groupId[0] === null
