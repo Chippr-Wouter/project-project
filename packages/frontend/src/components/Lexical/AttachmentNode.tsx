@@ -40,7 +40,7 @@ import {
   type AttachmentDensity
 } from "@projectproject/shared"
 import { Button } from "@/components/ui/button"
-import { AttachmentChip } from "@/components/Lexical/AttachmentChip"
+import { AttachmentChip } from "@/components/AttachmentChip"
 import { AttachmentTile } from "@/components/Lexical/AttachmentTile"
 import { standardEaseCss, transitions } from "@/lib/springs"
 import {

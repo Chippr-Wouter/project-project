@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vite-plus/test"
 import {
+  formatAttachmentMarkdown,
   attachmentViewParams,
   parseAttachmentUrl
 } from "@projectproject/shared"
 import {
   ATTACHMENT_MARKDOWN_RE,
-  formatAttachmentMarkdown,
   unescapeAttachmentAlt
 } from "./attachmentTransformer"
 

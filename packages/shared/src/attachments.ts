@@ -79,6 +79,21 @@ export const withAttachmentParams = (
   return query.length === 0 ? base : `${base}?${query.join("&")}`
 }
 
+export const formatAttachmentMarkdown = (input: {
+  readonly kind: "image" | "file"
+  readonly alt: string
+  readonly url: string
+  readonly width?: number | null
+  readonly density?: AttachmentDensity
+}): string => {
+  const alt = input.alt.replace(/([[\]\\*_`~&<>])/g, "\\$1")
+  const url = withAttachmentParams(input.url, {
+    width: input.width,
+    density: input.density
+  })
+  return `${input.kind === "image" ? "!" : ""}[${alt}](${url})`
+}
+
 const unanchored = (pattern: RegExp) => pattern.source.replace(/^\^|\$$/g, "")
 
 const ATTACHMENT_URL_CANDIDATE_RE = new RegExp(

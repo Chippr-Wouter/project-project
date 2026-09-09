@@ -2,6 +2,8 @@ import type * as Schema from "effect/Schema"
 import * as Effect from "effect/Effect"
 import {
   CurrentUser,
+  formatAttachmentMarkdown,
+  isRasterImageContentType,
   type McpTools,
   DEFAULT_TICKET_SORT,
   Unauthorized,
@@ -359,12 +361,22 @@ const prepare_ticket_attachment = Effect.fn("prepare_ticket_attachment")(
   ) {
     const current = yield* CurrentUser
     const uploads = yield* AttachmentUploads.AttachmentUploads
-    const { orgSlug, projectSlug, ticketId, ...payload } = input
-    return yield* uploads.prepare(
+    const { orgSlug, projectSlug, ticketId, density, width, ...payload } = input
+    const prepared = yield* uploads.prepare(
       { orgSlug, projectSlug, ticketId },
       current.id,
       payload
     )
+    return {
+      ...prepared,
+      markdown: formatAttachmentMarkdown({
+        kind: isRasterImageContentType(payload.contentType) ? "image" : "file",
+        alt: payload.filename,
+        url: prepared.url,
+        density,
+        width
+      })
+    }
   }
 )
 

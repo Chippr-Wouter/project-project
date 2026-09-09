@@ -4,7 +4,7 @@ import {
   attachmentFileFormat,
   type AttachmentFileFormat
 } from "@projectproject/shared"
-import { AttachmentDownload } from "@/components/Lexical/AttachmentDownload"
+import { AttachmentDownload } from "@/components/AttachmentDownload"
 import { transitions } from "@/lib/springs"
 import { cn } from "@/lib/utils"
 import { m } from "@/paraglide/messages"

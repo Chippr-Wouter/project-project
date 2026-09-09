@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { motion } from "motion/react"
 import { transitions } from "@/lib/springs"
-import { AttachmentDownload } from "@/components/Lexical/AttachmentDownload"
+import { AttachmentDownload } from "@/components/AttachmentDownload"
 import { FileText, Image as ImageIcon } from "lucide-react"
 import {
   Popover,

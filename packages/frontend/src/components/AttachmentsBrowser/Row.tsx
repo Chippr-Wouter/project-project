@@ -5,7 +5,7 @@ import {
   isRasterImageContentType
 } from "@projectproject/shared"
 import type { AttachmentRow, AttachmentTicketRef } from "@projectproject/shared"
-import { formatAttachmentMarkdown } from "@/components/Lexical/attachmentTransformer"
+import { formatAttachmentMarkdown } from "@projectproject/shared"
 import { CopyButton } from "@/components/ui/copy-button"
 import {
   Tooltip,

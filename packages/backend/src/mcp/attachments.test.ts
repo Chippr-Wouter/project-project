@@ -734,6 +734,119 @@ describe.skipIf(!databaseUrl)("MCP attachment upload with Postgres", () => {
 })
 
 describe("MCP attachment contracts", () => {
+  it.each([
+    { density: "compact", width: 320 },
+    { density: "rich" },
+    { width: 1 }
+  ])("accepts attachment display options %j", (options) => {
+    expect(
+      Schema.is(McpTools.prepare_ticket_attachment.input)({
+        orgSlug: "acme",
+        projectSlug: "demo",
+        ticketId: "T-122",
+        ...upload,
+        ...options
+      })
+    ).toBe(true)
+  })
+
+  it.each([
+    { density: "small" },
+    { width: 0 },
+    { width: -1 },
+    { width: 1.5 },
+    { width: "320" },
+    { width: Infinity }
+  ])("rejects invalid attachment display options %j", (options) => {
+    expect(
+      Schema.is(McpTools.prepare_ticket_attachment.input)({
+        orgSlug: "acme",
+        projectSlug: "demo",
+        ticketId: "T-122",
+        ...upload,
+        ...options
+      })
+    ).toBe(false)
+  })
+
+  it.effect.each([
+    {
+      contentType: "image/png",
+      filename: "screen[1].png",
+      density: "compact" as const,
+      width: 320,
+      expected: "![screen\\[1\\].png](URL?w=320&d=compact)"
+    },
+    {
+      contentType: "application/zip",
+      filename: "archive.zip",
+      density: "compact" as const,
+      expected: "[archive.zip](URL?d=compact)"
+    },
+    {
+      contentType: "image/png",
+      filename: "screen.png",
+      expected: "![screen.png](URL)"
+    }
+  ])("prepares ready-to-paste markdown: $filename", (options) =>
+    Effect.gen(function* () {
+      const url = "/api/attachments/acme/01JBX7Q2K9ZWCVE8MTQ4RXPGHN"
+      const prepare = vi.fn<
+        AttachmentUploads.AttachmentUploads["Service"]["prepare"]
+      >(() =>
+        Effect.succeed({
+          id: "01JBX7Q2K9ZWCVE8MTQ4RXPGHN",
+          url,
+          uploadUrl: "https://example.test/upload?token=secret",
+          expiresAt: Schema.decodeSync(Schema.DateFromString)(
+            "2026-09-09T00:00:00Z"
+          )
+        })
+      )
+      const { expected, ...input } = options
+      const decoded = yield* Schema.decodeEffect(
+        McpTools.prepare_ticket_attachment.input
+      )({
+        orgSlug: "acme",
+        projectSlug: "demo",
+        ticketId: "T-122",
+        ...input
+      })
+      const result = yield* handlers
+        .prepare_ticket_attachment(decoded)
+        .pipe(
+          Effect.provideService(CurrentUser, user),
+          Effect.provide(
+            Layer.mergeAll(
+              Layer.mock(AttachmentUploads.AttachmentUploads, { prepare }),
+              Layer.mock(BetterAuth.BetterAuth, {}),
+              Layer.mock(Comments.Comments, {}),
+              Layer.mock(GroupDocs.GroupDocs, {}),
+              Layer.mock(Groups.Groups, {}),
+              Layer.mock(OrgStorage.OrgStorage, {}),
+              Layer.mock(ProjectDocs.ProjectDocs, {}),
+              Layer.mock(Projects.Projects, {}),
+              Layer.mock(Tags.Tags, {}),
+              Layer.mock(TicketDocs.TicketDocs, {}),
+              Layer.mock(TicketIndex.TicketIndex, {}),
+              Layer.mock(Tickets.Tickets, {}),
+              Layer.mock(Users.Users, {})
+            )
+          )
+        )
+      expect(result.markdown).toBe(expected.replace("URL", url))
+      expect(result.url).toBe(url)
+      expect(result.markdown).not.toContain("secret")
+      expect(prepare.mock.calls[0]?.[2]).toEqual({
+        filename: input.filename,
+        contentType: input.contentType
+      })
+      expect(Schema.is(McpTools.prepare_ticket_attachment.output)(result)).toBe(
+        true
+      )
+    })
+  )
+
   it("requires a ticket but no byte size", () => {
     const scope = { orgSlug: "acme", projectSlug: "demo", ticketId: "T-122" }
     expect(
