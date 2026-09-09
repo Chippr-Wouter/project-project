@@ -36,6 +36,7 @@ const FakeTicketDocs = Layer.succeed(TicketDocs, {
   read: () => unexpected("TicketDocs.read"),
   create: () => unexpected("TicketDocs.create"),
   write: () => unexpected("TicketDocs.write"),
+  update: () => unexpected("TicketDocs.update"),
   remove: () => unexpected("TicketDocs.remove"),
   readRaw: () => unexpected("TicketDocs.readRaw")
 } satisfies TicketDocsShape)
@@ -62,7 +63,8 @@ const rebuiltDocument: TicketDocument = {
   createdBy: "test-user",
   createdAt: DateTime.toDate(DateTime.makeUnsafe("2026-01-01T00:00:00.000Z")),
   updatedAt: DateTime.toDate(DateTime.makeUnsafe("2026-01-01T00:00:00.000Z")),
-  body: "# Restored ticket\n"
+  body: "# Restored ticket\n",
+  commentsRegion: ""
 }
 
 const indexedDocument = (
@@ -82,6 +84,7 @@ const RebuildTicketDocs = Layer.succeed(TicketDocs, {
   read: () => Effect.succeed(rebuiltDocument),
   create: () => unexpected("TicketDocs.create"),
   write: () => unexpected("TicketDocs.write"),
+  update: () => unexpected("TicketDocs.update"),
   remove: () => unexpected("TicketDocs.remove"),
   readRaw: () => unexpected("TicketDocs.readRaw")
 } satisfies TicketDocsShape)

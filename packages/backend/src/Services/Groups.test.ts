@@ -67,7 +67,8 @@ function makeTicketDocument(
     createdBy: "user-1",
     createdAt: now,
     updatedAt: now,
-    body: ""
+    body: "",
+    commentsRegion: ""
   }
 }
 
@@ -151,6 +152,7 @@ function makeFakeDocs(initial?: {
       return Effect.void
     },
     remove: () => unexpectedTicketDocsCall("remove"),
+    update: () => unexpectedTicketDocsCall("update"),
     readRaw: () => unexpectedTicketDocsCall("readRaw")
   } satisfies TicketDocsShape
 
