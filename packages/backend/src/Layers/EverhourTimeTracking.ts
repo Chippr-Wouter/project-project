@@ -184,11 +184,14 @@ export const EverhourTimeTrackingLive = Layer.effect(
     const loadSprints = (orgSlug: string, slug: string) =>
       Effect.gen(function* () {
         const ids = yield* groupDocs.listIds(orgSlug, slug).pipe(Effect.orDie)
-        const groups = yield* Effect.forEach(ids, (id) =>
-          groupDocs.read(orgSlug, slug, id).pipe(
-            Effect.catchTag("NotFound", () => Effect.succeed(null)),
-            Effect.orDie
-          )
+        const groups = yield* Effect.forEach(
+          ids,
+          (id) =>
+            groupDocs.read(orgSlug, slug, id).pipe(
+              Effect.catchTag("NotFound", () => Effect.succeed(null)),
+              Effect.orDie
+            ),
+          { concurrency: 8 }
         )
         return groups
           .filter(
