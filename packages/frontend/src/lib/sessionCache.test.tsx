@@ -203,6 +203,7 @@ it("switches the visible sidebar and list together and clears page drafts while 
           slug: "project",
           key: "PROJ",
           name: org + " project",
+          banner: null,
           icon: "box",
           color: "#94a3b8",
           createdBy: "alice",
