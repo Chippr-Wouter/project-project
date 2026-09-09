@@ -121,6 +121,7 @@
   "tickets_status_validation_reserved": "That name is reserved by a built-in status.",
   "tickets_status_validation_slug_exists": "A status with this name already exists.",
   "tickets_title_aria_label": "Ticket title",
+  "tickets_title_save_error": "Could not save the title. Try again.",
   "tickets_type_aria_label": "Type: {label}. Click to change.",
   "tickets_type_bug": "Bug",
   "tickets_type_chore": "Chore",

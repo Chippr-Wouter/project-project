@@ -64,21 +64,49 @@ export function TicketPage({
             params: { orgSlug, slug }
           }}
         />
-        <MarkdownSaveIndicator status={bodyStatus} />
+        <div className="flex items-center gap-2">
+          <MarkdownSaveIndicator status={bodyStatus} />
+          <ArchiveTicketControl
+            orgSlug={orgSlug}
+            slug={slug}
+            id={ticket.id}
+            archived={ticket.archivedAt !== null}
+          />
+          <ConfirmDeleteIcon
+            ariaLabel={m.tickets_detail_delete_aria_label()}
+            message={m.tickets_detail_delete_confirm()}
+            disabled={deleting}
+            onConfirm={async () => {
+              setDeleting(true)
+              const exit = await remove()
+              if (Exit.isSuccess(exit)) {
+                void navigate({
+                  to: "/orgs/$orgSlug/projects/$slug",
+                  params: { orgSlug, slug }
+                })
+                return
+              }
+              setDeleting(false)
+              throw Cause.squash(exit.cause)
+            }}
+          />
+        </div>
       </div>
       <header className="flex items-start gap-2">
-        <StatusButton
-          orgSlug={orgSlug}
-          slug={slug}
-          ticket={ticket}
-          query={{ sort: { key: "updated", dir: "desc" } }}
-          size="lg"
-        />
+        <div className="mt-1.5 flex h-[1lh] shrink-0 items-center text-xl">
+          <StatusButton
+            orgSlug={orgSlug}
+            slug={slug}
+            ticket={ticket}
+            query={{ sort: { key: "updated", dir: "desc" } }}
+            size="lg"
+          />
+        </div>
         <div className="flex min-w-0 flex-1 flex-col items-start gap-1">
           <h1 className="w-full">
             <TitleField orgSlug={orgSlug} slug={slug} ticket={ticket} />
           </h1>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 px-2">
             <span className="font-mono text-xs tabular-nums text-muted-foreground">
               {ticket.id}
             </span>
@@ -91,30 +119,6 @@ export function TicketPage({
             )}
           </div>
         </div>
-        <ArchiveTicketControl
-          orgSlug={orgSlug}
-          slug={slug}
-          id={ticket.id}
-          archived={ticket.archivedAt !== null}
-        />
-        <ConfirmDeleteIcon
-          ariaLabel={m.tickets_detail_delete_aria_label()}
-          message={m.tickets_detail_delete_confirm()}
-          disabled={deleting}
-          onConfirm={async () => {
-            setDeleting(true)
-            const exit = await remove()
-            if (Exit.isSuccess(exit)) {
-              void navigate({
-                to: "/orgs/$orgSlug/projects/$slug",
-                params: { orgSlug, slug }
-              })
-              return
-            }
-            setDeleting(false)
-            throw Cause.squash(exit.cause)
-          }}
-        />
       </header>
 
       <div className="h-px bg-border/60" />

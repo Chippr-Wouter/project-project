@@ -212,7 +212,7 @@ export function StatusButton({
   const statusLabel = statusLabelFor(currentStatus, statuses)
   const wrapperClass =
     size === "lg"
-      ? "-mt-1 grid size-10 place-items-center rounded-lg bg-muted transition-colors group-hover/hitbox:bg-foreground/5"
+      ? "grid size-10 place-items-center rounded-lg bg-muted transition-colors group-hover/hitbox:bg-foreground/5"
       : cn(
           "grid size-6 place-items-center rounded-full transition-colors group-hover/hitbox:bg-foreground/5",
           meta.className
