@@ -11,6 +11,7 @@ export type TicketCreatorShellProps = {
   inputRef: Ref<HTMLInputElement>
   value: string
   onValueChange: (next: string) => void
+  onPointerEnter?: () => void
   onFocus?: () => void
   onBlur?: () => void
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void
@@ -34,6 +35,7 @@ function _TicketCreatorShell(
     inputRef,
     value,
     onValueChange,
+    onPointerEnter,
     onFocus,
     onBlur,
     onKeyDown,
@@ -65,6 +67,7 @@ function _TicketCreatorShell(
           ref={inputRef}
           value={value}
           onChange={(e) => onValueChange(e.target.value)}
+          onPointerEnter={onPointerEnter}
           onFocus={onFocus}
           onBlur={onBlur}
           onKeyDown={onKeyDown}

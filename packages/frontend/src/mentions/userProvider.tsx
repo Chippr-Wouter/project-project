@@ -1,5 +1,6 @@
 import * as Effect from "effect/Effect"
-import { ApiClient } from "@/services/ApiClient"
+import * as Registry from "effect/unstable/reactivity/AtomRegistry"
+import { meAtom } from "@/atoms/auth"
 import { MemberAvatar } from "@/components/MemberAvatar"
 import type { MentionProvider } from "./registry"
 
@@ -26,8 +27,8 @@ export const userMentionProvider: MentionProvider = {
           image: m.image
         }))
       }
-      const client = yield* ApiClient
-      const me = yield* client.auth.me()
+      const registry = yield* Registry.AtomRegistry
+      const me = yield* Registry.getResult(registry, meAtom)
       const label = me.name ?? me.id
       if (
         q &&
