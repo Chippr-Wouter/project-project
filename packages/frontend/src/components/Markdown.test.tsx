@@ -104,3 +104,15 @@ it("keeps formatted labels readable on hand-authored compact links", () => {
   )
   expect(screen.getByText("report.pdf")).toBeDefined()
 })
+
+it("preserves links around compact images without nesting download links", () => {
+  render(
+    <Markdown>{`[**![shot](/api/attachments/acme/${ID}?d=compact)**](https://example.test)`}</Markdown>
+  )
+  expect(screen.getAllByRole("link")).toHaveLength(1)
+  expect(screen.getByRole("link").getAttribute("href")).toBe(
+    "https://example.test"
+  )
+  expect(screen.getByText("shot")).toBeDefined()
+  expect(screen.queryByRole("img")).toBeNull()
+})

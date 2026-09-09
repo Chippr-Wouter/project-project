@@ -1,4 +1,10 @@
-import { Children, isValidElement, useId, type ReactNode } from "react"
+import {
+  Children,
+  cloneElement,
+  isValidElement,
+  useId,
+  type ReactNode
+} from "react"
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown"
 import remarkGfm from "remark-gfm"
 import rehypePrismPlus from "rehype-prism-plus"
@@ -36,6 +42,40 @@ const attachmentLabel = (children: ReactNode): string =>
     })
     .join("")
 
+const linkedAttachmentContent = (
+  children: ReactNode,
+  morphId: string
+): ReactNode =>
+  Children.map(children, (child, index) => {
+    if (
+      !isValidElement<{ src?: string; alt?: string; children?: ReactNode }>(
+        child
+      )
+    )
+      return child
+    const { src, alt, children: nested } = child.props
+    const id = `${morphId}-${index}`
+    if (
+      src &&
+      parseAttachmentUrl(src) &&
+      attachmentViewParams(src).density === "compact"
+    ) {
+      return (
+        <AttachmentChip
+          variant="linked"
+          url={attachmentSrc(src)}
+          alt={alt ?? ""}
+          filename={alt ?? ""}
+          kind="image"
+          morphId={id}
+        />
+      )
+    }
+    return nested === undefined
+      ? child
+      : cloneElement(child, {}, linkedAttachmentContent(nested, id))
+  })
+
 export function Markdown({
   children,
   className
@@ -72,7 +112,10 @@ export function Markdown({
             if (!ref) {
               return (
                 <a href={href} {...rest}>
-                  {linkChildren}
+                  {linkedAttachmentContent(
+                    linkChildren,
+                    `${attachmentId}-${node?.position?.start.offset}`
+                  )}
                 </a>
               )
             }

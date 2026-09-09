@@ -170,3 +170,14 @@ describe("formatAttachmentMarkdown density round-trip", () => {
     expect(attachmentViewParams(url).density).toBe("compact")
   })
 })
+
+it("round-trips large widths without decoding a plus sign as a space", () => {
+  const markdown = formatAttachmentMarkdown({
+    kind: "image",
+    alt: "shot",
+    url: URL,
+    width: 1e21
+  })
+  const match = markdown.match(ATTACHMENT_MARKDOWN_RE)
+  expect(attachmentViewParams(match![3]).width).toBe(1e21)
+})

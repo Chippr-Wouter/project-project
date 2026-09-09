@@ -71,7 +71,9 @@ export const withAttachmentParams = (
   const query: Array<string> = []
   const width = params.width ?? null
   if (width !== null && Number.isFinite(width) && width > 0) {
-    query.push(`${WIDTH_PARAM}=${Math.max(1, Math.round(width))}`)
+    query.push(
+      `${WIDTH_PARAM}=${encodeURIComponent(Math.max(1, Math.round(width)))}`
+    )
   }
   if (params.density === "compact") {
     query.push(`${DENSITY_PARAM}=compact`)

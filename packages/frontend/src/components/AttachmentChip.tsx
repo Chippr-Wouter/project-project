@@ -55,16 +55,26 @@ export function AttachmentChip({
   filename,
   kind,
   morphId,
-  onBroken
+  onBroken,
+  variant = "default"
 }: {
   url: string
   alt: string
   filename: string
   kind: "image" | "file"
   morphId: string
+  variant?: "default" | "linked"
   onBroken?: () => void
 }) {
   const [broken, setBroken] = useState(false)
+
+  if (variant === "linked") {
+    return (
+      <span className={CHIP}>
+        <ChipBody filename={filename} kind={kind} morphId={morphId} />
+      </span>
+    )
+  }
 
   if (kind !== "image" || broken) {
     return (
@@ -78,6 +88,7 @@ export function AttachmentChip({
   return (
     <Popover>
       <PopoverTrigger
+        nativeButton={false}
         openOnHover
         delay={HOVER_DELAY_MS}
         render={<span className={CHIP} />}
