@@ -21,6 +21,45 @@ import {
   type UpdateTicketInput
 } from "@projectproject/shared"
 
+const watchTicketContent = Effect.fn(function* (
+  get: Atom.AtomContext,
+  orgSlug: string,
+  slug: string,
+  query: {
+    q?: string
+    sort?: { key: string }
+    filter?: { updatedAfter?: Date }
+  }
+) {
+  const reactivity = yield* Reactivity.Reactivity
+  const project = `${orgSlug}/${slug}`
+  const queryKeys = [
+    ...(query.q || query.sort?.key === "title"
+      ? [`ticket-title-query/${project}`]
+      : []),
+    ...(query.sort?.key === "updated" || query.filter?.updatedAfter
+      ? [`ticket-updated-query/${project}`]
+      : [])
+  ]
+  const refresh = () => get.refreshSelf()
+  let release = reactivity.registerUnsafe(
+    [`ticket-content/${project}`, ...queryKeys],
+    refresh
+  )
+  get.addFinalizer(() => release())
+  return (tickets: ReadonlyArray<Ticket>, paginated = false) => {
+    release()
+    release = reactivity.registerUnsafe(
+      [
+        ...queryKeys,
+        ...(paginated ? [`ticket-title-query/${project}`] : []),
+        ...tickets.map((ticket) => `ticket-content/${project}/${ticket.id}`)
+      ],
+      refresh
+    )
+  }
+})
+
 class MalformedQuery extends Data.TaggedError("MalformedQuery")<{
   readonly cause: unknown
 }> {}
@@ -137,14 +176,21 @@ const sectionsKeyForListKey = (key: string) => {
 export const ticketsSectionsBaseAtom = Atom.family((key: string) => {
   const { orgSlug, slug, queryJson } = splitFamilyKey(key)
   return runtime
-    .atom(
+    .atom((get) =>
       Effect.gen(function* () {
         const query = yield* decodeListQuery(queryJson)
         const client = yield* ApiClient
+        const track = yield* watchTicketContent(get, orgSlug, slug, query)
         const snapshot = yield* client.tickets.sections({
           params: { orgSlug, slug },
           query: ticketListQueryToSearch(query)
         })
+        track(
+          Object.values(snapshot.sections).flatMap((page) => page.items),
+          Object.values(snapshot.sections).some(
+            (page) => page.nextCursor !== null
+          )
+        )
         const value: TicketSectionsValue = {
           counts: snapshot.counts,
           sections: Object.fromEntries(
@@ -167,7 +213,10 @@ export const ticketsSectionsBaseAtom = Atom.family((key: string) => {
     .pipe(
       Atom.withReactivity([
         `tickets/${orgSlug}/${slug}`,
-        `ticket-lists/${orgSlug}/${slug}`
+        `ticket-lists/${orgSlug}/${slug}`,
+        ...(decodeStoredQuery(queryJson).filter?.groupId?.length
+          ? [`sprint-membership/${orgSlug}/${slug}`]
+          : [])
       ]),
       Atom.setIdleTTL("2 minutes")
     )
@@ -336,6 +385,7 @@ const decodeCountQuery = (queryJson: string) =>
 
 const ticketsCountBaseAtom = Atom.family((key: string) => {
   const { orgSlug, slug, queryJson } = splitFamilyKey(key)
+  const query = decodeCountQueryFromKey(JSON.parse(queryJson))
   return runtime
     .atom(
       Effect.gen(function* () {
@@ -350,7 +400,14 @@ const ticketsCountBaseAtom = Atom.family((key: string) => {
     .pipe(
       Atom.withReactivity([
         `tickets/${orgSlug}/${slug}`,
-        `ticket-lists/${orgSlug}/${slug}`
+        `ticket-lists/${orgSlug}/${slug}`,
+        ...(query.q ? [`ticket-title-query/${orgSlug}/${slug}`] : []),
+        ...(query.filter?.updatedAfter
+          ? [`ticket-updated-query/${orgSlug}/${slug}`]
+          : []),
+        ...(query.filter?.groupId?.length
+          ? [`sprint-membership/${orgSlug}/${slug}`]
+          : [])
       ]),
       Atom.setIdleTTL("2 minutes")
     )
@@ -442,7 +499,23 @@ export const updateTicketAtom = Atom.family((key: string) => {
         if (unsaved === payload) unsaved = {}
         const remote = ticketRemoteAtom(ticketKey(orgSlug, slug, id))
         get.refresh(remote)
-        yield* Reactivity.invalidate([`ticket-lists/${orgSlug}/${slug}`])
+        const contentOnly = Object.keys(payload).every(
+          (field) => field === "title" || field === "body"
+        )
+        const invalidationKeys: string[] = []
+        if (contentOnly) {
+          invalidationKeys.push(`ticket-updated-query/${orgSlug}/${slug}`)
+          if (payload.title !== undefined) {
+            invalidationKeys.push(
+              `ticket-content/${orgSlug}/${slug}`,
+              `ticket-content/${orgSlug}/${slug}/${id}`,
+              `ticket-title-query/${orgSlug}/${slug}`
+            )
+          }
+        } else {
+          invalidationKeys.push(`ticket-lists/${orgSlug}/${slug}`)
+        }
+        yield* Reactivity.invalidate(invalidationKeys)
         yield* get
           .result(remote, { suspendOnWaiting: true })
           .pipe(Effect.ignore)
@@ -639,18 +712,22 @@ const splitSprintKey = (
 export const ticketsInSprintAtom = Atom.family((key: string) => {
   const { orgSlug, slug, groupId } = splitSprintKey(key)
   return runtime
-    .atom(
+    .atom((get) =>
       Effect.gen(function* () {
         const client = yield* ApiClient
-        return yield* client.groups.listTickets({
+        const track = yield* watchTicketContent(get, orgSlug, slug, {})
+        const tickets = yield* client.groups.listTickets({
           params: { orgSlug, slug, id: groupId as GroupId }
         })
+        track(tickets)
+        return tickets
       })
     )
     .pipe(
       Atom.withReactivity([
         `tickets/${orgSlug}/${slug}`,
-        `ticket-lists/${orgSlug}/${slug}`
+        `ticket-lists/${orgSlug}/${slug}`,
+        `sprint-membership/${orgSlug}/${slug}/${groupId}`
       ]),
       Atom.setIdleTTL("2 minutes")
     )
@@ -719,7 +796,11 @@ export const ticketSearchAtom = Atom.family((key: string) => {
     .pipe(
       Atom.withReactivity([
         `tickets/${orgSlug}/${slug}`,
-        `ticket-lists/${orgSlug}/${slug}`
+        `ticket-lists/${orgSlug}/${slug}`,
+        `ticket-title-query/${orgSlug}/${slug}`,
+        ...(options.excludeGroupId
+          ? [`sprint-membership/${orgSlug}/${slug}`]
+          : [])
       ]),
       Atom.setIdleTTL("2 minutes")
     )
@@ -741,13 +822,12 @@ export const archiveTicketAtom = Atom.family((key: string) => {
           )
         : current,
     fn: runtime.fn(
-      Effect.fn(function* (input: { reason?: string }, get) {
+      Effect.fn(function* (input: { reason?: string }) {
         const client = yield* ApiClient
         const updated = yield* client.tickets.archive({
           params: { orgSlug, slug, id },
           payload: { reason: input.reason }
         })
-        get.refresh(ticketRemoteAtom(ticketKey(orgSlug, slug, id)))
         yield* Reactivity.invalidate([`tickets/${orgSlug}/${slug}`])
         return updated
       })
@@ -766,12 +846,11 @@ export const unarchiveTicketAtom = Atom.family((key: string) => {
           )
         : current,
     fn: runtime.fn(
-      Effect.fn(function* (_input: void, get) {
+      Effect.fn(function* (_input: void) {
         const client = yield* ApiClient
         const updated = yield* client.tickets.unarchive({
           params: { orgSlug, slug, id }
         })
-        get.refresh(ticketRemoteAtom(ticketKey(orgSlug, slug, id)))
         yield* Reactivity.invalidate([`tickets/${orgSlug}/${slug}`])
         return updated
       })
@@ -782,10 +861,9 @@ export const unarchiveTicketAtom = Atom.family((key: string) => {
 export const deleteTicketAtom = Atom.family((key: string) => {
   const { orgSlug, slug, id } = splitTicketKey(key)
   return runtime.fn(
-    Effect.fn(function* (_input: void, get) {
+    Effect.fn(function* (_input: void) {
       const client = yield* ApiClient
       yield* client.tickets.delete({ params: { orgSlug, slug, id } })
-      get.refresh(ticketRemoteAtom(ticketKey(orgSlug, slug, id)))
       yield* Reactivity.invalidate([`tickets/${orgSlug}/${slug}`])
     })
   )
@@ -831,20 +909,17 @@ export const updateTicketStatusAtom = Atom.family((key: string) => {
             sectionsKeyForListKey(input.sourceSectionKey)
           )
           const counts = ticketsCountBaseAtom(input.countKey)
-          get.refresh(detail)
-          get.refresh(sections)
+          yield* Reactivity.invalidate([`tickets/${orgSlug}/${slug}`])
           yield* get
             .result(detail, { suspendOnWaiting: true })
             .pipe(Effect.ignore)
           yield* get
             .result(sections, { suspendOnWaiting: true })
             .pipe(Effect.ignore)
-          get.refresh(counts)
           yield* get
             .result(counts, { suspendOnWaiting: true })
             .pipe(Effect.ignore)
           yield* clearPending
-          yield* Reactivity.invalidate([`tickets/${orgSlug}/${slug}`])
           return updated
         }).pipe(Effect.ensuring(clearPending))
       })
