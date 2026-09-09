@@ -2,7 +2,7 @@ import * as Context from "effect/Context"
 import type * as Effect from "effect/Effect"
 import type * as Layer from "effect/Layer"
 import type * as ManagedRuntime from "effect/ManagedRuntime"
-import type { McpServer as SdkMcpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
+import type { Server as SdkMcpServer } from "@modelcontextprotocol/sdk/server/index.js"
 import type { BackendInfrastructureLive, BackendServicesLive } from "../runtime"
 
 type McpToolServices =

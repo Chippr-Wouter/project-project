@@ -15,6 +15,7 @@ import {
   type GroupId,
   type QuickCreateTicketInput,
   type Ticket,
+  type TicketDetail,
   type TicketStatus,
   type UpdateTicketInput
 } from "@projectproject/shared"
@@ -122,7 +123,10 @@ const ticketsListBaseAtom = Atom.family((key: string) => {
       })
     )
     .pipe(
-      Atom.withReactivity(["tickets", orgSlug, slug]),
+      Atom.withReactivity([
+        `tickets/${orgSlug}/${slug}`,
+        `ticket-lists/${orgSlug}/${slug}`
+      ]),
       Atom.setIdleTTL("2 minutes")
     )
 })
@@ -260,7 +264,10 @@ const ticketsCountBaseAtom = Atom.family((key: string) => {
       })
     )
     .pipe(
-      Atom.withReactivity(["tickets", orgSlug, slug]),
+      Atom.withReactivity([
+        `tickets/${orgSlug}/${slug}`,
+        `ticket-lists/${orgSlug}/${slug}`
+      ]),
       Atom.setIdleTTL("2 minutes")
     )
 })
@@ -304,7 +311,7 @@ export const ticketBodyDraftAtom = Atom.family((_key: string) =>
   Atom.make<string | null>(null).pipe(Atom.setIdleTTL("10 minutes"))
 )
 
-export const ticketBaseAtom = Atom.family((key: string) => {
+const ticketRemoteAtom = Atom.family((key: string) => {
   const { orgSlug, slug, id } = splitTicketKey(key)
   return runtime
     .atom(
@@ -314,14 +321,119 @@ export const ticketBaseAtom = Atom.family((key: string) => {
       })
     )
     .pipe(
-      Atom.withReactivity(["tickets", orgSlug, slug]),
+      Atom.withReactivity([`tickets/${orgSlug}/${slug}`]),
       Atom.setIdleTTL("2 minutes")
     )
 })
 
-export const ticketAtom = Atom.family((key: string) =>
-  Atom.optimistic(ticketBaseAtom(key))
+const ticketUpdateBaseAtom = Atom.family((_key: string) =>
+  Atom.readable<UpdateTicketInput>(() => ({})).pipe(
+    Atom.setIdleTTL("2 minutes")
+  )
 )
+
+const optimisticTicketUpdateAtom = Atom.family((key: string) =>
+  Atom.optimistic(ticketUpdateBaseAtom(key))
+)
+
+const mergeTicketUpdateInput = (
+  current: UpdateTicketInput,
+  input: UpdateTicketInput
+): UpdateTicketInput => ({ ...current, ...input })
+
+export const updateTicketAtom = Atom.family((key: string) => {
+  const { orgSlug, slug, id } = splitTicketKey(key)
+  let unsaved: UpdateTicketInput = {}
+  return Atom.optimisticFn(optimisticTicketUpdateAtom(key), {
+    reducer: mergeTicketUpdateInput,
+    fn: runtime.fn(
+      Effect.fn(function* (input: UpdateTicketInput, get) {
+        unsaved = { ...unsaved, ...input }
+        const payload = unsaved
+        const client = yield* ApiClient
+        const updated = yield* client.tickets.update({
+          params: { orgSlug, slug, id },
+          payload
+        })
+        if (unsaved === payload) unsaved = {}
+        const remote = ticketRemoteAtom(ticketKey(orgSlug, slug, id))
+        get.refresh(remote)
+        yield* Reactivity.invalidate([`ticket-lists/${orgSlug}/${slug}`])
+        yield* get
+          .result(remote, { suspendOnWaiting: true })
+          .pipe(Effect.ignore)
+        return updated
+      })
+    )
+  })
+})
+
+const ticketDetailBaseAtom = Atom.family((key: string) =>
+  Atom.optimistic(ticketRemoteAtom(key)).pipe(Atom.setIdleTTL("2 minutes"))
+)
+
+export const ticketAtom = Atom.family((key: string) =>
+  Atom.readable((get) => {
+    const remote = get(ticketDetailBaseAtom(key))
+    if (!Result.isSuccess(remote)) return remote
+    const input = get(optimisticTicketUpdateAtom(key))
+    const mutation = get(updateTicketAtom(key))
+    const statusMutation = get(updateTicketStatusAtom(key))
+    const updated = Result.map(remote, (ticket) =>
+      applyOptimisticTicketUpdate(ticket, input)
+    )
+    return mutation.waiting || statusMutation.waiting
+      ? Result.waiting(updated)
+      : updated
+  }).pipe(Atom.setIdleTTL("2 minutes"))
+)
+
+export const hydrateTicketAtom = Atom.family((key: string) =>
+  Atom.optimisticFn(ticketDetailBaseAtom(key), {
+    reducer: (_current, ticket: TicketDetail) => Result.success(ticket),
+    fn: runtime.fn(
+      Effect.fn(function* (_ticket: TicketDetail, get) {
+        return yield* get.result(ticketRemoteAtom(key), {
+          suspendOnWaiting: true
+        })
+      })
+    )
+  })
+)
+
+export const ticketUpdatePreviewAtom = Atom.family((key: string) =>
+  Atom.readable((get) => ({
+    input: get(optimisticTicketUpdateAtom(key)),
+    waiting:
+      get(updateTicketAtom(key)).waiting ||
+      get(updateTicketStatusAtom(key)).waiting
+  }))
+)
+
+export function applyOptimisticTicketPreview(
+  ticket: Ticket,
+  input: UpdateTicketInput
+): Ticket {
+  return {
+    ...ticket,
+    title: input.title ?? ticket.title,
+    status: input.status ?? ticket.status,
+    type: input.type ?? ticket.type,
+    priority: input.priority ?? ticket.priority,
+    tags: input.tags ?? ticket.tags,
+    assignees: input.assignees ?? ticket.assignees
+  }
+}
+
+export function applyOptimisticTicketUpdate(
+  ticket: TicketDetail,
+  input: UpdateTicketInput
+): TicketDetail {
+  return {
+    ...applyOptimisticTicketPreview(ticket, input),
+    body: input.body ?? ticket.body
+  }
+}
 
 export interface QuickCreateTicketArg {
   readonly ticket: QuickCreateTicketInput
@@ -380,7 +492,11 @@ export const quickCreateTicketAtom = Atom.family((sectionKey: string) => {
           payload: input.ticket
         })
         get.refresh(ticketsListBaseAtom(sectionKey))
-        yield* Reactivity.invalidate(["tickets", orgSlug, slug])
+        yield* Reactivity.invalidate([`tickets/${orgSlug}/${slug}`])
+        get.set(
+          hydrateTicketAtom(ticketKey(orgSlug, slug, created.id)),
+          created
+        )
         return created
       })
     )
@@ -416,7 +532,10 @@ export const ticketsInSprintAtom = Atom.family((key: string) => {
       })
     )
     .pipe(
-      Atom.withReactivity(["tickets", orgSlug, slug]),
+      Atom.withReactivity([
+        `tickets/${orgSlug}/${slug}`,
+        `ticket-lists/${orgSlug}/${slug}`
+      ]),
       Atom.setIdleTTL("2 minutes")
     )
 })
@@ -482,30 +601,17 @@ export const ticketSearchAtom = Atom.family((key: string) => {
       })
     )
     .pipe(
-      Atom.withReactivity(["tickets", orgSlug, slug]),
+      Atom.withReactivity([
+        `tickets/${orgSlug}/${slug}`,
+        `ticket-lists/${orgSlug}/${slug}`
+      ]),
       Atom.setIdleTTL("2 minutes")
     )
 })
 
-export const updateTicketAtom = Atom.family((key: string) => {
-  const { orgSlug, slug, id } = splitTicketKey(key)
-  return runtime.fn(
-    Effect.fn(function* (input: UpdateTicketInput, get) {
-      const client = yield* ApiClient
-      const updated = yield* client.tickets.update({
-        params: { orgSlug, slug, id },
-        payload: input
-      })
-      get.refresh(ticketBaseAtom(ticketKey(orgSlug, slug, id)))
-      yield* Reactivity.invalidate(["tickets", orgSlug, slug])
-      return updated
-    })
-  )
-})
-
 export const archiveTicketAtom = Atom.family((key: string) => {
   const { orgSlug, slug, id } = splitTicketKey(key)
-  return Atom.optimisticFn(ticketAtom(key), {
+  return Atom.optimisticFn(ticketDetailBaseAtom(key), {
     reducer: (current, _input: { reason?: string }) =>
       Result.isSuccess(current)
         ? Result.success(
@@ -525,8 +631,8 @@ export const archiveTicketAtom = Atom.family((key: string) => {
           params: { orgSlug, slug, id },
           payload: { reason: input.reason }
         })
-        get.refresh(ticketBaseAtom(ticketKey(orgSlug, slug, id)))
-        yield* Reactivity.invalidate(["tickets", orgSlug, slug])
+        get.refresh(ticketRemoteAtom(ticketKey(orgSlug, slug, id)))
+        yield* Reactivity.invalidate([`tickets/${orgSlug}/${slug}`])
         return updated
       })
     )
@@ -535,7 +641,7 @@ export const archiveTicketAtom = Atom.family((key: string) => {
 
 export const unarchiveTicketAtom = Atom.family((key: string) => {
   const { orgSlug, slug, id } = splitTicketKey(key)
-  return Atom.optimisticFn(ticketAtom(key), {
+  return Atom.optimisticFn(ticketDetailBaseAtom(key), {
     reducer: (current, _input: void) =>
       Result.isSuccess(current)
         ? Result.success(
@@ -549,8 +655,8 @@ export const unarchiveTicketAtom = Atom.family((key: string) => {
         const updated = yield* client.tickets.unarchive({
           params: { orgSlug, slug, id }
         })
-        get.refresh(ticketBaseAtom(ticketKey(orgSlug, slug, id)))
-        yield* Reactivity.invalidate(["tickets", orgSlug, slug])
+        get.refresh(ticketRemoteAtom(ticketKey(orgSlug, slug, id)))
+        yield* Reactivity.invalidate([`tickets/${orgSlug}/${slug}`])
         return updated
       })
     )
@@ -563,8 +669,8 @@ export const deleteTicketAtom = Atom.family((key: string) => {
     Effect.fn(function* (_input: void, get) {
       const client = yield* ApiClient
       yield* client.tickets.delete({ params: { orgSlug, slug, id } })
-      get.refresh(ticketBaseAtom(ticketKey(orgSlug, slug, id)))
-      yield* Reactivity.invalidate(["tickets", orgSlug, slug])
+      get.refresh(ticketRemoteAtom(ticketKey(orgSlug, slug, id)))
+      yield* Reactivity.invalidate([`tickets/${orgSlug}/${slug}`])
     })
   )
 })
@@ -580,18 +686,9 @@ export interface UpdateTicketStatusArg {
 export const updateTicketStatusAtom = Atom.family((key: string) => {
   const { orgSlug, slug, id } = splitTicketKey(key)
   const project = `${orgSlug}/${slug}`
-  return Atom.optimisticFn(ticketAtom(key), {
+  return Atom.optimisticFn(optimisticTicketUpdateAtom(key), {
     reducer: (current, input: UpdateTicketStatusArg) =>
-      Result.isSuccess(current)
-        ? Result.success(
-            {
-              ...current.value,
-              status: input.status,
-              updatedAt: DateTime.toDate(DateTime.nowUnsafe())
-            },
-            { waiting: true }
-          )
-        : current,
+      mergeTicketUpdateInput(current, { status: input.status }),
     fn: runtime.fn(
       Effect.fn(function* (input: UpdateTicketStatusArg, get) {
         const pending = pendingTicketStatusChangesAtom(project)
@@ -613,7 +710,7 @@ export const updateTicketStatusAtom = Atom.family((key: string) => {
             params: { orgSlug, slug, id },
             payload: { status: input.status }
           })
-          const detail = ticketBaseAtom(key)
+          const detail = ticketRemoteAtom(key)
           const source = ticketsListBaseAtom(input.sourceSectionKey)
           const destination = ticketsListBaseAtom(input.destSectionKey)
           const counts = ticketsCountBaseAtom(input.countKey)
@@ -634,7 +731,7 @@ export const updateTicketStatusAtom = Atom.family((key: string) => {
             .result(counts, { suspendOnWaiting: true })
             .pipe(Effect.ignore)
           yield* clearPending
-          yield* Reactivity.invalidate(["tickets", orgSlug, slug])
+          yield* Reactivity.invalidate([`tickets/${orgSlug}/${slug}`])
           return updated
         }).pipe(Effect.ensuring(clearPending))
       })

@@ -2,7 +2,14 @@ import * as Result from "effect/unstable/reactivity/AsyncResult"
 import { useAtomValue } from "@effect/atom-react"
 import { useDebouncer } from "@tanstack/react-pacer"
 import * as DateTime from "effect/DateTime"
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import {
+  type ComponentProps,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react"
 import { useNavigate, useRouter } from "@tanstack/react-router"
 import { AnimatePresence, motion } from "motion/react"
 import {
@@ -122,22 +129,21 @@ export function Toolbar({
 
   const filter = query.filter
   const status: TicketStatus | "all" =
-    filter?.status?.length === 1 ? filter.status[0]! : "all"
+    filter?.status?.length === 1 ? filter.status[0] : "all"
   const typeFilter: TicketType | "all" =
-    filter?.type?.length === 1 ? filter.type[0]! : "all"
+    filter?.type?.length === 1 ? filter.type[0] : "all"
   const assigneeFilter: string =
     filter?.assignee?.length === 1
       ? filter.assignee[0] === null
         ? "unassigned"
-        : (filter.assignee[0] as string)
+        : filter.assignee[0]
       : "all"
-  const selectedTags: ReadonlyArray<TagName> =
-    (filter?.tags as ReadonlyArray<TagName> | undefined) ?? []
+  const selectedTags: ReadonlyArray<TagName> = filter?.tags ?? []
   const sprintFilter: SprintFilterValue =
     filter?.groupId?.length === 1
       ? filter.groupId[0] === null
         ? "unassigned"
-        : (filter.groupId[0] as SprintFilterValue)
+        : filter.groupId[0]
       : "all"
   const archivedFilter = filter?.archived === true
   const sortKey: SortKey = query.sort.key
@@ -584,6 +590,9 @@ function FiltersMenu({
   onSprintChange: (s: SprintFilterValue) => void
   onArchivedChange: (on: boolean) => void
 }) {
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const [anchor, setAnchor] =
+    useState<ComponentProps<typeof DropdownMenuContent>["anchor"]>()
   const tags = useAtomValue(tagsAtom(tagsKey(orgSlug, slug)))
   const tagList = Result.isSuccess(tags) ? tags.value : []
   const sprintsList = useAtomValue(
@@ -612,8 +621,19 @@ function FiltersMenu({
     (archivedFilter ? 1 : 0)
   const active = activeCount > 0
   return (
-    <DropdownMenu>
+    <DropdownMenu
+      onOpenChange={(open) => {
+        const trigger = triggerRef.current
+        if (!open || !trigger) return
+        const bounds = trigger.getBoundingClientRect()
+        setAnchor({
+          getBoundingClientRect: () => bounds,
+          contextElement: trigger
+        })
+      }}
+    >
       <DropdownMenuTrigger
+        ref={triggerRef}
         render={
           <button
             type="button"
@@ -642,6 +662,7 @@ function FiltersMenu({
         }
       />
       <DropdownMenuContent
+        anchor={anchor}
         align="end"
         sideOffset={6}
         className="w-56"

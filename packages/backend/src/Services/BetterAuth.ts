@@ -61,7 +61,7 @@ export interface BetterAuthShape {
     orgSlug: string
   ) => Effect.Effect<Org, BetterAuthError | NotFound>
   readonly submitConsent: (
-    headers: Headers,
+    request: Request,
     input: { accept: boolean; oauth_query: string }
   ) => Effect.Effect<{ redirectURI: string }, BetterAuthError>
 }

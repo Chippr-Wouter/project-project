@@ -33,6 +33,7 @@ import {
   ticketsListKeyForStatus
 } from "@/atoms/tickets"
 import { cn } from "@/lib/utils"
+import { preloadTicketPage } from "@/lib/prefetch"
 import { TYPE_LABELS, TYPE_META } from "@/lib/ticket-meta"
 import { m } from "@/paraglide/messages"
 import type {
@@ -315,7 +316,10 @@ export function SprintTicketCreator({
         setTitle(v)
         setHighlight(0)
       }}
-      onFocus={() => setFocused(true)}
+      onFocus={() => {
+        setFocused(true)
+        void preloadTicketPage()
+      }}
       onBlur={() => setFocused(false)}
       onKeyDown={onKeyDown}
       onSubmit={onSubmit}

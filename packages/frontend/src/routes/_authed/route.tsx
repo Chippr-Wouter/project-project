@@ -99,7 +99,7 @@ function Shell({ user }: { user: User }) {
             data-scroll-root
             className="min-w-0 flex-1 overflow-auto rounded-xl bg-muted/60 [scrollbar-gutter:stable]"
           >
-            <div data-scroll-content className="p-6">
+            <div data-scroll-content className="flex min-h-full flex-col p-6">
               <Outlet />
             </div>
           </div>

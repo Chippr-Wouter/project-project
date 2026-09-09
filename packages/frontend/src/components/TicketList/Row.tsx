@@ -1,5 +1,6 @@
 import {
   memo,
+  useCallback,
   useRef,
   useState,
   type KeyboardEvent,
@@ -8,11 +9,19 @@ import {
 } from "react"
 import { AnimatePresence, motion } from "motion/react"
 import { useNavigate } from "@tanstack/react-router"
+import { useAtomValue } from "@effect/atom-react"
+import {
+  applyOptimisticTicketPreview,
+  ticketKey,
+  ticketUpdatePreviewAtom
+} from "@/atoms/tickets"
 import { TicketGitChip } from "@/components/TicketGit"
 import { TicketHoverCard } from "@/components/TicketHoverCard"
 import { DeferredDropdownMenus } from "@/components/ui/dropdown-menu"
 import { Popover, PopoverTrigger } from "@/components/ui/popover"
 import { transitions } from "@/lib/springs"
+import { ticketPrefetchAtoms } from "@/lib/prefetch"
+import { usePrefetch } from "@/hooks/usePrefetch"
 import { cn } from "@/lib/utils"
 import type {
   Group,
@@ -55,12 +64,25 @@ function RowImpl({
   activePreviewId: Ticket["id"] | null
   onPreviewOpenChange: (ticketId: Ticket["id"], open: boolean) => void
 }) {
+  const updatePreview = useAtomValue(
+    ticketUpdatePreviewAtom(ticketKey(orgSlug, slug, ticket.id))
+  )
+  const visibleTicket = applyOptimisticTicketPreview(
+    ticket,
+    updatePreview.input
+  )
   const dashIdx = ticket.id.lastIndexOf("-")
   const idPrefix = dashIdx >= 0 ? ticket.id.slice(0, dashIdx) : ticket.id
   const idTail = dashIdx >= 0 ? ticket.id.slice(dashIdx + 1) : ""
   const rowElement = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const [previewMounted, setPreviewMounted] = useState(false)
+  const prefetch = usePrefetch(
+    useCallback(
+      () => ticketPrefetchAtoms(orgSlug, slug, ticket.id),
+      [orgSlug, slug, ticket.id]
+    )
+  )
   const open = () => {
     void navigate({
       to: "/orgs/$orgSlug/projects/$slug/tickets/$id",
@@ -96,26 +118,28 @@ function RowImpl({
           }}
         >
           <div
+            {...prefetch}
             ref={rowElement}
             role="link"
             tabIndex={0}
             onClick={handleClick}
             onKeyDown={handleKeyDown}
             className={cn(
-              "col-span-full grid cursor-pointer grid-cols-subgrid items-center gap-3 rounded-lg px-3 py-2.5 text-left outline-none transition-colors hover:bg-muted/60 focus-visible:ring-1 focus-visible:ring-ring"
+              "col-span-full grid cursor-pointer grid-cols-subgrid items-center gap-3 rounded-lg px-3 py-2.5 text-left outline-none transition-colors hover:bg-muted/60 focus-visible:ring-1 focus-visible:ring-ring",
+              updatePreview.waiting && "animate-pulse"
             )}
           >
             <StatusButton
               orgSlug={orgSlug}
               slug={slug}
-              ticket={ticket}
+              ticket={visibleTicket}
               query={query}
               stopPropagation
             />
             <PriorityButton
               orgSlug={orgSlug}
               slug={slug}
-              ticket={ticket}
+              ticket={visibleTicket}
               stopPropagation
             />
             <span className="inline-flex shrink-0 items-center font-mono text-xs text-muted-foreground tabular-nums">
@@ -159,12 +183,16 @@ function RowImpl({
                 )}
               >
                 <span className="min-w-0 truncate text-sm font-medium">
-                  {ticket.title}
+                  {visibleTicket.title}
                 </span>
               </PopoverTrigger>
               <div className="ml-auto flex shrink-0 items-center gap-2 pl-3">
-                <TicketGitChip orgSlug={orgSlug} slug={slug} ticket={ticket} />
-                {showSprintCol && sprintMembership !== null && (
+                <TicketGitChip
+                  orgSlug={orgSlug}
+                  slug={slug}
+                  ticket={visibleTicket}
+                />
+                {showSprintCol && (
                   <SprintField
                     orgSlug={orgSlug}
                     slug={slug}
@@ -175,7 +203,7 @@ function RowImpl({
                 <AssigneeRowTrigger
                   orgSlug={orgSlug}
                   slug={slug}
-                  ticket={ticket}
+                  ticket={visibleTicket}
                   members={members}
                   className="hidden sm:inline-flex"
                 />
@@ -184,7 +212,7 @@ function RowImpl({
             <TypeButton
               orgSlug={orgSlug}
               slug={slug}
-              ticket={ticket}
+              ticket={visibleTicket}
               className="hidden sm:inline-flex"
             />
             {showExtraActionsCol && (
@@ -195,7 +223,7 @@ function RowImpl({
                   e.preventDefault()
                 }}
               >
-                {extraRowActions?.(ticket)}
+                {extraRowActions?.(visibleTicket)}
               </span>
             )}
           </div>
