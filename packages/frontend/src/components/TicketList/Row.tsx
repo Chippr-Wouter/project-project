@@ -192,22 +192,25 @@ function RowImpl({
                   slug={slug}
                   ticket={visibleTicket}
                 />
-                {showSprintCol && (
-                  <SprintField
-                    orgSlug={orgSlug}
-                    slug={slug}
-                    ticketId={ticket.id}
-                    membership={sprintMembership}
-                  />
-                )}
-                <AssigneeRowTrigger
+              </div>
+            </div>
+            {showSprintCol && (
+              <div className="flex min-w-0 items-center">
+                <SprintField
                   orgSlug={orgSlug}
                   slug={slug}
-                  ticket={visibleTicket}
-                  members={members}
-                  className="hidden sm:inline-flex"
+                  ticketId={ticket.id}
+                  membership={sprintMembership}
                 />
               </div>
+            )}
+            <div className="hidden items-center sm:flex">
+              <AssigneeRowTrigger
+                orgSlug={orgSlug}
+                slug={slug}
+                ticket={visibleTicket}
+                members={members}
+              />
             </div>
             <TypeButton
               orgSlug={orgSlug}
