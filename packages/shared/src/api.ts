@@ -103,7 +103,7 @@ import {
   UpdateGroupTicketsOutput,
   UpdateTicketOrderInput
 } from "./schemas/Group"
-import { TicketCounts, TicketListPage } from "./filters/Ticket"
+import { TicketCounts, TicketListPage, TicketSections } from "./filters/Ticket"
 import { TicketCountParams, TicketListParams } from "./filters/url"
 import {
   Attachment,
@@ -870,6 +870,18 @@ const TicketSearchParams = Schema.Struct({
 })
 
 const TicketsGroup = HttpApiGroup.make("tickets")
+  .add(
+    HttpApiEndpoint.get(
+      "sections",
+      "/orgs/:orgSlug/projects/:slug/tickets/sections",
+      {
+        params: ProjectPath,
+        query: TicketListParams,
+        success: TicketSections,
+        error: [Unauthorized, NotFound]
+      }
+    )
+  )
   .add(
     HttpApiEndpoint.get("list", "/orgs/:orgSlug/projects/:slug/tickets", {
       params: ProjectPath,

@@ -11,12 +11,10 @@ import {
   sprintsListAtom
 } from "@/atoms/sprints"
 import {
-  ticketsCountAtom,
-  ticketsCountKey,
+  ticketsSectionsAtom,
+  ticketsSectionsKey,
   ticketsInSprintAtom,
-  ticketsInSprintKey,
-  ticketsListAtom,
-  ticketsListKeyForStatus
+  ticketsInSprintKey
 } from "@/atoms/tickets"
 import { SprintDetail } from "@/components/sprints/SprintDetail"
 import {
@@ -61,48 +59,9 @@ export const Route = createFileRoute(
     const view = search.view ?? "board"
     const tickets =
       view === "list"
-        ? Effect.all(
-            [
-              Registry.getResult(
-                registry,
-                ticketsCountAtom(
-                  ticketsCountKey(orgSlug, slug, {
-                    filter: query.filter,
-                    q: query.q
-                  })
-                )
-              ),
-              Effect.gen(function* () {
-                const statuses = yield* Registry.getResult(
-                  registry,
-                  projectStatusesAtom(key)
-                )
-                yield* Effect.forEach(
-                  statuses.filter(
-                    (status) =>
-                      !query.filter?.status?.length ||
-                      query.filter.status.includes(status.slug)
-                  ),
-                  (status) =>
-                    Effect.exit(
-                      // @effect-diagnostics-next-line anyUnknownInErrorContext:off
-                      Registry.getResult(
-                        registry,
-                        ticketsListAtom(
-                          ticketsListKeyForStatus(
-                            orgSlug,
-                            slug,
-                            query,
-                            status.slug
-                          )
-                        )
-                      )
-                    ),
-                  { concurrency: 4, discard: true }
-                )
-              })
-            ],
-            { concurrency: "unbounded", discard: true }
+        ? Registry.getResult(
+            registry,
+            ticketsSectionsAtom(ticketsSectionsKey(orgSlug, slug, query))
           )
         : view === "board"
           ? Registry.getResult(

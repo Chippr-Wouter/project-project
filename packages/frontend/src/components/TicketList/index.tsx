@@ -1,8 +1,16 @@
-import type { ReactNode } from "react"
+import { useState, type ReactNode } from "react"
+import { useAtomValue } from "@effect/atom-react"
+import * as Result from "effect/unstable/reactivity/AsyncResult"
+import {
+  ticketsListKey,
+  ticketsSectionsAtom,
+  ticketsSectionsKey,
+  type TicketSectionsValue
+} from "@/atoms/tickets"
+import { ErrorPage } from "@/components/ErrorPage"
 import { BacklogTicketCreator } from "./BacklogTicketCreator"
 import { SegmentedList } from "./SegmentedList"
 import { Toolbar } from "./Toolbar"
-import { queryHasActiveFilter } from "./url"
 import type {
   Group,
   Member,
@@ -30,7 +38,42 @@ export function TicketList({
   creator?: ReactNode
   showSprintFilter?: boolean
 }) {
-  const hasActiveFilter = queryHasActiveFilter(query)
+  const key = ticketsListKey(orgSlug, slug, query)
+  const result = useAtomValue(
+    ticketsSectionsAtom(ticketsSectionsKey(orgSlug, slug, query))
+  )
+  const [previous, setPrevious] = useState<{
+    key: string
+    query: TicketListQuery
+    value: TicketSectionsValue
+  } | null>(null)
+  if (
+    Result.isSuccess(result) &&
+    (previous?.key !== key || previous.value !== result.value)
+  ) {
+    setPrevious({ key, query, value: result.value })
+  }
+  const active = Result.isSuccess(result)
+    ? { key, query, value: result.value }
+    : previous
+  const renderSections = () =>
+    active ? (
+      <SegmentedList
+        key={active.key}
+        orgSlug={orgSlug}
+        slug={slug}
+        query={active.query}
+        snapshot={active.value}
+        members={members}
+        extraRowActions={extraRowActions}
+        sprintMembership={sprintMembership}
+      />
+    ) : (
+      <div
+        aria-busy="true"
+        className="h-96 animate-pulse rounded-lg bg-muted/40 motion-reduce:animate-none"
+      />
+    )
 
   return (
     <div className="group/list flex flex-col gap-3">
@@ -45,17 +88,17 @@ export function TicketList({
           query={query}
           members={members}
           showSprintFilter={showSprintFilter}
+          ticketCounts={active?.value.counts}
         />
 
-        <SegmentedList
-          orgSlug={orgSlug}
-          slug={slug}
-          query={query}
-          members={members}
-          extraRowActions={extraRowActions}
-          sprintMembership={sprintMembership}
-          hasActiveFilter={hasActiveFilter}
-        />
+        <div aria-busy={result.waiting || Result.isInitial(result)}>
+          {Result.matchWithError(result, {
+            onInitial: renderSections,
+            onError: (error) => <ErrorPage error={error} contained />,
+            onDefect: (defect) => <ErrorPage error={defect} contained />,
+            onSuccess: renderSections
+          })}
+        </div>
       </div>
     </div>
   )

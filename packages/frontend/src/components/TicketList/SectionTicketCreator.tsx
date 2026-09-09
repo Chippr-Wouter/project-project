@@ -1,3 +1,5 @@
+import * as Random from "effect/Random"
+import * as Effect from "effect/Effect"
 import * as Result from "effect/unstable/reactivity/AsyncResult"
 import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as Exit from "effect/Exit"
@@ -175,6 +177,7 @@ export function SectionTicketCreator({
     setTitle("")
     inputRef.current?.focus()
     const exit = await create({
+      clientId: Effect.runSync(Random.next).toString(36),
       ticket: { title: submittedTitle, type, status },
       viewerId,
       projectPrefix

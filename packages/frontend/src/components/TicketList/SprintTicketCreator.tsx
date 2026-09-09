@@ -1,3 +1,5 @@
+import * as Random from "effect/Random"
+import * as Effect from "effect/Effect"
 import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as Result from "effect/unstable/reactivity/AsyncResult"
 import { useNavigate } from "@tanstack/react-router"
@@ -158,6 +160,7 @@ export function SprintTicketCreator({
     }
     if (submitting) return
     const exit = await create({
+      clientId: Effect.runSync(Random.next).toString(36),
       ticket: { title: item.label, type },
       viewerId,
       projectPrefix
@@ -178,6 +181,7 @@ export function SprintTicketCreator({
     }
     if (!trimmed || submitting) return
     const exit = await create({
+      clientId: Effect.runSync(Random.next).toString(36),
       ticket: { title: trimmed, type },
       viewerId,
       projectPrefix

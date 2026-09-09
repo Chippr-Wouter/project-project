@@ -25,6 +25,7 @@ import type {
   TicketDetail,
   TicketListPage,
   TicketListQuery,
+  TicketSections,
   UpdateTicketInput,
   Validation
 } from "@projectproject/shared"
@@ -35,6 +36,12 @@ import type { MalformedTicketDocument } from "./TicketDocs"
 type TicketReadError = NotFound | MarkdownError | MalformedTicketDocument
 
 export interface TicketsShape {
+  readonly sections: (
+    orgSlug: string,
+    userId: string,
+    slug: string,
+    query: TicketListQuery
+  ) => Effect.Effect<TicketSections, NotFound | MarkdownError>
   readonly list: (
     orgSlug: string,
     userId: string,

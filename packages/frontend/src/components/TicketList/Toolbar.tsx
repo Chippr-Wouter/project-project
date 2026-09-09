@@ -1,10 +1,8 @@
 import * as Result from "effect/unstable/reactivity/AsyncResult"
 import { useAtomValue } from "@effect/atom-react"
-import { useDebouncer } from "@tanstack/react-pacer"
 import * as DateTime from "effect/DateTime"
 import {
   type ComponentProps,
-  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -53,7 +51,6 @@ import {
 import { boardStatusesFor } from "@/components/sprints/board-utils"
 import { m } from "@/paraglide/messages"
 import { tagsAtom, tagsKey } from "@/atoms/tags"
-import { ticketsCountAtom, ticketsCountKey } from "@/atoms/tickets"
 import {
   projectKey as sprintsProjectKey,
   sprintsListAtom
@@ -66,7 +63,7 @@ import {
   type Member,
   type SortKey,
   type TagName,
-  type TicketCountQuery,
+  type TicketCounts,
   type TicketFilter,
   type TicketListQuery,
   type ProjectStatus,
@@ -79,12 +76,12 @@ import { cn } from "@/lib/utils"
 import { transitions } from "@/lib/springs"
 import { SORT_LABELS } from "./sort"
 import { TICKET_SEARCH_KEYS } from "./url"
+import { MIN_SEARCH_CHARS, useTicketSearch } from "./search"
 
 type SearchValue = string | ReadonlyArray<string> | undefined
 type SearchRecord = { readonly [k: string]: SearchValue }
 
 const EMPTY_STATUSES: ReadonlyArray<ProjectStatus> = []
-const MIN_SEARCH_CHARS = 3
 
 const TOOLBAR_BUTTON_CLASS = cn(
   "inline-flex h-9 items-center gap-2 rounded-xl border border-border bg-background px-3 text-sm",
@@ -114,13 +111,15 @@ export function Toolbar({
   slug,
   query,
   members,
-  showSprintFilter = false
+  showSprintFilter = false,
+  ticketCounts
 }: {
   orgSlug: string
   slug: string
   query: TicketListQuery
   members: ReadonlyArray<Member>
   showSprintFilter?: boolean
+  ticketCounts?: TicketCounts
 }) {
   const router = useRouter()
   const navigate = useNavigate()
@@ -158,7 +157,8 @@ export function Toolbar({
         for (const k of TICKET_SEARCH_KEYS) cleared[k] = undefined
         return { ...cleared, ...nextSearch }
       },
-      replace: true
+      replace: true,
+      resetScroll: false
     })
   }
 
@@ -226,45 +226,8 @@ export function Toolbar({
     })
   }
 
-  const [queryInput, setQueryInput] = useState(queryStr)
-  useEffect(() => {
-    setQueryInput(queryStr)
-  }, [queryStr])
-
-  const latestQueryRef = useRef(query)
-  useEffect(() => {
-    latestQueryRef.current = query
-  }, [query])
-
-  const effectiveQ = (q: string): string | undefined =>
-    q.length >= MIN_SEARCH_CHARS ? q : undefined
-  const searchDebouncer = useDebouncer(
-    (nextQ: string | undefined) => {
-      updateQuery({ ...latestQueryRef.current, q: nextQ })
-    },
-    { wait: 200 }
-  )
-  const setSearchQuery = (q: string) => {
-    setQueryInput(q)
-    const nextQ = effectiveQ(q)
-    if (nextQ === undefined && latestQueryRef.current.q === undefined) {
-      searchDebouncer.cancel()
-      return
-    }
-    searchDebouncer.maybeExecute(nextQ)
-  }
-  const flushSearch = () => {
-    searchDebouncer.flush()
-    const nextQ = effectiveQ(queryInput)
-    if ((nextQ ?? "") !== queryStr) {
-      updateQuery({ ...latestQueryRef.current, q: nextQ })
-    }
-  }
-  const clearSearch = () => {
-    setQueryInput("")
-    searchDebouncer.cancel()
-    updateQuery({ ...latestQueryRef.current, q: undefined })
-  }
+  const search = useTicketSearch(query.q, (q) => updateQuery({ ...query, q }))
+  const queryInput = search.draft
 
   const [searchFocused, setSearchFocused] = useState(false)
   const compact = searchFocused || queryInput.length > 0
@@ -297,16 +260,10 @@ export function Toolbar({
     queryStr.length > 0
 
   const clearAll = () => {
+    search.reset()
     updateQuery({ sort: query.sort })
   }
 
-  const countQuery: TicketCountQuery = {
-    filter: filter,
-    q: query.q
-  }
-  const countsResult = useAtomValue(
-    ticketsCountAtom(ticketsCountKey(orgSlug, slug, countQuery))
-  )
   const statusesResult = useAtomValue(
     projectStatusesAtom(projectStatusKey(orgSlug, slug))
   )
@@ -316,14 +273,14 @@ export function Toolbar({
     ? statusesResult.value
     : EMPTY_STATUSES
   const counts = useMemo<Record<string, number>>(() => {
-    if (!Result.isSuccess(countsResult)) return { all: 0 }
-    const byStatus = countsResult.value.byStatus as Record<string, number>
-    const next: Record<string, number> = { all: countsResult.value.total }
+    if (!ticketCounts) return { all: 0 }
+    const byStatus: Readonly<Record<string, number>> = ticketCounts.byStatus
+    const next: Record<string, number> = { all: ticketCounts.total }
     for (const s of boardStatusesFor(statuses)) {
       next[s] = byStatus[s] ?? 0
     }
     return next
-  }, [countsResult, statuses])
+  }, [ticketCounts, statuses])
 
   const FULL_FITS_ROW = 720
   const ALL_COMPACT_FITS_ROW = 460
@@ -348,11 +305,11 @@ export function Toolbar({
         <InputGroupInput
           ref={searchRef}
           value={queryInput}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => search.change(e.target.value)}
           onFocus={() => setSearchFocused(true)}
           onBlur={() => {
             setSearchFocused(false)
-            flushSearch()
+            search.flush()
           }}
           placeholder={m.tickets_search_placeholder()}
           aria-label={m.tickets_search_aria_label()}
@@ -367,7 +324,7 @@ export function Toolbar({
             type="button"
             variant="ghost"
             size="icon-xs"
-            onClick={clearSearch}
+            onClick={search.clear}
             aria-label={m.tickets_search_clear_aria_label()}
             className="shrink-0 rounded-xl"
           >
