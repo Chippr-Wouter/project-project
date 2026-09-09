@@ -6,7 +6,7 @@ export function MetaRow({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1">
       <span className="text-xs text-muted-foreground">{label}</span>
       <div className="min-w-0">{children}</div>
     </div>
