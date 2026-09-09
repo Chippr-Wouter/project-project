@@ -10,11 +10,32 @@
   "tickets_archive_submit": "Archive",
   "tickets_archived_badge": "Archived",
   "tickets_assign_sprint_chip": "Assign sprint",
-  "tickets_assignee_count": "{count} people",
+  "tickets_assignee_count": [
+    {
+      "declarations": ["input count", "local countPlural = count: plural"],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "{count} person",
+        "countPlural=*": "{count} people"
+      }
+    }
+  ],
   "tickets_assignee_unassigned": "Unassigned",
   "tickets_assignees_aria_label": "Assignees: {label}. Click to change.",
-  "tickets_assignees_row_many_aria_label": "{count} people assigned. Click to change.",
-  "tickets_assignees_row_one_aria_label": "Assigned to {name}. Click to change.",
+  "tickets_assignees_row_aria_label": [
+    {
+      "declarations": [
+        "input count",
+        "input name",
+        "local countPlural = count: plural"
+      ],
+      "selectors": ["countPlural"],
+      "match": {
+        "countPlural=one": "Assigned to {name}. Click to change.",
+        "countPlural=*": "{count} people assigned. Click to change."
+      }
+    }
+  ],
   "tickets_assignees_row_unassigned_aria_label": "Unassigned. Click to assign.",
   "tickets_clear_search_button": "Clear search",
   "tickets_create_error_fallback": "Failed to create ticket",

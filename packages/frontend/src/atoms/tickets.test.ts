@@ -20,6 +20,7 @@ import {
   ticketsCountAtom,
   ticketsSectionsAtom,
   ticketsSectionsKey,
+  ticketsInSprintAtom,
   ticketsListKeyForStatus,
   ticketUpdatePreviewAtom,
   updateTicketAtom,
@@ -276,6 +277,91 @@ describe("applyOptimisticTicketUpdate", () => {
           waiting: false
         })
         expect(registry.get(preview)).toEqual({ input: {}, waiting: false })
+      } finally {
+        registry.dispose()
+      }
+    }
+  )
+
+  it.each(["board type", "board priority", "board assignees"] as const)(
+    "keeps %s optimistic until its list finishes refreshing",
+    async (scenario) => {
+      const registry = AtomRegistry.make()
+      const key = ticketKey("org", "project", ticket.id)
+      const sprintTicketsKey = "org/project/G-1"
+      const list = ticketsInSprintAtom(sprintTicketsKey)
+      const preview = ticketUpdatePreviewAtom(key)
+      const patch =
+        scenario === "board type"
+          ? { type: "bug" as const }
+          : scenario === "board priority"
+            ? { priority: "high" as const }
+            : { assignees: ["user-2"] }
+      const updated = { ...ticket, ...patch } satisfies TicketDetail
+      let saved = false
+      let finishRefresh: ((response: Response) => void) | undefined
+      const encoded = Schema.encodeSync(TicketDetail)
+      const listResponse = (value: TicketDetail) =>
+        Response.json([encoded(value)])
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+          if (init?.method === "PATCH") {
+            expect(await new Response(init.body).json()).toEqual(patch)
+            saved = true
+            return Response.json(encoded(updated))
+          }
+          const url = new URL(
+            input instanceof Request ? input.url : String(input)
+          )
+          if (url.pathname.endsWith("/tickets")) {
+            if (saved)
+              return new Promise<Response>((resolve) => {
+                finishRefresh = resolve
+              })
+            return listResponse(ticket)
+          }
+          return Response.json(encoded(saved ? updated : ticket))
+        })
+      )
+      try {
+        registry.mount(list)
+        registry.mount(preview)
+        await vi.waitFor(() =>
+          expect(Result.isSuccess(registry.get(list))).toBe(true)
+        )
+        registry.set(updateTicketAtom(key), { ...patch, sprintTicketsKey })
+        await vi.waitFor(() =>
+          expect(registry.get(ticketAtom(key))).toMatchObject({
+            _tag: "Success",
+            value: patch
+          })
+        )
+        expect(registry.get(preview)).toEqual({ input: patch, waiting: true })
+        const stale = registry.get(list)
+        expect(stale).toMatchObject({
+          value: [{ type: "chore", priority: "med" }]
+        })
+        if (Result.isSuccess(stale)) {
+          expect(
+            applyOptimisticTicketPreview(
+              stale.value[0],
+              registry.get(preview).input
+            )
+          ).toMatchObject(patch)
+        }
+        const resolveRefresh = await vi.waitFor(() => {
+          if (!finishRefresh) throw new Error("List refresh has not started")
+          return finishRefresh
+        })
+        resolveRefresh(listResponse(updated))
+        await vi.waitFor(() =>
+          expect(registry.get(preview)).toEqual({ input: {}, waiting: false })
+        )
+        expect(registry.get(list)).toMatchObject({
+          value: [patch],
+          waiting: false
+        })
       } finally {
         registry.dispose()
       }

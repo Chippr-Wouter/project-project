@@ -198,6 +198,7 @@ it.each(["row", "card"] as const)(
           <SprintBoardCard
             orgSlug="org"
             slug="project"
+            sprintTicketsKey="org/project/G-1"
             ticket={ticket}
             members={[]}
           />

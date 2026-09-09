@@ -482,13 +482,23 @@ const mergeTicketUpdateInput = (
   input: UpdateTicketInput
 ): UpdateTicketInput => ({ ...current, ...input })
 
+type UpdateTicketArg = UpdateTicketInput & {
+  readonly sprintTicketsKey?: string
+}
+
 export const updateTicketAtom = Atom.family((key: string) => {
   const { orgSlug, slug, id } = splitTicketKey(key)
   let unsaved: UpdateTicketInput = {}
   return Atom.optimisticFn(optimisticTicketUpdateAtom(key), {
-    reducer: mergeTicketUpdateInput,
+    reducer: (
+      current,
+      { sprintTicketsKey: _sprintTicketsKey, ...input }: UpdateTicketArg
+    ) => mergeTicketUpdateInput(current, input),
     fn: runtime.fn(
-      Effect.fn(function* (input: UpdateTicketInput, get) {
+      Effect.fn(function* (
+        { sprintTicketsKey, ...input }: UpdateTicketArg,
+        get
+      ) {
         unsaved = { ...unsaved, ...input }
         const payload = unsaved
         const client = yield* ApiClient
@@ -519,6 +529,13 @@ export const updateTicketAtom = Atom.family((key: string) => {
         yield* get
           .result(remote, { suspendOnWaiting: true })
           .pipe(Effect.ignore)
+        if (sprintTicketsKey !== undefined) {
+          yield* get
+            .result(ticketsInSprintAtom(sprintTicketsKey), {
+              suspendOnWaiting: true
+            })
+            .pipe(Effect.ignore)
+        }
         return updated
       })
     )

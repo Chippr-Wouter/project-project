@@ -19,7 +19,7 @@ import type {
   Ticket,
   TicketListQuery
 } from "@projectproject/shared"
-import { AssigneeRowTrigger } from "./AssigneeField"
+import { AssigneeField } from "./AssigneeField"
 import { PriorityButton } from "./PriorityField"
 import { SprintField } from "./SprintField"
 import { StatusButton } from "./StatusField"
@@ -169,7 +169,7 @@ function RowImpl({
                   membership={sprintMembership}
                 />
               )}
-              <AssigneeRowTrigger
+              <AssigneeField
                 orgSlug={orgSlug}
                 slug={slug}
                 ticket={visibleTicket}
