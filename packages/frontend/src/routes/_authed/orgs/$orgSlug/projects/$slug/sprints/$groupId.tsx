@@ -1,8 +1,6 @@
 import { useMemo } from "react"
 import { createFileRoute } from "@tanstack/react-router"
 import * as Schema from "effect/Schema"
-import * as Effect from "effect/Effect"
-import * as Registry from "effect/unstable/reactivity/AtomRegistry"
 import { projectStatusesAtom } from "@/atoms/projectStatuses"
 import {
   projectKey,
@@ -47,44 +45,27 @@ export const Route = createFileRoute(
     return { ...sanitized, view }
   },
   loaderDeps: ({ search }) => search,
-  loader: async ({
+  loader: ({
     context: { registry },
     params: { orgSlug, slug, groupId },
-    deps: search,
-    abortController
+    deps: search
   }) => {
     const id = decodeGroupId(groupId)
     const key = projectKey(orgSlug, slug)
     const query = sprintListQuery(search, id)
     const view = search.view ?? "board"
-    const tickets =
-      view === "list"
-        ? Registry.getResult(
-            registry,
-            ticketsSectionsAtom(ticketsSectionsKey(orgSlug, slug, query))
-          )
-        : view === "board"
-          ? Registry.getResult(
-              registry,
-              ticketsInSprintAtom(ticketsInSprintKey(orgSlug, slug, id))
-            )
-          : Effect.void
-
-    await Effect.runPromiseExit(
-      Effect.all(
-        [
-          Registry.getResult(
-            registry,
-            sprintAtom(sprintKey(orgSlug, slug, id))
-          ),
-          Registry.getResult(registry, sprintsListAtom(key)),
-          Registry.getResult(registry, projectStatusesAtom(key)),
-          tickets
-        ],
-        { concurrency: "unbounded", discard: true }
-      ),
-      { signal: abortController.signal }
-    )
+    registry.mount(sprintAtom(sprintKey(orgSlug, slug, id)))()
+    registry.mount(sprintsListAtom(key))()
+    registry.mount(projectStatusesAtom(key))()
+    if (view === "list") {
+      registry.mount(
+        ticketsSectionsAtom(ticketsSectionsKey(orgSlug, slug, query))
+      )()
+    } else if (view === "board") {
+      registry.mount(
+        ticketsInSprintAtom(ticketsInSprintKey(orgSlug, slug, id))
+      )()
+    }
 
     return {
       crumb: { type: "sprint" as const, orgSlug, slug, groupId: id }
