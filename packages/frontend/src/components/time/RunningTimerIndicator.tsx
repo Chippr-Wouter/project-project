@@ -204,24 +204,39 @@ export function RunningTimerIndicator({ orgSlug }: { orgSlug: string }) {
   )
 }
 
-function ProjectTimerIndicator({
-  orgSlug,
-  slug,
-  routeGroupId,
-  ticketId,
-  timer,
-  timerWaiting
-}: {
+type ProjectTimerProps = {
   orgSlug: string
   slug: string
   routeGroupId: GroupId | null
   ticketId: TicketId | null
   timer: ActiveTimer | null
   timerWaiting: boolean
-}) {
-  const statusResult = useAtomValue(
+}
+
+function ProjectTimerIndicator(props: ProjectTimerProps) {
+  const { orgSlug, slug } = props
+  const status = useAtomValue(
     everhourProjectStatusAtom(projectAtomKey(orgSlug, slug))
   )
+  if (Result.isInitial(status)) {
+    return <div className="h-7 w-48 animate-pulse rounded-lg bg-accent/60" />
+  }
+  if (!Result.isSuccess(status) || status.value.status === "not_connected") {
+    return null
+  }
+  return (
+    <ConnectedProjectTimerIndicator key={`${orgSlug}/${slug}`} {...props} />
+  )
+}
+
+function ConnectedProjectTimerIndicator({
+  orgSlug,
+  slug,
+  routeGroupId,
+  ticketId,
+  timer,
+  timerWaiting
+}: ProjectTimerProps) {
   const profileResult = useAtomValue(everhourProfileAtom)
   const sprintsResult = useAtomValue(
     sprintsListAtom(sprintsProjectKey(orgSlug, slug))
@@ -247,10 +262,7 @@ function ProjectTimerIndicator({
   )
   const elapsed = useElapsed(timer ? timer.startedAt : null)
   const connected =
-    Result.isSuccess(statusResult) &&
-    statusResult.value.status !== "not_connected" &&
-    Result.isSuccess(profileResult) &&
-    profileResult.value.connected
+    Result.isSuccess(profileResult) && profileResult.value.connected
   const sprints = useMemo(
     () => (Result.isSuccess(sprintsResult) ? sprintsResult.value : []),
     [sprintsResult]
@@ -326,7 +338,7 @@ function ProjectTimerIndicator({
     if (!open) setShowLog(false)
   }, [open])
 
-  if (Result.isInitial(statusResult) || Result.isInitial(profileResult)) {
+  if (Result.isInitial(profileResult)) {
     return <div className="h-7 w-48 animate-pulse rounded-lg bg-accent/60" />
   }
   if (!connected) return null

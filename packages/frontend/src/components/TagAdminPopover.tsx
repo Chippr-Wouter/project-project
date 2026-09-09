@@ -24,6 +24,7 @@ type Props = {
   usageCount: number
   onPatch: (patch: { nextName?: TagName; color?: Tag["color"] }) => void
   onDelete: () => Promise<void> | void
+  onOpenChange?: (open: boolean) => void
   children: ReactElement<Record<string, unknown>>
 }
 
@@ -32,11 +33,16 @@ export function TagAdminPopover({
   usageCount,
   onPatch,
   onDelete,
+  onOpenChange,
   children
 }: Props) {
   const [open, setOpen] = useState(false)
+  const changeOpen = (next: boolean) => {
+    setOpen(next)
+    onOpenChange?.(next)
+  }
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={changeOpen}>
       <PopoverTrigger render={children} />
       <PopoverContent
         align="start"
@@ -51,9 +57,9 @@ export function TagAdminPopover({
             onPatch={onPatch}
             onConfirmDelete={async () => {
               await onDelete()
-              setOpen(false)
+              changeOpen(false)
             }}
-            onDismiss={() => setOpen(false)}
+            onDismiss={() => changeOpen(false)}
           />
         </ConfirmButton.Root>
       </PopoverContent>
