@@ -1,3 +1,7 @@
+import {
+  CallToolRequestSchema,
+  type CallToolRequest
+} from "@modelcontextprotocol/sdk/types.js"
 import { describe, expect, test } from "vite-plus/test"
 import * as Effect from "effect/Effect"
 import * as DateTime from "effect/DateTime"
@@ -5,6 +9,7 @@ import * as Layer from "effect/Layer"
 import * as ManagedRuntime from "effect/ManagedRuntime"
 import * as Schema from "effect/Schema"
 import {
+  McpTools,
   BranchNotFound,
   Forbidden,
   GroupId,
@@ -31,6 +36,35 @@ import {
 } from "../Services/TicketIndex"
 import { registerAllTools } from "./dispatch"
 import { handlers } from "./handlers"
+
+type ToolResult = {
+  content: ReadonlyArray<{ type: "text"; text: string }>
+  isError?: boolean
+}
+
+const captureToolCalls = (
+  registered: Map<string, (input: unknown) => Promise<ToolResult>>
+) => ({
+  setRequestHandler: (
+    schema: unknown,
+    handler: (request: CallToolRequest) => Promise<ToolResult>
+  ) => {
+    if (schema !== CallToolRequestSchema) return
+    for (const name of Object.keys(McpTools)) {
+      registered.set(name, (input) =>
+        handler({
+          method: "tools/call",
+          params: {
+            name,
+            arguments: Schema.decodeUnknownSync(
+              Schema.Record(Schema.String, Schema.Unknown)
+            )(input)
+          }
+        })
+      )
+    }
+  }
+})
 
 const decodeTicketId = Schema.decodeUnknownSync(TicketId)
 const isoDate = (s: string) => DateTime.toDate(DateTime.makeUnsafe(s))
@@ -152,17 +186,13 @@ describe("MCP dispatcher → list_tickets", () => {
         isError?: boolean
       }>
     >()
-    const fakeServer = {
-      registerTool: (
-        name: string,
-        _meta: unknown,
-        cb: (input: unknown) => Promise<any>
-      ) => {
-        registered.set(name, cb)
-      }
-    } as any
+    const fakeServer = captureToolCalls(registered)
 
-    registerAllTools(fakeServer, runtime as any, handlers as any)
+    registerAllTools(
+      fakeServer as Parameters<typeof registerAllTools>[0],
+      runtime,
+      handlers
+    )
 
     const cb = registered.get("list_tickets")
     expect(cb).toBeDefined()
@@ -192,17 +222,13 @@ describe("MCP dispatcher → doc tools", () => {
         isError?: boolean
       }>
     >()
-    const fakeServer = {
-      registerTool: (
-        name: string,
-        _meta: unknown,
-        cb: (input: unknown) => Promise<any>
-      ) => {
-        registered.set(name, cb)
-      }
-    } as any
+    const fakeServer = captureToolCalls(registered)
 
-    registerAllTools(fakeServer, runtime as any, handlers as any)
+    registerAllTools(
+      fakeServer as Parameters<typeof registerAllTools>[0],
+      runtime,
+      handlers
+    )
 
     const cb = registered.get("get_project_doc")
     expect(cb).toBeDefined()
@@ -223,12 +249,12 @@ describe("MCP dispatcher → doc tools", () => {
   test("get_group_doc returns DocFile-shaped JSON envelope", async () => {
     const runtime = ManagedRuntime.make(TestLayer)
     const registered = new Map<string, (i: unknown) => Promise<any>>()
-    const fakeServer = {
-      registerTool: (name: string, _m: unknown, cb: any) => {
-        registered.set(name, cb)
-      }
-    } as any
-    registerAllTools(fakeServer, runtime as any, handlers as any)
+    const fakeServer = captureToolCalls(registered)
+    registerAllTools(
+      fakeServer as Parameters<typeof registerAllTools>[0],
+      runtime,
+      handlers
+    )
 
     const cb = registered.get("get_group_doc")
     expect(cb).toBeDefined()
@@ -247,12 +273,12 @@ describe("MCP dispatcher → doc tools", () => {
   test("get_ticket_doc returns DocFile-shaped JSON envelope", async () => {
     const runtime = ManagedRuntime.make(TestLayer)
     const registered = new Map<string, (i: unknown) => Promise<any>>()
-    const fakeServer = {
-      registerTool: (name: string, _m: unknown, cb: any) => {
-        registered.set(name, cb)
-      }
-    } as any
-    registerAllTools(fakeServer, runtime as any, handlers as any)
+    const fakeServer = captureToolCalls(registered)
+    registerAllTools(
+      fakeServer as Parameters<typeof registerAllTools>[0],
+      runtime,
+      handlers
+    )
 
     const cb = registered.get("get_ticket_doc")
     expect(cb).toBeDefined()
@@ -364,12 +390,12 @@ describe("MCP dispatcher → write tools", () => {
   const makeServer = (layer: Layer.Layer<any, never, never>) => {
     const runtime = ManagedRuntime.make(layer)
     const registered = new Map<string, (i: unknown) => Promise<any>>()
-    const fakeServer = {
-      registerTool: (name: string, _m: unknown, cb: any) => {
-        registered.set(name, cb)
-      }
-    } as any
-    registerAllTools(fakeServer, runtime as any, handlers as any)
+    const fakeServer = captureToolCalls(registered)
+    registerAllTools(
+      fakeServer as Parameters<typeof registerAllTools>[0],
+      runtime,
+      handlers
+    )
     return { runtime, registered }
   }
 
@@ -611,11 +637,12 @@ describe("MCP dispatcher → add_tickets_to_group", () => {
   ) => {
     const runtime = ManagedRuntime.make(layer)
     const registered = new Map<string, (i: unknown) => Promise<any>>()
-    const fakeServer = {
-      registerTool: (name: string, _m: unknown, cb: any) =>
-        registered.set(name, cb)
-    } as any
-    registerAllTools(fakeServer, runtime as any, handlers as any)
+    const fakeServer = captureToolCalls(registered)
+    registerAllTools(
+      fakeServer as Parameters<typeof registerAllTools>[0],
+      runtime,
+      handlers
+    )
     return {
       runtime,
       call: () =>
@@ -753,10 +780,12 @@ describe("MCP dispatcher → sprint writes", () => {
   ) => {
     const runtime = ManagedRuntime.make(layer)
     const registered = new Map<string, (i: unknown) => Promise<any>>()
-    const fakeServer = {
-      registerTool: (n: string, _m: unknown, cb: any) => registered.set(n, cb)
-    } as any
-    registerAllTools(fakeServer, runtime as any, handlers as any)
+    const fakeServer = captureToolCalls(registered)
+    registerAllTools(
+      fakeServer as Parameters<typeof registerAllTools>[0],
+      runtime,
+      handlers
+    )
     return {
       runtime,
       call: () => withFakeUser(() => registered.get(name)!(input))
@@ -915,12 +944,12 @@ describe("MCP dispatcher → NotFound retained", () => {
 
     const runtime = ManagedRuntime.make(HiddenLayer)
     const registered = new Map<string, (i: unknown) => Promise<any>>()
-    const fakeServer = {
-      registerTool: (name: string, _m: unknown, cb: any) => {
-        registered.set(name, cb)
-      }
-    } as any
-    registerAllTools(fakeServer, runtime as any, handlers as any)
+    const fakeServer = captureToolCalls(registered)
+    registerAllTools(
+      fakeServer as Parameters<typeof registerAllTools>[0],
+      runtime,
+      handlers
+    )
 
     const cb = registered.get("get_ticket_doc")
     const result = await withFakeUser(() =>
