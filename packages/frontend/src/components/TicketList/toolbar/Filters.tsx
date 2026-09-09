@@ -39,7 +39,12 @@ import {
   type SprintFilterValue
 } from "./model"
 import { useTicketToolbar } from "./context"
-import { ControlSlot, FilterSection, SectionLabel } from "./shared"
+import {
+  ControlSlot,
+  FilterSection,
+  SectionLabel,
+  ToolbarButton
+} from "./shared"
 
 export function Filters() {
   const {
@@ -74,12 +79,8 @@ export function Filters() {
         <DropdownMenuTrigger
           ref={triggerRef}
           render={
-            <button
-              type="button"
-              className={cn(
-                "inline-flex h-9 items-center gap-2 rounded-xl border border-border bg-background px-3 text-sm text-muted-foreground transition-all duration-100 hover:text-foreground active:scale-[0.97] ring-offset-background focus-visible:ring-2 focus-visible:ring-ring outline-none",
-                active && "bg-accent text-foreground hover:text-foreground"
-              )}
+            <ToolbarButton
+              active={active}
               aria-label={
                 compact && active
                   ? m.tickets_filters_active_aria_label({
@@ -87,7 +88,6 @@ export function Filters() {
                     })
                   : m.tickets_filters_aria_label()
               }
-              aria-pressed={active}
             >
               <SlidersHorizontal className="size-4" strokeWidth={1.75} />
               <CollapsingLabel show={!compact}>
@@ -99,7 +99,7 @@ export function Filters() {
                 </span>
               )}
               <ChevronDown className="size-3.5 opacity-60" strokeWidth={1.75} />
-            </button>
+            </ToolbarButton>
           }
         />
         <DropdownMenuContent

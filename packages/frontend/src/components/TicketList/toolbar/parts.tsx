@@ -39,7 +39,7 @@ import {
 } from "@projectproject/shared"
 import { useTicketToolbar } from "./context"
 import { SORT_LABELS } from "../sort"
-import { ControlSlot } from "./shared"
+import { ControlSlot, ToolbarButton } from "./shared"
 
 export function SearchInput() {
   const { search, searchActive: compact, setFocused } = useTicketToolbar()
@@ -110,14 +110,9 @@ export function Status() {
       <DropdownMenu>
         <DropdownMenuTrigger
           render={
-            <button
-              type="button"
-              className={cn(
-                "inline-flex h-9 items-center gap-2 rounded-xl border border-border bg-background px-3 text-sm text-muted-foreground transition-all duration-100 hover:text-foreground active:scale-[0.97] ring-offset-background focus-visible:ring-2 focus-visible:ring-ring outline-none",
-                active && "bg-accent text-foreground hover:text-foreground"
-              )}
+            <ToolbarButton
+              active={active}
               aria-label={m.tickets_status_aria_label({ label: currentLabel })}
-              aria-pressed={active}
             >
               <CurrentIcon
                 className={cn("size-4", currentMeta?.className)}
@@ -140,7 +135,7 @@ export function Status() {
                 {counts[status] ?? 0}
               </span>
               <ChevronDown className="size-3.5 opacity-60" strokeWidth={1.75} />
-            </button>
+            </ToolbarButton>
           }
         />
         <DropdownMenuContent
@@ -210,9 +205,7 @@ export function Sort() {
       <DropdownMenu>
         <DropdownMenuTrigger
           render={
-            <button
-              type="button"
-              className="inline-flex h-9 items-center gap-2 rounded-xl border border-border bg-background px-3 text-sm text-muted-foreground transition-all duration-100 hover:text-foreground active:scale-[0.97] ring-offset-background focus-visible:ring-2 focus-visible:ring-ring outline-none"
+            <ToolbarButton
               aria-label={m.tickets_sort_aria_label({
                 label: SORT_LABELS[sortKey]()
               })}
@@ -222,7 +215,7 @@ export function Sort() {
                 {SORT_LABELS[sortKey]()}
               </CollapsingLabel>
               <ChevronDown className="size-3.5 opacity-60" strokeWidth={1.75} />
-            </button>
+            </ToolbarButton>
           }
         />
         <DropdownMenuContent align="end" sideOffset={6} className="w-44">
