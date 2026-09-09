@@ -104,16 +104,23 @@ export const Route = createFileRoute("/_authed/orgs/$orgSlug/projects/$slug")({
   }
 })
 
+const TICKET_DETAIL_ROUTE_ID =
+  "/_authed/orgs/$orgSlug/projects/$slug/tickets/$id"
+const PROJECT_SETTINGS_ROUTE_ID =
+  "/_authed/orgs/$orgSlug/projects/$slug/settings"
+
 function ProjectLayout() {
   const { orgSlug, slug } = Route.useParams()
-  const location = useLocation()
   const project = useAtomValue(projectAtom(projectKey(orgSlug, slug)))
-  const onTicketDetail = location.pathname.startsWith(
-    `/orgs/${orgSlug}/projects/${slug}/tickets/`
-  )
-  const onSettings = location.pathname.startsWith(
-    `/orgs/${orgSlug}/projects/${slug}/settings`
-  )
+  const headerHidden = useMatches({
+    select: (matches) =>
+      matches.some(
+        (match) =>
+          match.routeId === TICKET_DETAIL_ROUTE_ID ||
+          match.routeId === PROJECT_SETTINGS_ROUTE_ID ||
+          match.routeId.startsWith(`${PROJECT_SETTINGS_ROUTE_ID}/`)
+      )
+  })
 
   return Result.matchWithError(project, {
     onInitial: () => (
@@ -154,7 +161,7 @@ function ProjectLayout() {
           />
           <ProjectSetupSlot orgSlug={orgSlug} slug={slug} project={value} />
           <div className="flex flex-1 flex-col gap-6">
-            {!onTicketDetail && !onSettings && (
+            {!headerHidden && (
               <PageContainer>
                 <ProjectHeader
                   orgSlug={orgSlug}
