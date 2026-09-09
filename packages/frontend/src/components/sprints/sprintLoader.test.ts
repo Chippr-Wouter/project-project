@@ -121,7 +121,7 @@ describe("sprint route loading", () => {
     ).toEqual([`sections:${ticketsSectionsKey("test", "project", query)}`])
   })
 
-  it("loads board tickets without list requests", async () => {
+  it("loads board tickets without list or count requests", async () => {
     await load({ view: "board" })
     expect(requests.started).toContain("board:test/project/G-1")
     expect(

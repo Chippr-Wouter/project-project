@@ -26,7 +26,7 @@ function InputGroup({
         input.focus()
       }}
       className={cn(
-        "group/input-group relative flex w-full cursor-text items-center gap-2 rounded-xl border border-border bg-background px-3 py-1.5 transition-[color,box-shadow]",
+        "group/input-group relative flex h-9 w-full cursor-text items-center gap-2 rounded-xl border border-border bg-background px-3 transition-[color,box-shadow]",
         "ring-offset-background focus-within:ring-2 focus-within:ring-ring",
         "has-[input:disabled]:opacity-50",
         className

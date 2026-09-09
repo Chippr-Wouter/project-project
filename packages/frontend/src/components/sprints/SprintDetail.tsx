@@ -31,6 +31,7 @@ import { SprintBoard } from "./SprintBoard"
 import { SprintDescription } from "./SprintDescription"
 import { SprintDetailSkeleton } from "./SprintDetailSkeleton"
 import { SprintTicketList } from "./SprintTicketList"
+import { SprintBoardToolbar } from "./SprintBoardToolbar"
 
 export function SprintDetail({
   orgSlug,
@@ -48,19 +49,31 @@ export function SprintDetail({
   const project = useProject()
   const sprint = useAtomValue(sprintAtom(sprintKey(orgSlug, slug, groupId)))
   const list = useAtomValue(sprintsListAtom(projectKey(orgSlug, slug)))
-  const [reorderMode, setReorderMode] = useState(false)
-  const [dragOrder, setDragOrder] = useState<ReadonlyArray<string> | null>(null)
+  const reorderKey = `${orgSlug}/${slug}/${groupId}/${view}`
+  const [reorder, setReorder] = useState<{
+    key: string
+    order: ReadonlyArray<string> | null
+  } | null>(null)
+  if (reorder !== null && reorder.key !== reorderKey) setReorder(null)
+  const reorderMode = reorder !== null
+  const dragOrder = reorder?.order ?? null
 
   const statusKey = projectStatusKey(orgSlug, slug)
   const statusesResult = useAtomValue(projectStatusesAtom(statusKey))
   const reorderStatus = useAtomSet(reorderStatusAtom(statusKey))
 
-  const enterReorder = useCallback(() => setReorderMode(true), [])
+  const enterReorder = useCallback(
+    () => setReorder({ key: reorderKey, order: null }),
+    [reorderKey]
+  )
 
-  const cancelReorder = useCallback(() => {
-    setDragOrder(null)
-    setReorderMode(false)
-  }, [])
+  const cancelReorder = useCallback(() => setReorder(null), [])
+
+  const setDragOrder = useCallback(
+    (next: ReadonlyArray<string> | null) =>
+      setReorder({ key: reorderKey, order: next }),
+    [reorderKey]
+  )
 
   const saveReorder = useCallback(() => {
     if (!Result.isSuccess(statusesResult)) return
@@ -92,8 +105,7 @@ export function SprintDetail({
         lastKey = newKey
       }
     }
-    setDragOrder(null)
-    setReorderMode(false)
+    setReorder(null)
   }, [dragOrder, statusesResult, reorderStatus])
 
   const isBoard = view === "board"
@@ -161,14 +173,14 @@ export function SprintDetail({
       )
 
       const boardSlot = (
-        <div className="grid">
+        <div className="relative">
           <motion.div
             initial={false}
             animate={{ opacity: reorderMode ? 1 : 0 }}
             transition={transitions.fade}
             inert={!reorderMode}
             aria-hidden={!reorderMode}
-            className="col-start-1 row-start-1"
+            className="absolute inset-x-0 top-1/2 -translate-y-1/2"
           >
             <ReorderBoardBanner onSave={saveReorder} onCancel={cancelReorder} />
           </motion.div>
@@ -178,7 +190,6 @@ export function SprintDetail({
             transition={transitions.fade}
             inert={reorderMode}
             aria-hidden={reorderMode}
-            className="col-start-1 row-start-1 self-center"
           >
             {creator}
           </motion.div>
@@ -195,20 +206,40 @@ export function SprintDetail({
           />
         </PageContainer>
       ) : isBoard ? (
-        <PageContainer>
-          <SprintBoard
-            orgSlug={orgSlug}
-            slug={slug}
-            groupId={display.id}
-            ticketIds={ticketIds}
-            members={project.members}
-            isCompleted={isCompleted}
-            reorderMode={reorderMode}
-            onEnterReorder={enterReorder}
-            onExitReorder={cancelReorder}
-            dragOrder={dragOrder}
-            setDragOrder={setDragOrder}
-          />
+        <PageContainer className="group/list gap-3">
+          {boardSlot}
+          <div className="flex flex-col gap-3 transition-opacity duration-200 ease-out group-has-[form[data-active]]/list:opacity-35">
+            <motion.div
+              initial={false}
+              animate={{ opacity: reorderMode ? 0.35 : 1 }}
+              transition={transitions.fade}
+              inert={reorderMode}
+              aria-hidden={reorderMode}
+            >
+              <SprintBoardToolbar
+                orgSlug={orgSlug}
+                slug={slug}
+                groupId={display.id}
+                ticketIds={ticketIds}
+                query={listQuery}
+                members={project.members}
+              />
+            </motion.div>
+            <SprintBoard
+              orgSlug={orgSlug}
+              slug={slug}
+              groupId={display.id}
+              ticketIds={ticketIds}
+              query={listQuery}
+              members={project.members}
+              isCompleted={isCompleted}
+              reorderMode={reorderMode}
+              onEnterReorder={enterReorder}
+              onExitReorder={cancelReorder}
+              dragOrder={dragOrder}
+              setDragOrder={setDragOrder}
+            />
+          </div>
         </PageContainer>
       ) : (
         <PageContainer>
@@ -222,12 +253,7 @@ export function SprintDetail({
         </PageContainer>
       )
 
-      return (
-        <div className="flex flex-col gap-4">
-          {isBoard && <PageContainer>{boardSlot}</PageContainer>}
-          {body}
-        </div>
-      )
+      return body
     }
   })
 }

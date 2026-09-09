@@ -12,6 +12,7 @@ import {
   ticketListQueryToSearch
 } from "@projectproject/shared"
 import { TicketList } from "@/components/TicketList"
+import { BacklogToolbar } from "@/components/TicketList/toolbars"
 import { ArchiveTicketControl } from "@/components/TicketList/ArchiveControl"
 import { PageContainer } from "@/components/page"
 import { projectKey, sprintMembershipAtom } from "@/atoms/sprints"
@@ -63,7 +64,14 @@ function TicketsTab() {
         query={query}
         members={project.members}
         sprintMembership={sprintMembership}
-        showSprintFilter
+        toolbar={
+          <BacklogToolbar
+            orgSlug={orgSlug}
+            slug={slug}
+            query={query}
+            members={project.members}
+          />
+        }
         extraRowActions={(ticket) => (
           <ArchiveTicketControl
             orgSlug={orgSlug}

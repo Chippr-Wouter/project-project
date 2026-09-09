@@ -165,9 +165,9 @@ function ProjectLayout() {
             enabled={value.github !== null}
           />
           <ProjectSetupSlot orgSlug={orgSlug} slug={slug} project={value} />
-          <div className="flex flex-1 flex-col gap-6">
+          <div className="flex flex-1 flex-col gap-3">
             {!headerHidden && (
-              <PageContainer>
+              <PageContainer className="gap-3">
                 <ProjectHeader
                   orgSlug={orgSlug}
                   slug={value.slug}

@@ -9,7 +9,6 @@ import {
   placeTicketAtom,
   sprintKey
 } from "@/atoms/sprints"
-import { ticketsInSprintAtom, ticketsInSprintKey } from "@/atoms/tickets"
 import {
   projectKey as projectStatusKey,
   projectStatusesAtom
@@ -18,8 +17,8 @@ import type {
   GroupId,
   Member,
   ProjectStatus,
-  Ticket,
-  TicketId
+  TicketId,
+  TicketListQuery
 } from "@projectproject/shared"
 import { cn } from "@/lib/utils"
 import {
@@ -30,6 +29,7 @@ import {
   type DragData
 } from "./board-utils"
 import { SprintBoardColumn } from "./SprintBoardColumn"
+import { useBoardTickets } from "./useBoardTickets"
 
 const EMPTY_STATUSES: ReadonlyArray<ProjectStatus> = []
 
@@ -38,6 +38,7 @@ export function SprintBoard({
   slug,
   groupId,
   ticketIds,
+  query,
   members,
   isCompleted,
   reorderMode,
@@ -50,6 +51,7 @@ export function SprintBoard({
   slug: string
   groupId: GroupId
   ticketIds: ReadonlyArray<TicketId>
+  query: TicketListQuery
   members: ReadonlyArray<Member>
   isCompleted: boolean
   reorderMode: boolean
@@ -91,7 +93,14 @@ export function SprintBoard({
     }
     update()
     const ro = new ResizeObserver(update)
-    ro.observe(container)
+    ro.observe(container, { box: "border-box" })
+    for (let node: Element | null = el; node && node !== paddingSource;) {
+      for (let prev = node.previousElementSibling; prev;) {
+        ro.observe(prev, { box: "border-box" })
+        prev = prev.previousElementSibling
+      }
+      node = node.parentElement
+    }
     window.addEventListener("resize", update)
     return () => {
       ro.disconnect()
@@ -126,9 +135,6 @@ export function SprintBoard({
 
   const key = sprintKey(orgSlug, slug, groupId)
   const statusKey = projectStatusKey(orgSlug, slug)
-  const list = useAtomValue(
-    ticketsInSprintAtom(ticketsInSprintKey(orgSlug, slug, groupId))
-  )
   const overlay = useAtomValue(pendingTicketStatusAtom(key))
   const place = useAtomSet(placeTicketAtom(key))
   const statusesResult = useAtomValue(projectStatusesAtom(statusKey))
@@ -148,20 +154,24 @@ export function SprintBoard({
   const flash = (id: TicketId) =>
     setLastFlash((prev) => ({ id, tick: (prev?.tick ?? 0) + 1 }))
 
-  const ticketById = useMemo(() => {
-    const m = new Map<TicketId, Ticket>()
-    if (Result.isSuccess(list)) {
-      for (const t of list.value) m.set(t.id, t)
-    }
-    return m
-  }, [list])
+  const { ticketById, matchingTicketIds } = useBoardTickets(
+    orgSlug,
+    slug,
+    groupId,
+    ticketIds,
+    query
+  )
 
   const grouped = useMemo(
+    () => groupTicketsByStatus(matchingTicketIds, ticketById, overlay, order),
+    [matchingTicketIds, ticketById, overlay, order]
+  )
+  const unfilteredGrouped = useMemo(
     () => groupTicketsByStatus(ticketIds, ticketById, overlay, order),
     [ticketIds, ticketById, overlay, order]
   )
-  const groupedRef = useRef(grouped)
-  groupedRef.current = grouped
+  const unfilteredGroupedRef = useRef(unfilteredGrouped)
+  unfilteredGroupedRef.current = unfilteredGrouped
 
   useEffect(() => {
     const el = ref.current
@@ -176,7 +186,7 @@ export function SprintBoard({
         if (src.type !== "card") return
         if (dst.type === "card" && dst.id === src.id) return
 
-        const current = groupedRef.current
+        const current = unfilteredGroupedRef.current
         let after: TicketId | null
         let nextStatus: string
         if (dst.type === "card") {
@@ -214,7 +224,7 @@ export function SprintBoard({
       layoutScroll
       style={{ height: height ? `${height}px` : undefined }}
       className={cn(
-        "overflow-x-auto pt-2 pb-4",
+        "overflow-x-auto",
         hasRightOverflow &&
           "[mask-image:linear-gradient(to_right,black_calc(100%-16px),transparent)]"
       )}
