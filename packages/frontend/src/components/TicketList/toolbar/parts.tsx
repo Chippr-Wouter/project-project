@@ -34,28 +34,16 @@ import { transitions } from "@/lib/springs"
 import { m } from "@/paraglide/messages"
 import {
   type SortKey,
-  type TicketFilter,
-  type TicketListQuery,
+  NATURAL_SORT_DIR,
   type TicketStatus
 } from "@projectproject/shared"
+import { useTicketToolbar } from "./context"
 import { SORT_LABELS } from "../sort"
 import { ControlSlot, TOOLBAR_BUTTON_CLASS } from "./shared"
 
-export function SearchInput({
-  value: searchInput,
-  onChange: setSearchQuery,
-  onFocus,
-  onBlur,
-  onClear: clearSearch,
-  active: compact
-}: {
-  value: string
-  onChange: (value: string) => void
-  onFocus: () => void
-  onBlur: () => void
-  onClear: () => void
-  active: boolean
-}) {
+export function SearchInput() {
+  const { search, searchActive: compact, setFocused } = useTicketToolbar()
+  const searchInput = search.draft
   const searchRef = useRef<HTMLInputElement>(null)
   const searchBelowMinChars =
     searchInput.length > 0 && searchInput.length < MIN_SEARCH_CHARS
@@ -68,9 +56,12 @@ export function SearchInput({
       <InputGroupInput
         ref={searchRef}
         value={searchInput}
-        onChange={(e) => setSearchQuery(e.target.value)}
-        onFocus={onFocus}
-        onBlur={onBlur}
+        onChange={(e) => search.change(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => {
+          setFocused(false)
+          search.flush()
+        }}
         placeholder={m.tickets_search_placeholder()}
         aria-label={m.tickets_search_aria_label()}
       />
@@ -84,7 +75,7 @@ export function SearchInput({
           type="button"
           variant="ghost"
           size="icon-xs"
-          onClick={clearSearch}
+          onClick={search.clear}
           aria-label={m.tickets_search_clear_aria_label()}
           className="shrink-0 rounded-xl"
         >
@@ -97,24 +88,13 @@ export function SearchInput({
   )
 }
 
-export function Status({
-  value: selected,
-  onChange,
-  counts,
-  orgSlug,
-  slug,
-  compact: controlsCompact
-}: {
-  value: TicketFilter["status"]
-  onChange: (value: TicketFilter["status"]) => void
-  counts: Record<string, number>
-  orgSlug: string
-  slug: string
-  compact: boolean
-}) {
+export function Status() {
+  const { query, patchFilter, counts, orgSlug, slug, controlsCompact } =
+    useTicketToolbar()
+  const selected = query.filter?.status
   const status = selected?.length === 1 ? selected[0] : "all"
   const setStatus = (status: TicketStatus | "all") =>
-    onChange(status === "all" ? undefined : [status])
+    patchFilter({ status: status === "all" ? undefined : [status] })
   const result = useAtomValue(projectStatusesAtom(projectKey(orgSlug, slug)))
   const statuses = Result.isSuccess(result) ? result.value : []
   const slugs = boardStatusesFor(statuses)
@@ -220,16 +200,11 @@ export function Status({
   )
 }
 
-export function Sort({
-  value,
-  onChange: setSortKey,
-  compact: controlsCompact
-}: {
-  value: TicketListQuery["sort"]
-  onChange: (key: SortKey) => void
-  compact: boolean
-}) {
-  const sortKey = value.key
+export function Sort() {
+  const { query, onQueryChange, controlsCompact } = useTicketToolbar()
+  const sortKey = query.sort.key
+  const setSortKey = (key: SortKey) =>
+    onQueryChange({ ...query, sort: { key, dir: NATURAL_SORT_DIR[key] } })
   return (
     <motion.div layout="position" transition={transitions.layout}>
       <DropdownMenu>
@@ -269,13 +244,8 @@ export function Sort({
   )
 }
 
-export function ClearAll({
-  visible: hasActiveFilters,
-  onClick: clearAll
-}: {
-  visible: boolean
-  onClick: () => void
-}) {
+export function ClearAll() {
+  const { hasActiveFilters, clearAll } = useTicketToolbar()
   return (
     <AnimatePresence initial={false} mode="popLayout">
       {hasActiveFilters && (

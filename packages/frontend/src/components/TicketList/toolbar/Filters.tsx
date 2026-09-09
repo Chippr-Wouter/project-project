@@ -36,9 +36,9 @@ import {
 } from "@projectproject/shared"
 import {
   activeFilterCount as countActiveFilters,
-  type FilterDimension,
   type SprintFilterValue
 } from "./model"
+import { useTicketToolbar } from "./context"
 import {
   ControlSlot,
   FilterSection,
@@ -46,23 +46,17 @@ import {
   TOOLBAR_BUTTON_CLASS
 } from "./shared"
 
-export function Filters({
-  value,
-  onChange,
-  filters,
-  members,
-  orgSlug,
-  slug,
-  compact
-}: {
-  value: TicketFilter | undefined
-  onChange: (patch: Partial<TicketFilter>) => void
-  filters: ReadonlyArray<FilterDimension>
-  members: ReadonlyArray<Member>
-  orgSlug: string
-  slug: string
-  compact: boolean
-}) {
+export function Filters() {
+  const {
+    query,
+    patchFilter: onChange,
+    filters,
+    members,
+    orgSlug,
+    slug,
+    searchActive: compact
+  } = useTicketToolbar()
+  const value = query.filter
   const activeFilterCount = countActiveFilters(value, filters)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const [anchor, setAnchor] =

@@ -1,12 +1,8 @@
 import { useLayoutEffect, useRef, useState } from "react"
-import {
-  NATURAL_SORT_DIR,
-  type Member,
-  type TicketFilter,
-  type TicketListQuery
-} from "@projectproject/shared"
+import type { TicketFilter } from "@projectproject/shared"
 import { useTicketSearch } from "../search"
-import { activeFilterCount, pruneFilter, type FilterDimension } from "./model"
+import { activeFilterCount, pruneFilter } from "./model"
+import { TicketToolbarContext, type TicketToolbarProps } from "./context"
 import { Filters } from "./Filters"
 import { ClearAll, SearchInput, Sort, Status } from "./parts"
 
@@ -19,16 +15,7 @@ export function TicketToolbar({
   counts,
   filters,
   showSort = false
-}: {
-  orgSlug: string
-  slug: string
-  query: TicketListQuery
-  onQueryChange: (query: TicketListQuery) => void
-  members: ReadonlyArray<Member>
-  counts: Record<string, number>
-  filters: ReadonlyArray<FilterDimension>
-  showSort?: boolean
-}) {
+}: TicketToolbarProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(0)
   const [focused, setFocused] = useState(false)
@@ -65,55 +52,38 @@ export function TicketToolbar({
     !!query.q
 
   return (
-    <div
-      ref={containerRef}
-      className="flex flex-wrap items-center gap-x-2 gap-y-2"
+    <TicketToolbarContext
+      value={{
+        orgSlug,
+        slug,
+        query,
+        onQueryChange,
+        members,
+        counts,
+        filters,
+        search,
+        searchActive,
+        controlsCompact,
+        setFocused,
+        patchFilter,
+        clearAll,
+        hasActiveFilters
+      }}
     >
-      <SearchInput
-        value={search.draft}
-        onChange={search.change}
-        onFocus={() => setFocused(true)}
-        onBlur={() => {
-          setFocused(false)
-          search.flush()
-        }}
-        onClear={search.clear}
-        active={searchActive}
-      />
-      {measured && (
-        <div className="relative flex flex-wrap items-center gap-2">
-          <Status
-            value={query.filter?.status}
-            onChange={(status) => patchFilter({ status })}
-            counts={counts}
-            orgSlug={orgSlug}
-            slug={slug}
-            compact={controlsCompact}
-          />
-          <Filters
-            value={query.filter}
-            onChange={patchFilter}
-            filters={filters}
-            members={members}
-            orgSlug={orgSlug}
-            slug={slug}
-            compact={searchActive}
-          />
-          {showSort && (
-            <Sort
-              value={query.sort}
-              onChange={(key) =>
-                onQueryChange({
-                  ...query,
-                  sort: { key, dir: NATURAL_SORT_DIR[key] }
-                })
-              }
-              compact={controlsCompact}
-            />
-          )}
-          <ClearAll visible={hasActiveFilters} onClick={clearAll} />
-        </div>
-      )}
-    </div>
+      <div
+        ref={containerRef}
+        className="flex flex-wrap items-center gap-x-2 gap-y-2"
+      >
+        <SearchInput />
+        {measured && (
+          <div className="relative flex flex-wrap items-center gap-2">
+            <Status />
+            <Filters />
+            {showSort && <Sort />}
+            <ClearAll />
+          </div>
+        )}
+      </div>
+    </TicketToolbarContext>
   )
 }
