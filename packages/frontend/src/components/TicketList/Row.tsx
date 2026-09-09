@@ -1,14 +1,14 @@
 import {
   memo,
-  useCallback,
   useRef,
   useState,
+  type HTMLAttributes,
   type KeyboardEvent,
   type MouseEvent,
   type ReactNode
 } from "react"
 import { AnimatePresence, motion } from "motion/react"
-import { useNavigate } from "@tanstack/react-router"
+import { useLinkProps, useNavigate } from "@tanstack/react-router"
 import { useAtomValue } from "@effect/atom-react"
 import {
   applyOptimisticTicketPreview,
@@ -19,8 +19,6 @@ import { TicketGitChip } from "@/components/TicketGit"
 import { TicketHoverCard } from "@/components/TicketHoverCard"
 import { Popover, PopoverTrigger } from "@/components/ui/popover"
 import { transitions } from "@/lib/springs"
-import { ticketPrefetchAtoms } from "@/lib/prefetch"
-import { usePrefetch } from "@/hooks/usePrefetch"
 import { cn } from "@/lib/utils"
 import type {
   Group,
@@ -76,12 +74,19 @@ function RowImpl({
   const rowElement = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const [previewMounted, setPreviewMounted] = useState(false)
-  const prefetch = usePrefetch(
-    useCallback(
-      () => ticketPrefetchAtoms(orgSlug, slug, ticket.id),
-      [orgSlug, slug, ticket.id]
-    )
-  )
+  const { onMouseEnter, onMouseLeave, onFocus, onBlur, onTouchStart } =
+    useLinkProps({
+      to: "/orgs/$orgSlug/projects/$slug/tickets/$id",
+      params: { orgSlug, slug, id: ticket.id },
+      preload: "intent"
+    })
+  const preload: HTMLAttributes<HTMLElement> = {
+    onMouseEnter,
+    onMouseLeave,
+    onFocus,
+    onBlur,
+    onTouchStart
+  }
   const open = () => {
     void navigate({
       to: "/orgs/$orgSlug/projects/$slug/tickets/$id",
@@ -116,7 +121,7 @@ function RowImpl({
         }}
       >
         <div
-          {...prefetch}
+          {...preload}
           ref={rowElement}
           role="link"
           tabIndex={0}
