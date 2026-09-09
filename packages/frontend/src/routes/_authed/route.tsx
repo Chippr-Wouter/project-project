@@ -1,5 +1,5 @@
 import * as Result from "effect/unstable/reactivity/AsyncResult"
-import { useAtomSet, useAtomValue } from "@effect/atom-react"
+import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
 import {
   createFileRoute,
   Link,
@@ -81,10 +81,26 @@ function AuthedLayout() {
       }
       return (
         <SidebarSlotProvider>
-          <Shell user={value} />
+          {value.activeOrgSlug ? (
+            <OrgShell user={value} orgSlug={value.activeOrgSlug} />
+          ) : (
+            <Shell user={value} />
+          )}
         </SidebarSlotProvider>
       )
     }
+  })
+}
+
+function OrgShell({ user, orgSlug }: { user: User; orgSlug: string }) {
+  const projects = useAtomValue(projectsListAtom(orgSlug))
+  const refresh = useAtomRefresh(projectsListAtom(orgSlug))
+
+  return Result.matchWithError(projects, {
+    onInitial: () => <LoaderOverlay active />,
+    onError: (error) => <ErrorPage error={error} reset={refresh} />,
+    onDefect: (defect) => <ErrorPage error={defect} reset={refresh} />,
+    onSuccess: () => <Shell user={user} />
   })
 }
 
