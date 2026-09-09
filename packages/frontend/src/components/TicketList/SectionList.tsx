@@ -1,3 +1,4 @@
+import { TICKET_LIST_LIMIT } from "@projectproject/shared"
 import * as Result from "effect/unstable/reactivity/AsyncResult"
 import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import { AnimatePresence, motion } from "motion/react"
@@ -166,6 +167,26 @@ export function SectionList({
                 onDefect: (defect) => <ErrorPage error={defect} contained />,
                 onSuccess: () => null
               })
+            ) : previousRef.current === null ? (
+              <div
+                aria-busy="true"
+                className="flex flex-col gap-1 animate-pulse motion-reduce:animate-none"
+              >
+                {Array.from(
+                  { length: Math.min(count, TICKET_LIST_LIMIT) },
+                  (_, index) => (
+                    <div
+                      key={index}
+                      aria-hidden="true"
+                      className="flex h-[52px] items-center gap-3 px-3"
+                    >
+                      <div className="size-4 rounded-full bg-muted" />
+                      <div className="h-3 w-10 rounded bg-muted" />
+                      <div className="h-3 w-2/5 rounded bg-muted" />
+                    </div>
+                  )
+                )}
+              </div>
             ) : items.length === 0 ? (
               <div className="px-3 py-4 text-center text-xs text-muted-foreground">
                 —

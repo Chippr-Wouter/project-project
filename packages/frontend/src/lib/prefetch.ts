@@ -1,4 +1,9 @@
+import * as Result from "effect/unstable/reactivity/AsyncResult"
 import * as Atom from "effect/unstable/reactivity/Atom"
+import {
+  ticketListQueryFromSearch,
+  type TicketId
+} from "@projectproject/shared"
 import {
   projectKey as statusKey,
   projectStatusesAtom
@@ -9,9 +14,32 @@ import {
   ticketAtom,
   ticketKey,
   ticketsCountAtom,
-  ticketsCountKey
+  ticketsCountKey,
+  ticketsListAtom,
+  ticketsListKeyForStatus
 } from "@/atoms/tickets"
-import type { TicketId } from "@projectproject/shared"
+
+const projectTicketRowsPrefetchAtom = Atom.family((key: string) => {
+  const separator = key.indexOf("/")
+  const orgSlug = key.slice(0, separator)
+  const slug = key.slice(separator + 1)
+  return Atom.readable((get) => {
+    const statuses = get(projectStatusesAtom(key))
+    if (!Result.isSuccess(statuses)) return
+    for (const status of statuses.value) {
+      get(
+        ticketsListAtom(
+          ticketsListKeyForStatus(
+            orgSlug,
+            slug,
+            ticketListQueryFromSearch({}),
+            status.slug
+          )
+        )
+      )
+    }
+  })
+})
 
 export function preloadTicketPage(): Promise<unknown> {
   return import("@/components/TicketPage")
@@ -23,6 +51,7 @@ export function projectPrefetchAtoms(
 ): Array<Atom.Atom<unknown>> {
   return [
     projectAtom(projectKey(orgSlug, slug)),
+    projectTicketRowsPrefetchAtom(projectKey(orgSlug, slug)),
     ticketsCountAtom(ticketsCountKey(orgSlug, slug, {})),
     sprintsListAtom(sprintsKey(orgSlug, slug)),
     projectStatusesAtom(statusKey(orgSlug, slug))

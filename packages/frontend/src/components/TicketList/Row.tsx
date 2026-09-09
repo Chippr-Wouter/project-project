@@ -17,6 +17,7 @@ import {
 } from "@/atoms/tickets"
 import { TicketGitChip } from "@/components/TicketGit"
 import { TicketHoverCard } from "@/components/TicketHoverCard"
+import { DeferredDropdownMenus } from "@/components/ui/dropdown-menu"
 import { Popover, PopoverTrigger } from "@/components/ui/popover"
 import { transitions } from "@/lib/springs"
 import { ticketPrefetchAtoms } from "@/lib/prefetch"
@@ -108,132 +109,134 @@ function RowImpl({
   }
   return (
     <div className="group/list-row col-span-full grid grid-cols-subgrid">
-      <Popover
-        open={activePreviewId === ticket.id}
-        onOpenChange={(nextOpen) => {
-          if (nextOpen) setPreviewMounted(true)
-          onPreviewOpenChange(ticket.id, nextOpen)
-        }}
-      >
-        <div
-          {...prefetch}
-          ref={rowElement}
-          role="link"
-          tabIndex={0}
-          onClick={handleClick}
-          onKeyDown={handleKeyDown}
-          className={cn(
-            "col-span-full grid cursor-pointer grid-cols-subgrid items-center gap-3 rounded-lg px-3 py-2.5 text-left outline-none transition-colors hover:bg-muted/60 focus-visible:ring-1 focus-visible:ring-ring",
-            updatePreview.waiting && "animate-pulse"
-          )}
+      <DeferredDropdownMenus>
+        <Popover
+          open={activePreviewId === ticket.id}
+          onOpenChange={(nextOpen) => {
+            if (nextOpen) setPreviewMounted(true)
+            onPreviewOpenChange(ticket.id, nextOpen)
+          }}
         >
-          <StatusButton
-            orgSlug={orgSlug}
-            slug={slug}
-            ticket={visibleTicket}
-            query={query}
-            stopPropagation
-          />
-          <PriorityButton
-            orgSlug={orgSlug}
-            slug={slug}
-            ticket={visibleTicket}
-            stopPropagation
-          />
-          <span className="inline-flex shrink-0 items-center font-mono text-xs text-muted-foreground tabular-nums">
-            <span>{idPrefix}-</span>
-            <AnimatePresence initial={false} mode="popLayout">
-              {!pending && (
-                <motion.span
-                  key={idTail}
-                  initial={{ opacity: 0, filter: "blur(4px)" }}
-                  animate={{ opacity: 1, filter: "blur(0px)" }}
-                  exit={{ opacity: 0, filter: "blur(4px)" }}
-                  transition={transitions.presence}
-                  className="inline-block"
-                >
-                  {idTail}
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </span>
-          <div className="flex min-w-0 items-center">
-            <PopoverTrigger
-              openOnHover
-              delay={TICKET_PREVIEW_DELAY_MS}
-              nativeButton={false}
-              onPointerEnter={handleTitlePointerEnter}
-              onPointerLeave={handleTitlePointerLeave}
-              render={(triggerProps) => (
-                <div
-                  {...triggerProps}
-                  role={undefined}
-                  tabIndex={undefined}
-                  aria-controls={undefined}
-                  aria-expanded={undefined}
-                  aria-haspopup={undefined}
-                  onClick={undefined}
-                  onKeyDown={undefined}
-                  onKeyUp={undefined}
-                  onPointerDown={undefined}
-                  className="flex min-w-0 flex-1 self-stretch items-center"
-                />
-              )}
-            >
-              <span className="min-w-0 truncate text-sm font-medium">
-                {visibleTicket.title}
-              </span>
-            </PopoverTrigger>
-            <div className="ml-auto flex shrink-0 items-center gap-2 pl-3">
-              <TicketGitChip
-                orgSlug={orgSlug}
-                slug={slug}
-                ticket={visibleTicket}
-              />
-              {showSprintCol && (
-                <SprintField
+          <div
+            {...prefetch}
+            ref={rowElement}
+            role="link"
+            tabIndex={0}
+            onClick={handleClick}
+            onKeyDown={handleKeyDown}
+            className={cn(
+              "col-span-full grid cursor-pointer grid-cols-subgrid items-center gap-3 rounded-lg px-3 py-2.5 text-left outline-none transition-colors hover:bg-muted/60 focus-visible:ring-1 focus-visible:ring-ring",
+              updatePreview.waiting && "animate-pulse"
+            )}
+          >
+            <StatusButton
+              orgSlug={orgSlug}
+              slug={slug}
+              ticket={visibleTicket}
+              query={query}
+              stopPropagation
+            />
+            <PriorityButton
+              orgSlug={orgSlug}
+              slug={slug}
+              ticket={visibleTicket}
+              stopPropagation
+            />
+            <span className="inline-flex shrink-0 items-center font-mono text-xs text-muted-foreground tabular-nums">
+              <span>{idPrefix}-</span>
+              <AnimatePresence initial={false} mode="popLayout">
+                {!pending && (
+                  <motion.span
+                    key={idTail}
+                    initial={{ opacity: 0, filter: "blur(4px)" }}
+                    animate={{ opacity: 1, filter: "blur(0px)" }}
+                    exit={{ opacity: 0, filter: "blur(4px)" }}
+                    transition={transitions.presence}
+                    className="inline-block"
+                  >
+                    {idTail}
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </span>
+            <div className="flex min-w-0 items-center">
+              <PopoverTrigger
+                openOnHover
+                delay={TICKET_PREVIEW_DELAY_MS}
+                nativeButton={false}
+                onPointerEnter={handleTitlePointerEnter}
+                onPointerLeave={handleTitlePointerLeave}
+                render={(triggerProps) => (
+                  <div
+                    {...triggerProps}
+                    role={undefined}
+                    tabIndex={undefined}
+                    aria-controls={undefined}
+                    aria-expanded={undefined}
+                    aria-haspopup={undefined}
+                    onClick={undefined}
+                    onKeyDown={undefined}
+                    onKeyUp={undefined}
+                    onPointerDown={undefined}
+                    className="flex min-w-0 flex-1 self-stretch items-center"
+                  />
+                )}
+              >
+                <span className="min-w-0 truncate text-sm font-medium">
+                  {visibleTicket.title}
+                </span>
+              </PopoverTrigger>
+              <div className="ml-auto flex shrink-0 items-center gap-2 pl-3">
+                <TicketGitChip
                   orgSlug={orgSlug}
                   slug={slug}
-                  ticketId={ticket.id}
-                  membership={sprintMembership}
+                  ticket={visibleTicket}
                 />
-              )}
-              <AssigneeRowTrigger
-                orgSlug={orgSlug}
-                slug={slug}
-                ticket={visibleTicket}
-                members={members}
-                className="hidden sm:inline-flex"
-              />
+                {showSprintCol && (
+                  <SprintField
+                    orgSlug={orgSlug}
+                    slug={slug}
+                    ticketId={ticket.id}
+                    membership={sprintMembership}
+                  />
+                )}
+                <AssigneeRowTrigger
+                  orgSlug={orgSlug}
+                  slug={slug}
+                  ticket={visibleTicket}
+                  members={members}
+                  className="hidden sm:inline-flex"
+                />
+              </div>
             </div>
+            <TypeButton
+              orgSlug={orgSlug}
+              slug={slug}
+              ticket={visibleTicket}
+              className="hidden sm:inline-flex"
+            />
+            {showExtraActionsCol && (
+              <span
+                className="inline-flex shrink-0 items-center"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  e.preventDefault()
+                }}
+              >
+                {extraRowActions?.(visibleTicket)}
+              </span>
+            )}
           </div>
-          <TypeButton
-            orgSlug={orgSlug}
-            slug={slug}
-            ticket={visibleTicket}
-            className="hidden sm:inline-flex"
-          />
-          {showExtraActionsCol && (
-            <span
-              className="inline-flex shrink-0 items-center"
-              onClick={(e) => {
-                e.stopPropagation()
-                e.preventDefault()
-              }}
-            >
-              {extraRowActions?.(visibleTicket)}
-            </span>
+          {previewMounted && (
+            <TicketHoverCard
+              ticketId={ticket.id}
+              scope={{ orgSlug, slug, members }}
+              anchor={rowElement}
+              interactive={false}
+            />
           )}
-        </div>
-        {previewMounted && (
-          <TicketHoverCard
-            ticketId={ticket.id}
-            scope={{ orgSlug, slug, members }}
-            anchor={rowElement}
-            interactive={false}
-          />
-        )}
-      </Popover>
+        </Popover>
+      </DeferredDropdownMenus>
     </div>
   )
 }

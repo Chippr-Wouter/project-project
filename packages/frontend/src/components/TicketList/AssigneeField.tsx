@@ -13,7 +13,7 @@ import { m } from "@/paraglide/messages"
 import { ticketKey, updateTicketAtom } from "@/atoms/tickets"
 import type { Member, TicketId } from "@projectproject/shared"
 
-function AssigneeMenuContent({
+function AssigneeMenuItems({
   orgSlug,
   slug,
   ticket,
@@ -39,13 +39,7 @@ function AssigneeMenuContent({
     )
   }
   return (
-    <DropdownMenuContent
-      align="start"
-      sideOffset={6}
-      className="w-56"
-      onClick={(e) => e.stopPropagation()}
-      finalFocus={false}
-    >
+    <>
       <DropdownMenuItem
         closeOnClick={false}
         onClick={() => {
@@ -84,6 +78,20 @@ function AssigneeMenuContent({
           </DropdownMenuItem>
         )
       })}
+    </>
+  )
+}
+
+function AssigneeMenuContent(props: Parameters<typeof AssigneeMenuItems>[0]) {
+  return (
+    <DropdownMenuContent
+      align="start"
+      sideOffset={6}
+      className="w-56"
+      onClick={(e) => e.stopPropagation()}
+      finalFocus={false}
+    >
+      <AssigneeMenuItems {...props} />
     </DropdownMenuContent>
   )
 }
