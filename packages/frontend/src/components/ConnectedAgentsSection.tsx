@@ -149,11 +149,7 @@ function ConnectMcpDisclosure() {
         description: m.profile_connect_mcp_codex_description(),
         language: "toml",
         buildSnippet: (url) =>
-          [
-            "[mcp_servers.projectproject]",
-            'command = "npx"',
-            `args = ["-y", "mcp-remote", "${url}"]`
-          ].join("\n")
+          ["[mcp_servers.projectproject]", `url = "${url}"`].join("\n")
       }
     ],
     []

@@ -52,6 +52,87 @@ const ticketFrontmatter = (id: string) => ({
   updatedAt: "2026-05-19T00:00:00.000Z"
 })
 
+describe("Markdown tickets (real fs)", () => {
+  it.effect("keeps the original ticket when exclusive creation collides", () =>
+    Effect.gen(function* () {
+      const md = yield* Markdown
+      const fs = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      const root = yield* Config.string("PROJECTS_DIR")
+
+      yield* md.createTicketFile(
+        "acme",
+        "foo",
+        "T-1",
+        ticketFrontmatter("T-1"),
+        "# Original\n"
+      )
+      const error = yield* md
+        .createTicketFile(
+          "acme",
+          "foo",
+          "T-1",
+          ticketFrontmatter("T-1"),
+          "# Replacement\n"
+        )
+        .pipe(Effect.flip)
+      const file = path.join(
+        root,
+        "orgs",
+        "acme",
+        "projects",
+        "foo",
+        "tickets",
+        "T-1.md"
+      )
+      const entries = yield* fs.readDirectory(path.dirname(file))
+
+      expect(error._tag).toBe("TicketIdTaken")
+      expect(yield* fs.readFileString(file, "utf8")).toContain("# Original")
+      expect(entries).toEqual(["T-1.md"])
+    }).pipe(Effect.provide(TestLayer))
+  )
+
+  it.effect(
+    "atomically replaces a ticket without leaving temporary files",
+    () =>
+      Effect.gen(function* () {
+        const md = yield* Markdown
+        const fs = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
+        const root = yield* Config.string("PROJECTS_DIR")
+
+        yield* md.createTicketFile(
+          "acme",
+          "foo",
+          "T-1",
+          ticketFrontmatter("T-1"),
+          "# Before\n"
+        )
+        yield* md.writeTicketFile(
+          "acme",
+          "foo",
+          "T-1",
+          { ...ticketFrontmatter("T-1"), title: "After" },
+          "# After\n"
+        )
+        const file = path.join(
+          root,
+          "orgs",
+          "acme",
+          "projects",
+          "foo",
+          "tickets",
+          "T-1.md"
+        )
+        const entries = yield* fs.readDirectory(path.dirname(file))
+
+        expect(yield* fs.readFileString(file, "utf8")).toContain("# After")
+        expect(entries).toEqual(["T-1.md"])
+      }).pipe(Effect.provide(TestLayer))
+  )
+})
+
 describe("Markdown deletion (real fs)", () => {
   it.effect(
     "removeTicketFile removes the file and listTicketIds reflects it",
