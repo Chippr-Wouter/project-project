@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 
 export type BannerPrototypeSettings = {
   pixelSize: number
@@ -106,45 +106,117 @@ export function ProjectBannerPrototypeShader({
   image,
   settings,
   mode,
-  label
+  label,
+  onRender
 }: {
   image: HTMLImageElement
   settings: BannerPrototypeSettings
   mode: "image" | "mask" | "original"
   label: string
+  onRender?: (canvas: HTMLCanvasElement) => void
 }) {
   const ref = useRef<HTMLCanvasElement>(null)
+  const [fallback, setFallback] = useState(false)
   const drawRef = useRef<(() => void) | null>(null)
-  const options = useRef({ settings, mode })
+  const options = useRef({ settings, mode, onRender })
 
   useEffect(() => {
-    options.current = { settings, mode }
+    options.current = { settings, mode, onRender }
     drawRef.current?.()
-  }, [settings, mode])
+  }, [settings, mode, onRender])
 
   useEffect(() => {
     const canvas = ref.current!
-    const gl = canvas.getContext("webgl2", { premultipliedAlpha: false })
-    if (!gl) return () => {}
+    const gl = fallback
+      ? null
+      : canvas.getContext("webgl2", { premultipliedAlpha: false })
+    if (!gl) {
+      const context = canvas.getContext("2d")
+      if (!context) return undefined
+      const draw = () => {
+        const { settings: s, mode: currentMode } = options.current
+        canvas.width = Math.round(
+          canvas.clientWidth * Math.min(window.devicePixelRatio || 1, 2)
+        )
+        canvas.height = Math.round(
+          canvas.clientHeight * Math.min(window.devicePixelRatio || 1, 2)
+        )
+        if (!canvas.width || !canvas.height) return
+        const sourceAspect = image.naturalWidth / image.naturalHeight
+        const cropWidth =
+          (sourceAspect > 3 ? image.naturalHeight * 3 : image.naturalWidth) /
+          s.zoom
+        const cropHeight = cropWidth / 3
+        const displayAspect = canvas.width / canvas.height
+        const width = displayAspect > 3 ? cropWidth : cropHeight * displayAspect
+        const height =
+          displayAspect > 3 ? cropWidth / displayAspect : cropHeight
+        const x =
+          (image.naturalWidth - cropWidth) * s.x + (cropWidth - width) / 2
+        const y =
+          (image.naturalHeight - cropHeight) * s.y + (cropHeight - height) / 2
+        context.globalCompositeOperation = "source-over"
+        context.drawImage(
+          image,
+          x,
+          y,
+          width,
+          height,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        )
+        if (currentMode !== "original") {
+          const gradient = context.createLinearGradient(0, 0, 0, canvas.height)
+          gradient.addColorStop(0, `rgba(0,0,0,${s.opacity})`)
+          gradient.addColorStop(1, "transparent")
+          context.globalCompositeOperation = "destination-in"
+          context.fillStyle = gradient
+          context.fillRect(0, 0, canvas.width, canvas.height)
+        }
+      }
+      drawRef.current = () => {
+        draw()
+        options.current.onRender?.(canvas)
+      }
+      const observer = new ResizeObserver(draw)
+      observer.observe(canvas)
+      drawRef.current()
+      return () => {
+        drawRef.current = null
+        observer.disconnect()
+      }
+    }
     const compile = (kind: number, source: string) => {
       const shader = gl.createShader(kind)!
       gl.shaderSource(shader, source)
       gl.compileShader(shader)
       if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        throw new Error(gl.getShaderInfoLog(shader) ?? "Shader compile failed")
+        gl.deleteShader(shader)
+        return null
       }
       return shader
     }
     const program = gl.createProgram()
     const vs = compile(gl.VERTEX_SHADER, vertex)
     const fs = compile(gl.FRAGMENT_SHADER, fragment)
+    if (!vs || !fs) {
+      if (vs) gl.deleteShader(vs)
+      if (fs) gl.deleteShader(fs)
+      gl.deleteProgram(program)
+      setFallback(true)
+      return undefined
+    }
     gl.attachShader(program, vs)
     gl.attachShader(program, fs)
     gl.linkProgram(program)
     gl.deleteShader(vs)
     gl.deleteShader(fs)
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      throw new Error(gl.getProgramInfoLog(program) ?? "Shader link failed")
+      gl.deleteProgram(program)
+      setFallback(true)
+      return undefined
     }
     const activateProgram = gl.useProgram.bind(gl)
     activateProgram(program)
@@ -189,6 +261,7 @@ export function ProjectBannerPrototypeShader({
       const dpr = Math.min(window.devicePixelRatio || 1, 2)
       canvas.width = Math.round(canvas.clientWidth * dpr)
       canvas.height = Math.round(canvas.clientHeight * dpr)
+      if (!canvas.width || !canvas.height) return
       gl.viewport(0, 0, canvas.width, canvas.height)
       gl.uniform2f(uniforms.resolution, canvas.width, canvas.height)
       gl.uniform2f(uniforms.sourceSize, image.naturalWidth, image.naturalHeight)
@@ -206,6 +279,7 @@ export function ProjectBannerPrototypeShader({
         currentMode === "image" ? 0 : currentMode === "mask" ? 1 : 2
       )
       gl.drawArrays(gl.TRIANGLES, 0, 6)
+      options.current.onRender?.(canvas)
     }
     drawRef.current = draw
     const observer = new ResizeObserver(draw)
@@ -218,11 +292,14 @@ export function ProjectBannerPrototypeShader({
       gl.deleteBuffer(buffer)
       gl.deleteVertexArray(vao)
       gl.deleteProgram(program)
+      if (!canvas.isConnected)
+        gl.getExtension("WEBGL_lose_context")?.loseContext()
     }
-  }, [image])
+  }, [image, fallback])
 
   return (
     <canvas
+      key={fallback ? "fallback" : "webgl"}
       ref={ref}
       role="img"
       aria-label={label}

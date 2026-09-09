@@ -9,88 +9,13 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { m } from "@/paraglide/messages"
+import { bannerDefaults, bannerPresets } from "./project-banner-presets"
 import {
   ProjectBannerPrototypeShader,
   type BannerPrototypeSettings
 } from "./ProjectBannerPrototypeShader"
-import sampleUrl from "./project-banner-prototype-sample.jpg"
-import forestUrl from "./project-banner-prototype-forest.jpg"
-import dunesUrl from "./project-banner-prototype-dunes.jpg"
-import oceanUrl from "./project-banner-prototype-ocean.jpg"
-import canyonUrl from "./project-banner-prototype-canyon.jpg"
-import coastUrl from "./project-banner-prototype-coast.jpg"
 
-const templates = [
-  {
-    src: sampleUrl,
-    label: () => m.project_banner_template_mountains(),
-    photographer: "Mattia Poli",
-    provider: "Unsplash",
-    url: "https://unsplash.com/photos/a-mountain-lake-surrounded-by-snow-covered-mountains-XPVVtqCQWzY",
-    x: 0,
-    y: 0.24
-  },
-  {
-    src: forestUrl,
-    label: () => m.project_banner_template_forest(),
-    photographer: "Laura Chouette",
-    provider: "Pexels",
-    url: "https://www.pexels.com/photo/misty-forest-landscape-with-evergreen-trees-29508251/",
-    x: 0.5,
-    y: 0.6
-  },
-  {
-    src: oceanUrl,
-    label: () => m.project_banner_template_ocean(),
-    photographer: "ysnapshotjournal",
-    provider: "Pexels",
-    url: "https://www.pexels.com/photo/dynamic-ocean-waves-captured-from-above-35295868/",
-    x: 0.5,
-    y: 0.5
-  },
-  {
-    src: dunesUrl,
-    label: () => m.project_banner_template_dunes(),
-    photographer: "Jacob Moore",
-    provider: "Pexels",
-    url: "https://www.pexels.com/photo/sand-dunes-landscape-15852511/",
-    x: 0.5,
-    y: 0.5
-  },
-  {
-    src: canyonUrl,
-    label: () => m.project_banner_template_canyon(),
-    photographer: "Ekaterina Belinskaya",
-    provider: "Pexels",
-    url: "https://www.pexels.com/photo/beautiful-orange-rock-formation-4671689/",
-    x: 0.5,
-    y: 0.5
-  },
-  {
-    src: coastUrl,
-    label: () => m.project_banner_template_coast(),
-    photographer: "Pok Rie",
-    provider: "Pexels",
-    url: "https://www.pexels.com/photo/aerial-view-of-waves-and-rocky-coastline-31743481/",
-    x: 0.5,
-    y: 0.65
-  }
-]
-
-const initialSettings: BannerPrototypeSettings = {
-  pixelSize: 2,
-  strength: 0.85,
-  color: 0.5,
-  fade: 0.8,
-  opacity: 1,
-  overallOpacity: 0.2,
-  height: 160,
-  noise: 0.3,
-  noiseScale: 5.5,
-  zoom: 1,
-  x: 0,
-  y: 0.24
-}
+const initialSettings = bannerDefaults
 
 export default function ProjectBannerPrototype({
   mode
@@ -98,12 +23,15 @@ export default function ProjectBannerPrototype({
   mode: "image" | "mask"
 }) {
   const navigate = useNavigate()
-  const [source, setSource] = useState(sampleUrl)
+  const [source, setSource] = useState(bannerPresets[0].src)
   const [image, setImage] = useState<HTMLImageElement | null>(null)
   const [error, setError] = useState(false)
   const [settings, setSettings] = useState(initialSettings)
   const [expanded, setExpanded] = useState(false)
-  const selectedTemplate = templates.find((template) => template.src === source)
+  const objectUrls = useRef<string[]>([])
+  const selectedTemplate = bannerPresets.find(
+    (template) => template.src === source
+  )
   const fileRef = useRef<HTMLInputElement>(null)
   const dragRef = useRef<{
     x: number
@@ -137,9 +65,15 @@ export default function ProjectBannerPrototype({
     photo.src = source
     return () => {
       cancelled = true
-      if (source.startsWith("blob:")) URL.revokeObjectURL(source)
     }
   }, [source])
+
+  useEffect(
+    () => () => {
+      objectUrls.current.forEach((url) => URL.revokeObjectURL(url))
+    },
+    []
+  )
 
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
@@ -306,7 +240,7 @@ export default function ProjectBannerPrototype({
                 {m.project_banner_templates_heading()}
               </p>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {templates.map((template) => (
+                {bannerPresets.map((template) => (
                   <div
                     key={template.src}
                     className="flex min-w-0 flex-col gap-1.5"
@@ -465,7 +399,7 @@ export default function ProjectBannerPrototype({
                   className="text-xs text-muted-foreground transition-colors hover:text-foreground"
                 >
                   {m.project_banner_template_credit({
-                    photographer: selectedTemplate.photographer,
+                    artist: selectedTemplate.artist,
                     provider: selectedTemplate.provider
                   })}
                 </a>
@@ -500,7 +434,7 @@ export default function ProjectBannerPrototype({
               <ChevronRight />
             </Button>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             <Button
               variant="tertiary"
               size="sm"
@@ -529,7 +463,9 @@ export default function ProjectBannerPrototype({
             const file = event.target.files?.[0]
             if (!file) return
             setError(false)
-            setSource(URL.createObjectURL(file))
+            const url = URL.createObjectURL(file)
+            objectUrls.current.push(url)
+            setSource(url)
             setSettings((current) => ({ ...current, zoom: 1, x: 0.5, y: 0.5 }))
             setExpanded(true)
             event.target.value = ""

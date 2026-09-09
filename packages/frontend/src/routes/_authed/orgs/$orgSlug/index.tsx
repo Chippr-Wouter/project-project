@@ -4,6 +4,7 @@ import { createFileRoute, Link } from "@tanstack/react-router"
 import * as DateTime from "effect/DateTime"
 import { ArrowRight, Plus } from "lucide-react"
 import { meAtom } from "@/atoms/auth"
+import { ProjectBanner } from "@/components/ProjectBanner"
 import { projectsListAtom } from "@/atoms/projects"
 import { PageContainer, PageHeader } from "@/components/page"
 import { ProjectTile as ProjectIconTile } from "@/components/ProjectTile"
@@ -125,10 +126,16 @@ function ProjectTile({
       to="/orgs/$orgSlug/projects/$slug"
       params={{ orgSlug, slug: project.slug }}
       className={cn(
-        "group flex flex-col gap-3 rounded-xl border border-border bg-background p-4 transition-all",
+        "group relative isolate flex flex-col gap-3 overflow-hidden rounded-xl border border-border bg-background p-4 transition-all",
         "hover:border-border/80 hover:bg-accent/30 hover:shadow-sm"
       )}
     >
+      <ProjectBanner
+        orgSlug={orgSlug}
+        slug={project.slug}
+        banner={project.banner}
+        variant="card"
+      />
       <div className="flex items-start justify-between gap-2">
         <ProjectIconTile
           icon={project.icon}

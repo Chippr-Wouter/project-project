@@ -18,18 +18,18 @@ Browser-side icon processing is approved: perform crop, cutout, and sticker prev
 
 The banner has its own image, independent of the icon. Accept any source aspect ratio and require a 3:1 crop with positioning and zoom.
 
-Offer curated image templates alongside custom upload, including the mountain lake used during prototyping. Templates use the same processing treatment. Selecting a template preserves processing adjustments and applies that image's starting crop.
+Offer six Claude Monet artworks alongside custom upload. Templates use the same processing treatment. Selecting a template preserves processing adjustments and applies that image’s starting crop.
 
-The prototype bundles these source images locally, with photographer credit linked in the picker. Sources were checked on 2026-09-09 under the [Unsplash License](https://unsplash.com/license) and [Pexels License](https://www.pexels.com/license/).
+The five Art Institute of Chicago assets were downloaded from its IIIF service; each artwork API record reports `is_public_domain: true` (checked 2026-09-09). Sunset uses the exact user-supplied reproduction for this local prototype; its reproduction licensing has not been independently verified. The title Sunset follows the user’s identification; the exact museum record and date remain unverified.
 
-| Template | Photographer | Source |
-| --- | --- | --- |
-| Mountain lake | Mattia Poli | [Unsplash](https://unsplash.com/photos/a-mountain-lake-surrounded-by-snow-covered-mountains-XPVVtqCQWzY) |
-| Misty forest | Laura Chouette | [Pexels](https://www.pexels.com/photo/misty-forest-landscape-with-evergreen-trees-29508251/) |
-| Ocean waves | ysnapshotjournal | [Pexels](https://www.pexels.com/photo/dynamic-ocean-waves-captured-from-above-35295868/) |
-| Dunes | Jacob Moore | [Pexels](https://www.pexels.com/photo/sand-dunes-landscape-15852511/) |
-| Sandstone canyon | Ekaterina Belinskaya | [Pexels](https://www.pexels.com/photo/beautiful-orange-rock-formation-4671689/) |
-| Rocky coastline | Pok Rie | [Pexels](https://www.pexels.com/photo/aerial-view-of-waves-and-rocky-coastline-31743481/) |
+| Template | Source |
+| --- | --- |
+| Sunset | User-supplied image; [account shared by the user](https://x.com/artistmonet) |
+| Water Lily Pond | [Art Institute of Chicago](https://www.artic.edu/artworks/87088) |
+| Stacks of Wheat (End of Summer) | [Art Institute of Chicago](https://www.artic.edu/artworks/64818) |
+| Cliff Walk at Pourville | [Art Institute of Chicago](https://www.artic.edu/artworks/14620) |
+| Arrival of the Normandy Train, Gare Saint-Lazare | [Art Institute of Chicago](https://www.artic.edu/artworks/16571) |
+| Bordighera | [Art Institute of Chicago](https://www.artic.edu/artworks/81537) |
 
 The selected treatment is a dithered gradient mask with horizontal noise. Place the banner behind content at the top of every project page, including tickets, sprints, and settings. It adds no layout height and scrolls away with the content. Keep header text and controls fully opaque.
 
@@ -47,19 +47,16 @@ User-approved rendering defaults from the local prototype:
 | Horizontal noise | 0.3 |
 | Noise scale | 5.5 |
 
-The sample image crop is zoom 1, horizontal position 0, vertical position 0.24. These are the prototype defaults; each uploaded image needs its own crop. The shallow display shows the center of the 3:1 crop without stretching it.
+The sample image crop is zoom 1, horizontal position 0.5, vertical position 0.65. These are the prototype defaults; each uploaded image needs its own crop. The shallow display shows the center of the 3:1 crop without stretching it.
 
-## Prototype
+## Persistence and storage
 
-Run the existing frontend with `bun run dev:frontend`. Append `?bannerPrototype=mask` to a local project page. `bannerPrototype=image` retains the alternative color-dithering comparison. Prototype files are `ProjectBannerPrototype.tsx`, `ProjectBannerPrototypeShader.tsx`, and `project-banner-prototype-sample.jpg` beside the existing project components.
+Approved 2026-09-09: store the original uploaded raster image and normalized 3:1 crop coordinates. `project.md` carries a nullable banner: a preset ID or attachment ID plus crop. Mirror the banner into `project_index` for dashboard and project-list rendering, alongside name, icon, and color.
 
-The prototype is development-only and keeps image selection and adjustments in memory. It does not persist project images or implement icon cutouts. The sample photo is [Mattia Poli on Unsplash](https://unsplash.com/photos/a-mountain-lake-surrounded-by-snow-covered-mountains-XPVVtqCQWzY).
+Project-level image upload preparation and commit reuse the attachment storage, MIME/size validation, serving, deduplication, and orphan lifecycle. Project images have a nullable ticket ID rather than a synthetic ticket. A generic `project_image_reference` table identifies each use by project and slot (currently `banner`, ready for `icon` and further slots). Replacing a slot preserves attachments used by another slot or ticket. Active project images cannot be deleted through the attachment browser.
 
-## Still to agree
+Owners/admins can change banners. Presets work without connected storage; custom uploads require active storage. Applying updates the header optimistically, and saving errors remain visible. Banners render at the top of every project page and within dashboard cards/project-list rows. Card renders are captured as bitmaps to release their WebGL contexts.
 
-- How the cutout check is evaluated.
-- Storage of original images versus processed outputs and crop settings.
-- Project image references and the shared API shape.
-- Final upload entry points, permissions, and disconnected-storage behavior.
+## Remaining icon work
 
-This records the agreed product behavior and banner verdict. It is not yet an approved implementation architecture.
+The icon UI and cutout check remain on T-136. Its accepted output can use the same project upload endpoints and `icon` reference slot. No icon processing or custom icon API is included in T-158.

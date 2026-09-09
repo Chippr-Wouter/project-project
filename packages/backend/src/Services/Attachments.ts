@@ -181,7 +181,7 @@ export interface AttachmentsShape {
   readonly prepare: (
     orgSlug: string,
     slug: string,
-    ticketId: string,
+    ticketId: string | null,
     userId: string,
     input: Omit<PrepareAttachmentInput, "byteSize"> & {
       readonly byteSize?: number
@@ -190,7 +190,7 @@ export interface AttachmentsShape {
   readonly commit: (
     orgSlug: string,
     slug: string,
-    ticketId: string,
+    ticketId: string | null,
     userId: string,
     attachmentId: string
   ) => Effect.Effect<Attachment, AttachmentUploadError | AttachmentNotUploaded>
