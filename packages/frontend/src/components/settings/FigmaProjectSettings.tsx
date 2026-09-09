@@ -10,7 +10,11 @@ import { projectKey } from "@/atoms/projects"
 import { ErrorPage } from "@/components/ErrorPage"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { type AppError, errorMessage } from "@/lib/errorMessage"
+import {
+  type AppError,
+  errorMessage,
+  figmaStatusErrorMessage
+} from "@/lib/errorMessage"
 import { m } from "@/paraglide/messages"
 import { FigmaTokenWalkthrough } from "./FigmaTokenWalkthrough"
 
@@ -87,7 +91,9 @@ function FigmaProjectContent({
       onError: (err) => errorMessage(err as AppError),
       onDefect: () => m.error_unknown()
     })
-  const error = status.lastCheckError ?? mutationError
+  const error = status.lastCheckError
+    ? figmaStatusErrorMessage(status.lastCheckError)
+    : mutationError
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()

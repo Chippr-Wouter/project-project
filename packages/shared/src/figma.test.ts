@@ -209,6 +209,16 @@ describe("extractFigmaRefs", () => {
     const md = `before https://figma.com/design/${KEY}/100% after`
     expect(extractFigmaRefs(md)).toEqual([])
   })
+
+  it("extracts a URL with an uppercase host", () => {
+    const md = `https://FIGMA.COM/design/${KEY}/A?node-id=1-2`
+    expect(extractFigmaRefs(md)[0]?.nodeId).toBe("1:2")
+  })
+
+  it("strips terminal prose punctuation", () => {
+    const md = `See https://figma.com/design/${KEY}/A?node-id=1-2.`
+    expect(extractFigmaRefs(md)[0]?.nodeId).toBe("1:2")
+  })
 })
 
 describe("figmaRefKey", () => {

@@ -79,8 +79,9 @@ Both are documented in [`.env.example`](../.env.example) and
 
 ## 5. Run the migrations
 
-The integration adds five tables. If they are missing, the profile settings
-section returns a 500:
+The integration adds `user_figma_integration`, `user_figma_oauth_state`,
+`project_figma_integration`, `figma_link_index`, and `figma_reference`. If they
+are missing, the profile settings section returns a 500:
 
 ```bash
 bun run --cwd packages/backend db:migrate
@@ -90,8 +91,9 @@ bun run --cwd packages/backend db:migrate
 
 There are deliberately two, and they use different credential types.
 
-**Personal (OAuth).** Each person connects their own Figma account from profile
-settings. Reads happen as that user, so permissions are exactly right.
+**Personal (OAuth).** Each person can connect their own Figma account from
+profile settings. This does not affect ticket metadata or provide per-user
+Figma reads yet; reconciliation continues to use the project credential.
 
 **Project (personal access token).** A scoped Figma PAT pasted into project
 settings, used for everyone on the project — including background work like

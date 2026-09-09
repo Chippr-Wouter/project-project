@@ -845,6 +845,51 @@ export const FigmaIntegrationsLive = Layer.effect(
         })
       })
 
+    const markProjectCredentialRejected = (
+      orgSlug: string,
+      slug: string,
+      reason: string
+    ) =>
+      Effect.gen(function* () {
+        const project = yield* projectRow(orgSlug, slug).pipe(
+          Effect.catchTag("NotFound", () => Effect.succeed(null))
+        )
+        if (project === null) return
+        const link = yield* activeLink(project.projectId)
+        if (link === null) return
+        const now = yield* DateTime.nowAsDate
+        yield* sql
+          .withTransaction(
+            Effect.gen(function* () {
+              yield* db
+                .update(projectIntegrationLink)
+                .set({
+                  status: "broken",
+                  lastCheckedAt: now,
+                  lastCheckStatus: "error",
+                  lastCheckError: reason,
+                  updatedAt: now
+                })
+                .where(eq(projectIntegrationLink.id, link.linkId))
+              yield* db
+                .update(projectFigmaIntegration)
+                .set({
+                  status: "broken",
+                  lastCheckedAt: now,
+                  lastCheckStatus: "error",
+                  lastCheckError: reason
+                })
+                .where(
+                  eq(
+                    projectFigmaIntegration.projectIntegrationLinkId,
+                    link.linkId
+                  )
+                )
+            })
+          )
+          .pipe(Effect.orDie)
+      })
+
     const credentialFor = (
       orgSlug: string,
       slug: string,
@@ -885,7 +930,8 @@ export const FigmaIntegrationsLive = Layer.effect(
       getProjectStatus,
       connectProject,
       disconnectProject,
-      credentialFor
+      credentialFor,
+      markProjectCredentialRejected
     } satisfies FigmaIntegrationsShape
   })
 )

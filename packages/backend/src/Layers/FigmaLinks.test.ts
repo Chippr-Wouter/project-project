@@ -9,6 +9,7 @@ import {
 import { makeWithDefaults } from "drizzle-orm/effect-postgres"
 import { PgClient } from "@effect/sql-pg"
 import * as DateTime from "effect/DateTime"
+import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import { describe, expect, vi } from "vite-plus/test"
@@ -111,10 +112,11 @@ describe("figmaThumbnailKey", () => {
       figmaThumbnailKey({
         keyPrefix: null,
         orgSlug: "acme",
+        projectSlug: "web",
         fileKey: "FILEKEY123",
         nodeId: "12:34"
       })
-    ).toBe("orgs/acme/figma/FILEKEY123/12-34.png")
+    ).toBe("orgs/acme/projects/web/figma/FILEKEY123/12-34.png")
   })
 
   it("keys a file-level ref distinctly from any node", () => {
@@ -122,10 +124,11 @@ describe("figmaThumbnailKey", () => {
       figmaThumbnailKey({
         keyPrefix: "pp",
         orgSlug: "acme",
+        projectSlug: "web",
         fileKey: "FILEKEY123",
         nodeId: null
       })
-    ).toBe("pp/orgs/acme/figma/FILEKEY123/file.png")
+    ).toBe("pp/orgs/acme/projects/web/figma/FILEKEY123/file.png")
   })
 })
 
@@ -308,6 +311,11 @@ const harness = (input: {
   readonly storage?: Effect.Effect<unknown, FigmaError | StorageNotConnected>
   readonly currentOrg?: Effect.Effect<unknown, NotFound>
   readonly projectMember?: Effect.Effect<unknown, NotFound>
+  readonly markProjectCredentialRejected?: (
+    orgSlug: string,
+    slug: string,
+    reason: string
+  ) => Effect.Effect<void>
 }) =>
   FigmaLinksLive.pipe(
     Layer.provide(Layer.succeed(Db, input.db as never)),
@@ -320,7 +328,9 @@ const harness = (input: {
       Layer.succeed(FigmaIntegrations, {
         credentialFor: () =>
           input.credential ??
-          Effect.succeed({ _tag: "FigmaToken", token: "secret-pat" })
+          Effect.succeed({ _tag: "FigmaToken", token: "secret-pat" }),
+        markProjectCredentialRejected:
+          input.markProjectCredentialRejected ?? (() => Effect.void)
       } as never)
     ),
     Layer.provide(
@@ -528,6 +538,7 @@ describe("reconcileTicket link index lookup", () => {
           sql.startsWith("select") && sql.includes('from "figma_link_index"')
       )
       expect(lookup).toContain('"node_id" = ')
+      expect(lookup).toContain('"project_slug" = ')
     })
   )
 
@@ -545,7 +556,7 @@ describe("reconcileTicket link index lookup", () => {
           sql.startsWith('insert into "figma_link_index"')
         )
         expect(insert).toContain(
-          'on conflict ("org_slug","file_key","node_id") do update set'
+          'on conflict ("project_slug","file_key","node_id") do update set'
         )
       })
   )
@@ -570,6 +581,29 @@ describe("reconcileTicket metadata resolution", () => {
       expect(params).not.toContain("secret-pat")
       expect(params).toContain("figma_auth_invalid")
     })
+  )
+
+  it.live(
+    "marks the project integration broken when its token is rejected",
+    () =>
+      Effect.gen(function* () {
+        const markProjectCredentialRejected = vi.fn(() => Effect.void)
+        const { db } = recordingDb((sql) =>
+          sql.startsWith("select") && sql.includes("project_index")
+            ? [["org-1"]]
+            : sql.startsWith('insert into "figma_link_index"')
+              ? [["link-1"]]
+              : []
+        )
+        yield* reconcile(harness({ db, markProjectCredentialRejected }), BODY)
+        yield* Effect.sleep("100 millis")
+
+        expect(markProjectCredentialRejected).toHaveBeenCalledWith(
+          "acme",
+          "web",
+          "figma_auth_invalid"
+        )
+      })
   )
 })
 
@@ -773,6 +807,59 @@ describe("reconcileTicket dev mode backlink", () => {
           "adopted-existing-dev-resource"
         )
         expect(order).toEqual(["figma-delete", "db-delete"])
+      })
+  )
+
+  it.live(
+    "retracts a dev resource created after its reference was removed",
+    () =>
+      Effect.gen(function* () {
+        const creationStarted = yield* Deferred.make<void>()
+        const finishCreation = yield* Deferred.make<void>()
+        let referenceExists = true
+        const createDevResource = vi.fn(() =>
+          Deferred.succeed(creationStarted, undefined).pipe(
+            Effect.andThen(Deferred.await(finishCreation)),
+            Effect.as("dev-race")
+          )
+        )
+        const deleteDevResource = vi.fn(() => Effect.void)
+        const fetchedAt = DateTime.formatIso(yield* DateTime.now)
+        const { db } = recordingDb((sql) => {
+          if (sql.includes(JOINED)) {
+            return referenceExists
+              ? referencedLink({
+                  fetchedAt,
+                  lastCheckStatus: "ok",
+                  devResourceId: null
+                })
+              : []
+          }
+          if (sql.startsWith('delete from "figma_reference"')) {
+            referenceExists = false
+            return []
+          }
+          if (sql.startsWith('update "figma_reference"')) {
+            return referenceExists ? [["link-1"]] : []
+          }
+          return []
+        })
+        const layer = harness({
+          db,
+          figma: { createDevResource, deleteDevResource }
+        })
+
+        yield* reconcile(layer, BODY)
+        yield* Deferred.await(creationStarted)
+        yield* reconcile(layer, "")
+        yield* Deferred.succeed(finishCreation, undefined)
+        yield* Effect.sleep("100 millis")
+
+        expect(deleteDevResource).toHaveBeenCalledWith(
+          expect.anything(),
+          "FILEKEY123",
+          "dev-race"
+        )
       })
   )
 })

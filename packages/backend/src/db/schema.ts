@@ -764,6 +764,9 @@ export const figmaLinkIndex = pgTable(
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
     orgSlug: text("org_slug").notNull(),
+    projectSlug: text("project_slug")
+      .notNull()
+      .references(() => projectIndex.slug, { onDelete: "cascade" }),
     fileKey: text("file_key").notNull(),
     nodeId: text("node_id"),
     kind: text("kind", {
@@ -782,10 +785,10 @@ export const figmaLinkIndex = pgTable(
   },
   (t) => [
     unique("figma_link_index_node_uidx")
-      .on(t.orgSlug, t.fileKey, t.nodeId)
+      .on(t.projectSlug, t.fileKey, t.nodeId)
       .nullsNotDistinct(),
     index("figma_link_index_org_idx").on(t.organizationId),
-    index("figma_link_index_file_idx").on(t.orgSlug, t.fileKey)
+    index("figma_link_index_file_idx").on(t.projectSlug, t.fileKey)
   ]
 )
 

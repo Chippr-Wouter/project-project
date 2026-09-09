@@ -29,7 +29,7 @@
   "figma_project_help_step_dev_scopes_title": "Scroll down for the Development scopes",
   "figma_project_help_step_scopes_alt": "Figma's Generate new token dialog with the token name, expiry and first scopes",
   "figma_project_help_step_scopes_body": "Call it something you will recognise later, like ProjectProject. The expiry is up to you, but the token does not renew itself — when it lapses, designs stop resolving. Tick current_user:read, file_content:read and file_metadata:read.",
-  "figma_project_help_step_scopes_title": "Name it, set an expiry, tick four scopes",
+  "figma_project_help_step_scopes_title": "Name it, set an expiry, tick the first three scopes",
   "figma_project_help_step_security_alt": "The Personal access tokens section of Figma's security settings",
   "figma_project_help_step_security_body": "Click your avatar in the top-left of Figma, choose Settings, then the Security tab. Scroll to Personal access tokens and press Generate new token.",
   "figma_project_help_step_security_title": "Open Figma → Settings → Security",

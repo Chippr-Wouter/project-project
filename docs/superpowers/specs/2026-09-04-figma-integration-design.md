@@ -119,7 +119,9 @@ same OAuth app, the second connection would silently invalidate the first,
 surfacing as intermittent `FigmaAuthInvalid` from whichever seam refreshed
 last. Different credential types cannot collide.
 
-It also lets the project token be scoped to exactly the four scopes we need
+It also lets the project token be scoped to exactly the five scopes we need —
+`current_user:read`, `file_content:read`, `file_metadata:read`,
+`file_dev_resources:read`, and `file_dev_resources:write` —
 with its own expiry, and matches Everhour's API-key project connection more
 closely than dual OAuth would.
 

@@ -1,6 +1,6 @@
-import { createContext, use, type ReactNode } from "react"
+import { createContext, use, useEffect, type ReactNode } from "react"
 import * as Result from "effect/unstable/reactivity/AsyncResult"
-import { useAtomValue } from "@effect/atom-react"
+import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
 import {
   figmaRefKey,
   type FigmaRef,
@@ -45,11 +45,27 @@ export const useFigmaMetadata = (
       ? figmaTicketLinksNoTicketKey
       : ticketKey(target.orgSlug, target.slug, target.ticketId)
   const result = useAtomValue(figmaTicketLinksAtom(key))
+  const refresh = useAtomRefresh(figmaTicketLinksAtom(key))
+  const refKey = ref === null ? null : figmaRefKey(ref)
+  const metadata =
+    refKey === null || !Result.isSuccess(result)
+      ? null
+      : (result.value.find(
+          (link) => `${link.fileKey}/${link.nodeId ?? ""}` === refKey
+        ) ?? null)
+
+  useEffect(() => {
+    if (refKey === null || metadata?.lastModified != null) return
+    let attempts = 0
+    refresh()
+    const interval = window.setInterval(() => {
+      attempts += 1
+      refresh()
+      if (attempts >= 15) window.clearInterval(interval)
+    }, 1_000)
+    return () => window.clearInterval(interval)
+  }, [metadata?.lastModified, refKey, refresh])
+
   if (ref === null || !Result.isSuccess(result)) return null
-  const refKey = figmaRefKey(ref)
-  return (
-    result.value.find(
-      (link) => `${link.fileKey}/${link.nodeId ?? ""}` === refKey
-    ) ?? null
-  )
+  return metadata
 }

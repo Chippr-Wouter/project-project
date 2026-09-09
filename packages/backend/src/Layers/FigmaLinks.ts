@@ -75,6 +75,7 @@ export const needsFigmaMetadata = (
 export const figmaThumbnailKey = (input: {
   readonly keyPrefix: string | null
   readonly orgSlug: string
+  readonly projectSlug: string
   readonly fileKey: string
   readonly nodeId: string | null
 }): string => {
@@ -83,7 +84,7 @@ export const figmaThumbnailKey = (input: {
     input.nodeId === null
       ? "file"
       : input.nodeId.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
-  const tail = `orgs/${input.orgSlug}/figma/${input.fileKey}/${node === "" ? "file" : node}.png`
+  const tail = `orgs/${input.orgSlug}/projects/${input.projectSlug}/figma/${input.fileKey}/${node === "" ? "file" : node}.png`
   return prefix === "" ? tail : `${prefix}/${tail}`
 }
 
@@ -163,6 +164,7 @@ export const FigmaLinksLive = Layer.effect(
     const resolveThumbnail = (
       credential: FigmaCredential,
       orgSlug: string,
+      projectSlug: string,
       ref: FigmaRef
     ) =>
       Effect.gen(function* () {
@@ -176,6 +178,7 @@ export const FigmaLinksLive = Layer.effect(
         const key = figmaThumbnailKey({
           keyPrefix: connection.keyPrefix,
           orgSlug,
+          projectSlug,
           fileKey: ref.fileKey,
           nodeId: ref.nodeId
         })
@@ -227,6 +230,7 @@ export const FigmaLinksLive = Layer.effect(
         const thumbnailKey = yield* resolveThumbnail(
           credential,
           orgSlug,
+          slug,
           entry.ref
         )
         const now = yield* DateTime.nowAsDate
@@ -251,7 +255,17 @@ export const FigmaLinksLive = Layer.effect(
         ),
         Effect.catchTags({
           FigmaAuthInvalid: (error) =>
-            recordError(entry.linkId, figmaCheckReason(error)),
+            Effect.all(
+              [
+                recordError(entry.linkId, figmaCheckReason(error)),
+                integrations.markProjectCredentialRejected(
+                  orgSlug,
+                  slug,
+                  figmaCheckReason(error)
+                )
+              ],
+              { discard: true }
+            ),
           FigmaRateLimited: (error) =>
             recordError(entry.linkId, figmaCheckReason(error)),
           FigmaFileNotFound: (error) =>
@@ -317,7 +331,7 @@ export const FigmaLinksLive = Layer.effect(
                 url
               })
               if (devResourceId === null) return
-              yield* db
+              const updated = yield* db
                 .update(figmaReference)
                 .set({ devResourceId })
                 .where(
@@ -328,6 +342,14 @@ export const FigmaLinksLive = Layer.effect(
                     eq(figmaReference.ticketId, ticketId)
                   )
                 )
+                .returning({ linkId: figmaReference.linkId })
+              if (updated.length === 0) {
+                yield* figma.deleteDevResource(
+                  credential,
+                  entry.ref.fileKey,
+                  devResourceId
+                )
+              }
             }),
           { concurrency: RESOLVE_CONCURRENCY, discard: true }
         )
@@ -423,6 +445,7 @@ export const FigmaLinksLive = Layer.effect(
     const upsertLink = (
       organizationId: string,
       orgSlug: string,
+      projectSlug: string,
       ref: FigmaRef
     ) =>
       Effect.gen(function* () {
@@ -436,6 +459,7 @@ export const FigmaLinksLive = Layer.effect(
           .where(
             and(
               eq(figmaLinkIndex.orgSlug, orgSlug),
+              eq(figmaLinkIndex.projectSlug, projectSlug),
               eq(figmaLinkIndex.fileKey, ref.fileKey),
               ref.nodeId === null
                 ? isNull(figmaLinkIndex.nodeId)
@@ -455,13 +479,14 @@ export const FigmaLinksLive = Layer.effect(
             id: ulid(),
             organizationId,
             orgSlug,
+            projectSlug,
             fileKey: ref.fileKey,
             nodeId: ref.nodeId,
             kind: ref.kind
           })
           .onConflictDoUpdate({
             target: [
-              figmaLinkIndex.orgSlug,
+              figmaLinkIndex.projectSlug,
               figmaLinkIndex.fileKey,
               figmaLinkIndex.nodeId
             ],
@@ -582,7 +607,12 @@ export const FigmaLinksLive = Layer.effect(
           for (const key of plan.added) {
             const ref = byKey.get(key)
             if (ref === undefined) continue
-            const link = yield* upsertLink(project.organizationId, orgSlug, ref)
+            const link = yield* upsertLink(
+              project.organizationId,
+              orgSlug,
+              slug,
+              ref
+            )
             if (link === null) continue
             added.push({ linkId: link.id, ref })
             if (link.resolve) toResolve.push({ linkId: link.id, ref })

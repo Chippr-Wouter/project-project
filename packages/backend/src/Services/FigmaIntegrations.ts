@@ -80,6 +80,11 @@ export interface FigmaIntegrationsShape {
     FigmaCredential,
     FigmaNotConnected | FigmaAuthInvalid | FigmaError
   >
+  readonly markProjectCredentialRejected: (
+    orgSlug: string,
+    slug: string,
+    reason: string
+  ) => Effect.Effect<void>
 }
 
 export class FigmaIntegrations extends Context.Service<

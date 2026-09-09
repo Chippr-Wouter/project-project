@@ -1,4 +1,11 @@
 import * as Match from "effect/Match"
+import {
+  FigmaAuthInvalid,
+  FigmaError,
+  FigmaFileNotFound,
+  FigmaNotConnected,
+  FigmaRateLimited
+} from "@projectproject/shared"
 import type {
   AttachmentNotUploaded,
   AttachmentTooLarge,
@@ -12,11 +19,6 @@ import type {
   EverhourConfigMissing,
   EverhourError,
   EverhourRateLimited,
-  FigmaAuthInvalid,
-  FigmaError,
-  FigmaFileNotFound,
-  FigmaNotConnected,
-  FigmaRateLimited,
   Forbidden,
   GitHubError,
   GitHubScopeInsufficient,
@@ -128,6 +130,24 @@ export const errorMessage = (error: AppError): string =>
       Match.tag("FigmaError", () => m.figma_error_generic()),
       Match.orElse(() => m.error_unknown())
     )
+
+export const figmaStatusErrorMessage = (reason: string): string => {
+  const error: AppError = (() => {
+    switch (reason) {
+      case "figma_not_connected":
+        return new FigmaNotConnected()
+      case "figma_auth_invalid":
+        return new FigmaAuthInvalid()
+      case "figma_rate_limited":
+        return new FigmaRateLimited({ retryAfterSeconds: 60 })
+      case "figma_file_not_found":
+        return new FigmaFileNotFound({ fileKey: "" })
+      default:
+        return new FigmaError({ reason })
+    }
+  })()
+  return errorMessage(error)
+}
 
 const conflictReason = (error: unknown): string | null => {
   if (
