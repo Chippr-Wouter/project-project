@@ -13,6 +13,9 @@
     "bootstrap:org": "bun --env-file=../../.env scripts/bootstrap-org.ts",
     "migrate:orgs": "bun --env-file=../../.env scripts/migrate-orgs.ts",
     "migrate:relayout": "bun --env-file=../../.env scripts/relayout-data.ts",
+    "benchmark:ticket-storage": "bun scripts/benchmark-ticket-storage.ts",
+    "benchmark:ticket-requests": "bun --env-file=../../.env scripts/benchmark-ticket-request-paths.ts",
+    "benchmark:ticket-compare": "bun scripts/benchmark-ticket-compare.ts",
     "ticket-index:rebuild": "bun --env-file=../../.env scripts/rebuild-ticket-index.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
@@ -36,7 +39,6 @@
     "octokit": "^5.0.5",
     "pg": "^8.20.0",
     "ulid": "^3.0.2",
-    "zod": "^4.4.3",
     "@better-auth/mcp": "1.7.3"
   },
   "devDependencies": {

@@ -1,9 +1,9 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "fef5e0bd-0dd1-4337-b721-1d9402371435",
+  "id": "325a6eba-0fb9-4fb5-b552-596bbb55e683",
   "prevIds": [
-    "e09e7617-d0ca-4d8d-be7b-73f64bbfb0ce"
+    "34bb8137-d669-40ba-b590-b9283bd2223f"
   ],
   "ddl": [
     {
@@ -50,18 +50,6 @@
     },
     {
       "isRlsEnabled": false,
-      "name": "figma_link_index",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "figma_reference",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
       "name": "github_app_install_session",
       "entityType": "tables",
       "schema": "public"
@@ -87,12 +75,6 @@
     {
       "isRlsEnabled": false,
       "name": "project_everhour_integration",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "project_figma_integration",
       "entityType": "tables",
       "schema": "public"
     },
@@ -147,18 +129,6 @@
     {
       "isRlsEnabled": false,
       "name": "user_everhour_integration",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "user_figma_integration",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "user_figma_oauth_state",
       "entityType": "tables",
       "schema": "public"
     },
@@ -427,7 +397,7 @@
       "table": "attachment_index"
     },
     {
-      "type": "timestamp(3) with time zone",
+      "type": "timestamp (3) with time zone",
       "typeSchema": null,
       "notNull": true,
       "dimensions": 0,
@@ -440,7 +410,7 @@
       "table": "attachment_index"
     },
     {
-      "type": "timestamp(3) with time zone",
+      "type": "timestamp (3) with time zone",
       "typeSchema": null,
       "notNull": false,
       "dimensions": 0,
@@ -453,7 +423,7 @@
       "table": "attachment_index"
     },
     {
-      "type": "timestamp(3) with time zone",
+      "type": "timestamp (3) with time zone",
       "typeSchema": null,
       "notNull": false,
       "dimensions": 0,
@@ -518,7 +488,7 @@
       "table": "attachment_reference"
     },
     {
-      "type": "timestamp(3) with time zone",
+      "type": "timestamp (3) with time zone",
       "typeSchema": null,
       "notNull": true,
       "dimensions": 0,
@@ -1036,279 +1006,6 @@
       "entityType": "columns",
       "schema": "public",
       "table": "everhour_work_type_task_link"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "figma_link_index"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "organization_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "figma_link_index"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "org_slug",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "figma_link_index"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "project_slug",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "figma_link_index"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "file_key",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "figma_link_index"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "node_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "figma_link_index"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "kind",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "figma_link_index"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "figma_link_index"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "file_name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "figma_link_index"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "thumbnail_key",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "figma_link_index"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "last_modified",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "figma_link_index"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "fetched_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "figma_link_index"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "last_check_status",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "figma_link_index"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "last_check_error",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "figma_link_index"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "figma_link_index"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "link_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "figma_reference"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "org_slug",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "figma_reference"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "project_slug",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "figma_reference"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "ticket_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "figma_reference"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "dev_resource_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "figma_reference"
-    },
-    {
-      "type": "timestamp(3) with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "figma_reference"
     },
     {
       "type": "uuid",
@@ -1958,136 +1655,6 @@
       "name": "project_integration_link_id",
       "entityType": "columns",
       "schema": "public",
-      "table": "project_figma_integration"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "organization_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "project_figma_integration"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "status",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "project_figma_integration"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "encrypted_access_token",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "project_figma_integration"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "access_token_nonce",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "project_figma_integration"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "access_token_tag",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "project_figma_integration"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "handle",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "project_figma_integration"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "last_checked_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "project_figma_integration"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "last_check_status",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "project_figma_integration"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "last_check_error",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "project_figma_integration"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "project_integration_link_id",
-      "entityType": "columns",
-      "schema": "public",
       "table": "project_github_repository"
     },
     {
@@ -2281,6 +1848,19 @@
       "generated": null,
       "identity": null,
       "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "project_index"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "1",
+      "generated": null,
+      "identity": null,
+      "name": "next_ticket_number",
       "entityType": "columns",
       "schema": "public",
       "table": "project_index"
@@ -3207,292 +2787,6 @@
       "entityType": "columns",
       "schema": "public",
       "table": "user_everhour_integration"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user_figma_integration"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "encrypted_access_token",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user_figma_integration"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "access_token_nonce",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user_figma_integration"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "access_token_tag",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user_figma_integration"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "encrypted_refresh_token",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user_figma_integration"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "refresh_token_nonce",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user_figma_integration"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "refresh_token_tag",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user_figma_integration"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "expires_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user_figma_integration"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "figma_user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user_figma_integration"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "handle",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user_figma_integration"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "email",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user_figma_integration"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "connected_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user_figma_integration"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user_figma_integration"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "last_verified_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user_figma_integration"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "last_check_status",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user_figma_integration"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "last_check_error",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user_figma_integration"
-    },
-    {
-      "type": "uuid",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "gen_random_uuid()",
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user_figma_oauth_state"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user_figma_oauth_state"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "state_hash",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user_figma_oauth_state"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "expires_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user_figma_oauth_state"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "consumed_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user_figma_oauth_state"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user_figma_oauth_state"
     },
     {
       "type": "text",
@@ -6431,90 +5725,6 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "figma_link_index_org_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "figma_link_index"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "project_slug",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        },
-        {
-          "value": "file_key",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "figma_link_index_file_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "figma_link_index"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "org_slug",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        },
-        {
-          "value": "project_slug",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        },
-        {
-          "value": "ticket_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "figma_reference_ticket_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "figma_reference"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "organization_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
       "name": "github_app_install_session_org_idx",
       "entityType": "indexes",
       "schema": "public",
@@ -6967,27 +6177,6 @@
       "entityType": "indexes",
       "schema": "public",
       "table": "ticket_index"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "user_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "user_figma_oauth_state_user_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "user_figma_oauth_state"
     },
     {
       "nameExplicit": true,
@@ -7715,57 +6904,6 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
-      "name": "figma_link_index_organization_id_organization_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "figma_link_index"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "project_slug"
-      ],
-      "schemaTo": "public",
-      "tableTo": "project_index",
-      "columnsTo": [
-        "slug"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "figma_link_index_project_slug_project_index_slug_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "figma_link_index"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "link_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "figma_link_index",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "figma_reference_link_id_figma_link_index_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "figma_reference"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "organization_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "organization",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
       "name": "github_app_install_session_organization_id_organization_id_fk",
       "entityType": "fks",
       "schema": "public",
@@ -7893,42 +7031,6 @@
       "entityType": "fks",
       "schema": "public",
       "table": "project_everhour_integration"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "organization_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "organization",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "project_figma_integration_organization_id_organization_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "project_figma_integration"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        "project_integration_link_id",
-        "organization_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "project_integration_link",
-      "columnsTo": [
-        "id",
-        "organization_id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "project_figma_integration_link_id_organization_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "project_figma_integration"
     },
     {
       "nameExplicit": false,
@@ -8247,40 +7349,6 @@
       "entityType": "fks",
       "schema": "public",
       "table": "user_everhour_integration"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "user_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "user_figma_integration_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "user_figma_integration"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "user_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "user_figma_oauth_state_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "user_figma_oauth_state"
     },
     {
       "nameExplicit": false,
@@ -8710,18 +7778,6 @@
     },
     {
       "columns": [
-        "link_id",
-        "project_slug",
-        "ticket_id"
-      ],
-      "nameExplicit": false,
-      "name": "figma_reference_pkey",
-      "entityType": "pks",
-      "schema": "public",
-      "table": "figma_reference"
-    },
-    {
-      "columns": [
         "invitation_id",
         "project_slug"
       ],
@@ -8820,16 +7876,6 @@
         "id"
       ],
       "nameExplicit": false,
-      "name": "figma_link_index_pkey",
-      "schema": "public",
-      "table": "figma_link_index",
-      "entityType": "pks"
-    },
-    {
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
       "name": "github_app_install_session_pkey",
       "schema": "public",
       "table": "github_app_install_session",
@@ -8880,16 +7926,6 @@
         "project_integration_link_id"
       ],
       "nameExplicit": false,
-      "name": "project_figma_integration_pkey",
-      "schema": "public",
-      "table": "project_figma_integration",
-      "entityType": "pks"
-    },
-    {
-      "columns": [
-        "project_integration_link_id"
-      ],
-      "nameExplicit": false,
       "name": "project_github_repository_pkey",
       "schema": "public",
       "table": "project_github_repository",
@@ -8923,26 +7959,6 @@
       "name": "user_everhour_integration_pkey",
       "schema": "public",
       "table": "user_everhour_integration",
-      "entityType": "pks"
-    },
-    {
-      "columns": [
-        "user_id"
-      ],
-      "nameExplicit": false,
-      "name": "user_figma_integration_pkey",
-      "schema": "public",
-      "table": "user_figma_integration",
-      "entityType": "pks"
-    },
-    {
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "name": "user_figma_oauth_state_pkey",
-      "schema": "public",
-      "table": "user_figma_oauth_state",
       "entityType": "pks"
     },
     {
@@ -9128,19 +8144,6 @@
     {
       "nameExplicit": true,
       "columns": [
-        "project_slug",
-        "file_key",
-        "node_id"
-      ],
-      "nullsNotDistinct": true,
-      "name": "figma_link_index_node_uidx",
-      "entityType": "uniques",
-      "schema": "public",
-      "table": "figma_link_index"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
         "id",
         "organization_id"
       ],
@@ -9194,17 +8197,6 @@
       "name": "project_index_id_unique",
       "schema": "public",
       "table": "project_index",
-      "entityType": "uniques"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "state_hash"
-      ],
-      "nullsNotDistinct": false,
-      "name": "user_figma_oauth_state_state_hash_key",
-      "schema": "public",
-      "table": "user_figma_oauth_state",
       "entityType": "uniques"
     },
     {

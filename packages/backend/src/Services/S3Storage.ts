@@ -1,11 +1,23 @@
 import * as Context from "effect/Context"
 import * as Data from "effect/Data"
+import * as Schema from "effect/Schema"
 import type * as Effect from "effect/Effect"
 
 export class S3Unavailable extends Data.TaggedError("S3Unavailable")<{
   readonly reason: string
   readonly retryable: boolean
 }> {}
+
+export const S3Endpoint = Schema.URLFromString.pipe(
+  Schema.check(
+    Schema.makeFilter(
+      (url) =>
+        url.protocol === "https:" ||
+        (url.protocol === "http:" &&
+          ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))
+    )
+  )
+)
 
 export interface S3Connection {
   readonly endpoint: string
@@ -62,6 +74,12 @@ export interface S3ObjectHead {
 }
 
 export interface S3StorageShape {
+  readonly putObject: (
+    connection: S3Connection,
+    key: string,
+    contentType: string,
+    bytes: Uint8Array
+  ) => Effect.Effect<void, S3Unavailable>
   readonly presignPut: (
     connection: S3Connection,
     key: string,

@@ -2,7 +2,14 @@ import * as Result from "effect/unstable/reactivity/AsyncResult"
 import { useAtomValue } from "@effect/atom-react"
 import { useDebouncer } from "@tanstack/react-pacer"
 import * as DateTime from "effect/DateTime"
-import { useEffect, useMemo, useRef, useState } from "react"
+import {
+  type ComponentProps,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react"
 import { useNavigate, useRouter } from "@tanstack/react-router"
 import { AnimatePresence, motion } from "motion/react"
 import {
@@ -122,22 +129,21 @@ export function Toolbar({
 
   const filter = query.filter
   const status: TicketStatus | "all" =
-    filter?.status?.length === 1 ? filter.status[0]! : "all"
+    filter?.status?.length === 1 ? filter.status[0] : "all"
   const typeFilter: TicketType | "all" =
-    filter?.type?.length === 1 ? filter.type[0]! : "all"
+    filter?.type?.length === 1 ? filter.type[0] : "all"
   const assigneeFilter: string =
     filter?.assignee?.length === 1
       ? filter.assignee[0] === null
         ? "unassigned"
-        : (filter.assignee[0] as string)
+        : filter.assignee[0]
       : "all"
-  const selectedTags: ReadonlyArray<TagName> =
-    (filter?.tags as ReadonlyArray<TagName> | undefined) ?? []
+  const selectedTags: ReadonlyArray<TagName> = filter?.tags ?? []
   const sprintFilter: SprintFilterValue =
     filter?.groupId?.length === 1
       ? filter.groupId[0] === null
         ? "unassigned"
-        : (filter.groupId[0] as SprintFilterValue)
+        : filter.groupId[0]
       : "all"
   const archivedFilter = filter?.archived === true
   const sortKey: SortKey = query.sort.key
@@ -268,9 +274,10 @@ export function Toolbar({
 
   const containerRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(0)
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = containerRef.current
     if (!el) return
+    setWidth(Math.round(el.getBoundingClientRect().width))
     const ro = new ResizeObserver(([entry]) => {
       if (!entry) return
       const next = Math.round(entry.contentRect.width)
@@ -371,69 +378,71 @@ export function Toolbar({
         ) : null}
       </InputGroup>
 
-      <div className="relative flex flex-wrap items-center gap-2">
-        <motion.div layout="position" transition={transitions.layout}>
-          <StatusSelect
-            value={status}
-            onChange={setStatus}
-            counts={counts}
-            statuses={statuses}
-            compact={controlsCompact}
-          />
-        </motion.div>
+      {measured && (
+        <div className="relative flex flex-wrap items-center gap-2">
+          <motion.div layout="position" transition={transitions.layout}>
+            <StatusSelect
+              value={status}
+              onChange={setStatus}
+              counts={counts}
+              statuses={statuses}
+              compact={controlsCompact}
+            />
+          </motion.div>
 
-        <motion.div layout="position" transition={transitions.layout}>
-          <FiltersMenu
-            orgSlug={orgSlug}
-            slug={slug}
-            members={members}
-            myId={myId}
-            compact={controlsCompact}
-            showSprintFilter={showSprintFilter}
-            typeFilter={typeFilter}
-            assigneeFilter={assigneeFilter}
-            selectedTags={selectedTags}
-            sprintFilter={sprintFilter}
-            archivedFilter={archivedFilter}
-            onTypeChange={setTypeFilter}
-            onAssigneeChange={setAssigneeFilter}
-            onTagsChange={setSelectedTags}
-            onSprintChange={setSprintFilter}
-            onArchivedChange={setArchivedFilter}
-          />
-        </motion.div>
+          <motion.div layout="position" transition={transitions.layout}>
+            <FiltersMenu
+              orgSlug={orgSlug}
+              slug={slug}
+              members={members}
+              myId={myId}
+              compact={controlsCompact}
+              showSprintFilter={showSprintFilter}
+              typeFilter={typeFilter}
+              assigneeFilter={assigneeFilter}
+              selectedTags={selectedTags}
+              sprintFilter={sprintFilter}
+              archivedFilter={archivedFilter}
+              onTypeChange={setTypeFilter}
+              onAssigneeChange={setAssigneeFilter}
+              onTagsChange={setSelectedTags}
+              onSprintChange={setSprintFilter}
+              onArchivedChange={setArchivedFilter}
+            />
+          </motion.div>
 
-        <motion.div layout="position" transition={transitions.layout}>
-          <SortMenu
-            value={sortKey}
-            onChange={setSortKey}
-            compact={controlsCompact}
-          />
-        </motion.div>
+          <motion.div layout="position" transition={transitions.layout}>
+            <SortMenu
+              value={sortKey}
+              onChange={setSortKey}
+              compact={controlsCompact}
+            />
+          </motion.div>
 
-        <AnimatePresence initial={false} mode="popLayout">
-          {hasActiveFilters && (
-            <motion.button
-              key="clear"
-              type="button"
-              onClick={clearAll}
-              initial={{ opacity: 0, scale: 0.6 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.6 }}
-              transition={transitions.pop}
-              className={cn(
-                "grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-destructive/40 bg-destructive/10 text-destructive transition-colors duration-100 active:scale-[0.97]",
-                "hover:bg-destructive/15 hover:border-destructive/60",
-                "ring-offset-background focus-visible:ring-2 focus-visible:ring-ring outline-none"
-              )}
-              title={m.tickets_filters_clear_all()}
-              aria-label={m.tickets_filters_clear_all()}
-            >
-              <X className="size-4 shrink-0" strokeWidth={1.75} />
-            </motion.button>
-          )}
-        </AnimatePresence>
-      </div>
+          <AnimatePresence initial={false} mode="popLayout">
+            {hasActiveFilters && (
+              <motion.button
+                key="clear"
+                type="button"
+                onClick={clearAll}
+                initial={{ opacity: 0, scale: 0.6 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.6 }}
+                transition={transitions.pop}
+                className={cn(
+                  "grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-destructive/40 bg-destructive/10 text-destructive transition-colors duration-100 active:scale-[0.97]",
+                  "hover:bg-destructive/15 hover:border-destructive/60",
+                  "ring-offset-background focus-visible:ring-2 focus-visible:ring-ring outline-none"
+                )}
+                title={m.tickets_filters_clear_all()}
+                aria-label={m.tickets_filters_clear_all()}
+              >
+                <X className="size-4 shrink-0" strokeWidth={1.75} />
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
     </div>
   )
 }
@@ -481,7 +490,7 @@ function StatusSelect({
             <CollapsingLabel show={!compact}>{currentLabel}</CollapsingLabel>
             <span
               className={cn(
-                "rounded-full px-1.5 font-mono text-[10px] tabular-nums",
+                "min-w-6 rounded-full px-1.5 text-center font-mono text-[10px] tabular-nums",
                 active
                   ? "bg-foreground/10 text-foreground"
                   : "bg-muted text-muted-foreground"
@@ -581,6 +590,9 @@ function FiltersMenu({
   onSprintChange: (s: SprintFilterValue) => void
   onArchivedChange: (on: boolean) => void
 }) {
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const [anchor, setAnchor] =
+    useState<ComponentProps<typeof DropdownMenuContent>["anchor"]>()
   const tags = useAtomValue(tagsAtom(tagsKey(orgSlug, slug)))
   const tagList = Result.isSuccess(tags) ? tags.value : []
   const sprintsList = useAtomValue(
@@ -609,8 +621,19 @@ function FiltersMenu({
     (archivedFilter ? 1 : 0)
   const active = activeCount > 0
   return (
-    <DropdownMenu>
+    <DropdownMenu
+      onOpenChange={(open) => {
+        const trigger = triggerRef.current
+        if (!open || !trigger) return
+        const bounds = trigger.getBoundingClientRect()
+        setAnchor({
+          getBoundingClientRect: () => bounds,
+          contextElement: trigger
+        })
+      }}
+    >
       <DropdownMenuTrigger
+        ref={triggerRef}
         render={
           <button
             type="button"
@@ -639,6 +662,7 @@ function FiltersMenu({
         }
       />
       <DropdownMenuContent
+        anchor={anchor}
         align="end"
         sideOffset={6}
         className="w-56"

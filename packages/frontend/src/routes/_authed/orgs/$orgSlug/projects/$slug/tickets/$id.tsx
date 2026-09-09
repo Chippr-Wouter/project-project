@@ -7,7 +7,7 @@ import { TicketPage, TicketPageSkeleton } from "@/components/TicketPage"
 import { ErrorPage } from "@/components/ErrorPage"
 import { NotFoundPage } from "@/components/NotFoundPage"
 import { TicketId } from "@projectproject/shared"
-import { ticketAtom, ticketBaseAtom, ticketKey } from "@/atoms/tickets"
+import { ticketAtom, ticketKey } from "@/atoms/tickets"
 import { m } from "@/paraglide/messages"
 import { useProject } from "../-context"
 
@@ -28,7 +28,7 @@ export const Route = createFileRoute(
   loader: ({ context, params }) => {
     const id = decodeTicketId(params.id)
     context.registry.mount(
-      ticketBaseAtom(ticketKey(params.orgSlug, params.slug, id))
+      ticketAtom(ticketKey(params.orgSlug, params.slug, id))
     )()
     return {
       crumb: {

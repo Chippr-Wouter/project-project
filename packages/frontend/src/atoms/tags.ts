@@ -48,7 +48,10 @@ export const tagUsageCountsAtom = Atom.family((key: string) => {
       })
     )
     .pipe(
-      Atom.withReactivity(["tickets", orgSlug, slug]),
+      Atom.withReactivity([
+        `tickets/${orgSlug}/${slug}`,
+        `ticket-lists/${orgSlug}/${slug}`
+      ]),
       Atom.setIdleTTL("2 minutes")
     )
 })
@@ -118,7 +121,7 @@ export const renameTagAtom = Atom.family((key: string) => {
         })
         get.refresh(tagsBaseAtom(key))
         if (input.nextName) {
-          yield* Reactivity.invalidate(["tickets", orgSlug, slug])
+          yield* Reactivity.invalidate([`tickets/${orgSlug}/${slug}`])
         }
         return tag
       })
@@ -143,7 +146,7 @@ export const deleteTagAtom = Atom.family((key: string) => {
           params: { orgSlug, slug, name: input.name }
         })
         get.refresh(tagsBaseAtom(key))
-        yield* Reactivity.invalidate(["tickets", orgSlug, slug])
+        yield* Reactivity.invalidate([`tickets/${orgSlug}/${slug}`])
       })
     )
   })

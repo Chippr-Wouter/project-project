@@ -57,6 +57,7 @@ import {
 } from "./Lexical/horizontalRuleTransformer"
 import { ChecklistClickExtension } from "./Lexical/checklistClickExtension"
 import { ListTabExtension } from "./Lexical/listTabExtension"
+import { registerMarkdownPaste } from "./Lexical/markdownPaste"
 import "@/lib/prism-langs"
 import { cn } from "@/lib/utils"
 import { m } from "@/paraglide/messages"
@@ -217,6 +218,63 @@ export function nextMarkdownChange(
   return nextMarkdown
 }
 
+export function createCoalescedSaveQueue<A>(options: {
+  readonly save: (value: A) => Promise<void> | void
+  readonly schedule: () => void
+  readonly onStatus: (status: SaveStatus) => void
+  readonly onError: (error: unknown) => void
+}) {
+  let pending: A | null = null
+  let inflight = false
+  let unmounted = false
+
+  const flush = (notify = true): Promise<void> | undefined => {
+    if (inflight || pending === null) return undefined
+    const next = pending
+    pending = null
+    inflight = true
+    if (notify) options.onStatus("saving")
+    let retainedFailure = false
+    let saving: Promise<void>
+    try {
+      saving = Promise.resolve(options.save(next))
+    } catch (error) {
+      saving = Promise.reject(error)
+    }
+    saving = saving
+      .then(() => {
+        if (notify && pending === null) options.onStatus("saved")
+      })
+      .catch((error: unknown) => {
+        if (pending === null) {
+          pending = next
+          retainedFailure = true
+        }
+        options.onError(error)
+        if (notify) options.onStatus("dirty")
+      })
+      .finally(() => {
+        inflight = false
+        if (pending !== null && !retainedFailure) {
+          if (unmounted) void flush(false)
+          else options.schedule()
+        }
+      })
+    return saving
+  }
+
+  return {
+    enqueue: (value: A) => {
+      pending = value
+    },
+    flush,
+    unmount: () => {
+      unmounted = true
+      void flush(false)
+    }
+  }
+}
+
 function LinkBlurActivationPlugin() {
   const [editor] = useLexicalComposerContext()
 
@@ -264,6 +322,8 @@ export function LexicalEditor({
       name: "@projectproject/body-editor",
       namespace: "ProjectBody",
       theme: lexicalTheme,
+      register: (editor: LexicalEditorType) =>
+        registerMarkdownPaste(editor, transformers),
       onError: (error) => {
         Effect.runFork(Effect.logError("[Lexical]", error))
       },
@@ -310,49 +370,36 @@ export function LexicalEditor({
   })
 
   const liveRef = useRef(markdown)
-  const pending = useRef<string | null>(null)
-  const inflight = useRef(false)
-  const unmounted = useRef(false)
   const onChangeRef = useRef(onChange)
-  const flushRef = useRef<(notify?: boolean) => void>(() => {})
+  const onStatusChangeRef = useRef(onStatusChange)
   const scheduleRef = useRef<() => void>(() => {})
   onChangeRef.current = onChange
+  onStatusChangeRef.current = onStatusChange
 
   function setStatus(s: SaveStatus) {
-    onStatusChange?.(s)
+    onStatusChangeRef.current?.(s)
   }
 
-  function flush(notify = true) {
-    if (inflight.current) return
-    const next = pending.current
-    if (next === null) return
-    pending.current = null
-    inflight.current = true
-    if (notify) setStatus("saving")
-    Promise.resolve(onChangeRef.current(next))
-      .then(() => {
-        if (notify) setStatus("saved")
-      })
-      .catch((err) => {
-        Effect.runFork(Effect.logError("[LexicalEditor] save failed", err))
-        if (notify) setStatus("dirty")
-      })
-      .finally(() => {
-        inflight.current = false
-        if (pending.current !== null) {
-          if (unmounted.current) flush(false)
-          else scheduleRef.current()
-        }
-      })
+  const saveQueueRef = useRef<ReturnType<
+    typeof createCoalescedSaveQueue<string>
+  > | null>(null)
+  if (saveQueueRef.current === null) {
+    saveQueueRef.current = createCoalescedSaveQueue({
+      save: (next) => onChangeRef.current(next),
+      schedule: () => scheduleRef.current(),
+      onStatus: setStatus,
+      onError: (error) => {
+        Effect.runFork(Effect.logError("[LexicalEditor] save failed", error))
+      }
+    })
   }
-  flushRef.current = flush
+  const saveQueue = saveQueueRef.current
 
-  const saveDebouncer = useDebouncer(() => flush(), {
+  const saveDebouncer = useDebouncer(() => saveQueue.flush(), {
     wait: debounceMs,
     onUnmount: (d) => {
       d.cancel()
-      unmounted.current = true
-      flushRef.current(false)
+      saveQueue.unmount()
     }
   })
   scheduleRef.current = () => saveDebouncer.maybeExecute()
@@ -432,7 +479,7 @@ export function LexicalEditor({
                 if (changed === null) return
                 liveRef.current = changed
                 onDraftChange?.(next)
-                pending.current = changed
+                saveQueue.enqueue(changed)
                 setStatus("dirty")
                 scheduleRef.current()
               })

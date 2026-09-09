@@ -1,6 +1,7 @@
 import * as BunFileSystem from "@effect/platform-bun/BunFileSystem"
 import * as BunPath from "@effect/platform-bun/BunPath"
 import * as Layer from "effect/Layer"
+import { AttachmentUploadsLive } from "./Layers/AttachmentUploads"
 import { AttachmentsLive } from "./Layers/Attachments"
 import { AuthenticationLive } from "./Layers/Auth"
 import { BetterAuthLive } from "./Layers/BetterAuth"
@@ -43,6 +44,7 @@ export const BackendInfrastructureLive = Layer.mergeAll(
 export const BackendServicesLive = TagsLive.pipe(
   Layer.provideMerge(ProjectStatusesLive),
   Layer.provideMerge(TicketsLive),
+  Layer.provideMerge(AttachmentUploadsLive),
   Layer.provideMerge(AttachmentsLive),
   Layer.provideMerge(FigmaLinksLive),
   Layer.provideMerge(CommentsLive),

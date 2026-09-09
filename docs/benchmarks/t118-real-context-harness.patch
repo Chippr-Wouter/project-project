@@ -1,0 +1,78 @@
+--- a/packages/backend/scripts/benchmark-ticket-request-paths.ts
++++ b/packages/backend/scripts/benchmark-ticket-request-paths.ts
+@@ -1,3 +1,10 @@
++import { ProjectsLive } from "../src/Layers/Projects"
++import { AttachmentsLive } from "../src/Layers/Attachments"
++import { ProjectDocs } from "../src/Services/ProjectDocs"
++import { Users } from "../src/Services/Users"
++import { CurrentOrg } from "../src/Services/CurrentOrg"
++import { OrgStorage } from "../src/Services/OrgStorage"
++import { S3Storage } from "../src/Services/S3Storage"
+ import { mkdir, rm, writeFile } from "node:fs/promises"
+ import { arch, cpus, platform } from "node:os"
+ import { join, resolve } from "node:path"
+@@ -414,6 +421,17 @@
+   Layer.provide(DocsLive),
+   Layer.provide(DatabaseLive)
+ )
++const ProjectContextLive = ProjectsLive.pipe(Layer.provide(Layer.mergeAll(
++  DatabaseLive, DocsLive, IndexLive, FakeGitHub,
++  Layer.succeed(ProjectDocs, {} as never),
++  Layer.succeed(Users, {} as never)
++)))
++const AttachmentContextLive = AttachmentsLive.pipe(Layer.provide(Layer.mergeAll(
++  DatabaseLive, ProjectContextLive,
++  Layer.succeed(CurrentOrg, {} as never),
++  Layer.succeed(OrgStorage, {} as never),
++  Layer.succeed(S3Storage, {} as never)
++)))
+ const BenchmarkLive = (options: Options) =>
+   TicketsLive.pipe(
+     Layer.provide(
+@@ -421,11 +439,11 @@
+         DocsLive,
+         DatabaseLive,
+         IndexLive,
+-        FakeProjects,
++        ProjectContextLive,
+         makeFakeGroups(options.ticketCount),
+         FakeGitHub,
+         FakeComments,
+-        FakeAttachments
++        AttachmentContextLive
+       )
+     )
+   )
+@@ -439,6 +457,7 @@
+   const client = new Client({ connectionString: process.env.DATABASE_URL })
+   await client.connect()
+   try {
++    await client.query(`insert into "user" (id, name, email, created_at, updated_at) values ($1, 'Benchmark', 'benchmark@example.com', now(), now())`, [userId])
+     await client.query(
+       `insert into organization (id, name, slug, created_at)
+        values ($1, 'Benchmark', $2, now())`,
+@@ -451,6 +470,7 @@
+        values ($1, $2, $3, 'T', 'Benchmark', 'B', '#000000', $4, $5, now())`,
+       [projectId, projectSlug, organizationId, options.ticketCount + 1, userId]
+     )
++    await client.query(`insert into project_member (project_slug, project_id, user_id, role) values ($1, $2, $3, $4)`, [projectSlug, projectId, userId, process.env.BENCHMARK_ROLE ?? "owner"])
+     await client.query(
+       `insert into ticket_index
+          (organization_id, org_slug, project_id, project_slug, ticket_id,
+@@ -563,6 +583,7 @@
+     await client.query("delete from organization where id = $1", [
+       organizationId
+     ])
++    await client.query('delete from "user" where id = $1', [userId])
+   } finally {
+     await client.end()
+   }
+@@ -613,7 +634,7 @@
+       operation: string,
+       effectFor: (sample: number) => Effect.Effect<A, E>
+     ) =>
+-      options.operation !== undefined && options.operation !== operation
++      options.operation !== undefined && !options.operation.split(",").includes(operation)
+         ? Effect.void
+         : Effect.forEach(
+             options.concurrencies,

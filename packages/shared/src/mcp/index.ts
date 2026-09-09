@@ -1,5 +1,10 @@
 import * as Schema from "effect/Schema"
 import {
+  AttachmentTooLarge,
+  AttachmentTypeRejected,
+  StorageConfigMissing,
+  StorageError,
+  StorageNotConnected,
   BranchNotFound,
   Conflict,
   Forbidden,
@@ -14,6 +19,12 @@ import {
   Unauthorized,
   Validation
 } from "../errors"
+import {
+  ATTACHMENT_MAX_BYTES,
+  OrgStorageStatus,
+  PrepareAttachmentInput,
+  PrepareAttachmentResult
+} from "../schemas/Attachment"
 import { Org } from "../schemas/Org"
 import { Member, Project, ProjectDetail, Slug } from "../schemas/Project"
 import {
@@ -71,9 +82,20 @@ export const McpTools = {
     errors: [Unauthorized] as const
   },
   get_org: {
-    description: "Fetch one organization by slug.",
+    description:
+      "Fetch one organization by slug, including attachment storage status: " +
+      "not_connected, active, or broken, and lastCheckedAt (null when never checked). " +
+      "This is the stored connection status, not a live connectivity check. " +
+      "Upload preparation and file transfer still validate storage independently. " +
+      "If storage is not connected or broken, check organization storage settings.",
     input: Schema.Struct({ orgSlug: Slug }),
-    output: Org,
+    output: Schema.Struct({
+      ...Org.fields,
+      storage: Schema.Struct({
+        status: OrgStorageStatus.fields.status,
+        lastCheckedAt: OrgStorageStatus.fields.lastCheckedAt
+      })
+    }),
     errors: [Unauthorized, NotFound] as const
   },
   list_projects: {
@@ -252,6 +274,40 @@ export const McpTools = {
     }),
     output: TicketDetail,
     errors: [Unauthorized, NotFound, Validation, MentionInvalid] as const
+  },
+  prepare_ticket_attachment: {
+    description:
+      "Prepare an attachment upload for an existing ticket. Requires organization storage " +
+      `and project membership. Accepts non-empty files up to ${ATTACHMENT_MAX_BYTES / (1024 * 1024)} MiB: PNG, JPEG, GIF, ` +
+      "WebP, AVIF, PDF, ZIP, gzip, or tar. Supply filename and contentType; the server measures the file size. " +
+      "POST the local file to the returned uploadUrl: curl --fail-with-body --request POST " +
+      "--data-binary '@/path/to/file' --header 'Content-Type: <contentType>' '<uploadUrl>'. " +
+      "The HTTP response returns the committed id, permanent url, filename, and contentType; " +
+      "no separate commit call is needed. The uploadUrl is a temporary credential: " +
+      "use it only for the upload, and prepare again if it expires. Retrying a completed " +
+      "upload returns its metadata without replacing its bytes. After a successful upload, " +
+      "read the current ticket and use update_ticket to insert ![alt](url) for images or " +
+      "[filename](url) for files, preserving existing content. Never save uploadUrl in markdown. " +
+      "Does not modify the description automatically. Do not send file paths or base64 as " +
+      "file content. If storage is not connected, connect it in organization settings and retry.",
+    input: Schema.Struct({
+      orgSlug: Slug,
+      projectSlug: Slug,
+      ticketId: TicketId,
+      filename: PrepareAttachmentInput.fields.filename,
+      contentType: PrepareAttachmentInput.fields.contentType
+    }),
+    output: PrepareAttachmentResult,
+    errors: [
+      Unauthorized,
+      NotFound,
+      Forbidden,
+      AttachmentTooLarge,
+      AttachmentTypeRejected,
+      StorageNotConnected,
+      StorageConfigMissing,
+      StorageError
+    ] as const
   },
   create_comment: {
     description:

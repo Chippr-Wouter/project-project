@@ -196,3 +196,14 @@ export const ticketListErrorMessage = (error: unknown): string => {
 
 export const ticketListDefectMessage = (defect: unknown): string =>
   m.tickets_list_defect({ defect: String(defect) })
+
+export const oauthConsentErrorMessage = (error: unknown): string =>
+  Match.value(error).pipe(
+    Match.when({ _tag: "Validation", reason: "invalid_signature" }, () =>
+      m.auth_oauth_consent_error_invalid_link()
+    ),
+    Match.when({ _tag: "Unauthorized" }, () =>
+      m.auth_oauth_consent_error_session()
+    ),
+    Match.orElse(() => m.auth_oauth_consent_error_retry())
+  )

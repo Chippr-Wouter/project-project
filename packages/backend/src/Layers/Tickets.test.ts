@@ -4,6 +4,7 @@ import * as BunServices from "@effect/platform-bun/BunServices"
 import { it } from "@effect/vitest"
 import * as Config from "effect/Config"
 import * as ConfigProvider from "effect/ConfigProvider"
+import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Schema from "effect/Schema"
@@ -19,7 +20,13 @@ import { Projects, type ProjectsShape } from "../Services/Projects"
 import { TicketIndex, type TicketIndexShape } from "../Services/TicketIndex"
 import { Tickets } from "../Services/Tickets"
 import { MarkdownLive } from "./Markdown"
+import { Markdown } from "../Services/Markdown"
+import {
+  parseCommentsRegion,
+  serializeCommentsRegion
+} from "../comments-region"
 import { TicketDocsLive } from "./TicketDocs"
+import { TicketDocs } from "../Services/TicketDocs"
 import { TicketsLive } from "./Tickets"
 
 const decodeProjectKey = Schema.decodeUnknownSync(ProjectKey)
@@ -84,15 +91,42 @@ const FakeGitHub = Layer.succeed(GitHub, {
 
 const recordedCommentBodies: Array<string> = []
 
-const FakeComments = Layer.succeed(Comments, {
-  list: () => unexpected("Comments.list"),
-  create: (_orgSlug, _userId, _slug, _ticketId, input) => {
-    recordedCommentBodies.push(input.body)
-    return Effect.succeed({} as never)
-  },
-  edit: () => unexpected("Comments.edit"),
-  remove: () => unexpected("Comments.remove")
-} satisfies CommentsShape)
+const FakeComments = Layer.effect(
+  Comments,
+  Effect.gen(function* () {
+    const markdown = yield* Markdown
+    return {
+      list: () => unexpected("Comments.list"),
+      create: (orgSlug, _userId, slug, ticketId, input) =>
+        Effect.gen(function* () {
+          recordedCommentBodies.push(input.body)
+          const file = yield* markdown.readTicketParts(orgSlug, slug, ticketId)
+          yield* markdown.writeTicketWithRegion(
+            orgSlug,
+            slug,
+            ticketId,
+            file.data,
+            file.description,
+            serializeCommentsRegion([
+              ...parseCommentsRegion(file.region),
+              {
+                id: `comment-${recordedCommentBodies.length}`,
+                author: "user-1",
+                createdAt: DateTime.toDate(
+                  DateTime.makeUnsafe("2026-01-01T00:00:00.000Z")
+                ),
+                editedAt: null,
+                body: input.body
+              }
+            ])
+          )
+          return {} as never
+        }).pipe(Effect.orDie),
+      edit: () => unexpected("Comments.edit"),
+      remove: () => unexpected("Comments.remove")
+    } satisfies CommentsShape
+  })
+)
 
 const ticketIndexProject = {
   orgSlug: "org",
@@ -104,11 +138,16 @@ const ticketIndexProject = {
 const FakeTicketIndex = Layer.succeed(TicketIndex, {
   projectFor: () => Effect.succeed(ticketIndexProject),
   list: () => Effect.succeed([]),
+  query: () => Effect.succeed([]),
+  count: () => Effect.succeed({ total: 0, byStatus: {} }),
   listIds: () => Effect.succeed([]),
+  existingIds: () => Effect.succeed(new Set()),
+  reserveTicketNumber: () => Effect.succeed(1),
   tagUsageCounts: () => Effect.succeed({}),
   findTicketIdsByTag: () => Effect.succeed([]),
   findTicketIdsByStatus: () => Effect.succeed([]),
   findTicketsByBranch: () => Effect.succeed([]),
+  getBranchDeletedAt: () => Effect.succeed(null),
   upsertTicket: () => Effect.void,
   markBranchStale: () => Effect.succeed([]),
   clearBranchStale: () => Effect.void,
@@ -171,7 +210,7 @@ const TestLayer = Layer.unwrap(
       prefix: "projectproject-tk-"
     })
     return TicketsLive.pipe(
-      Layer.provide(TicketDocsLive),
+      Layer.provideMerge(TicketDocsLive),
       Layer.provide(FakeAttachments),
       Layer.provide(FakeFigmaLinks),
       Layer.provide(FakeProjects),
@@ -277,6 +316,10 @@ it.effect("archiving sets archivedAt and records the reason as a comment", () =>
     )
     expect(archived.archivedAt).not.toBeNull()
     expect(recordedCommentBodies).toEqual(["no longer relevant"])
+
+    const docs = yield* TicketDocs
+    const stored = yield* docs.read("org", "p", created.id)
+    expect(stored.commentsRegion).toContain("no longer relevant")
 
     const unarchived = yield* tickets.unarchive(
       "org",

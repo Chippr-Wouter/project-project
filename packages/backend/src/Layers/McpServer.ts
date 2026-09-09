@@ -1,15 +1,4 @@
-// The McpServer Layer builds:
-//   1. A ManagedRuntime providing everything handlers need (Users, BetterAuth,
-//      Db, ...) EXCEPT CurrentUser — that is provided per-call by the
-//      dispatcher because each MCP tool invocation has its own authed user.
-//   2. An SDK McpServer with every catalog tool registered.
-//
-// Lifetime: the runtime is acquired in a scope and disposed when the layer's
-// scope ends, so a graceful server shutdown tears everything down. Defects
-// from `dispose()` are caught and logged rather than turning into unhandled
-// promise rejections during teardown.
-
-import { McpServer as SdkMcpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
+import { Server as SdkMcpServer } from "@modelcontextprotocol/sdk/server/index.js"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as ManagedRuntime from "effect/ManagedRuntime"
@@ -42,7 +31,7 @@ export const McpServerLive = Layer.effect(
         {
           capabilities: { tools: {} },
           instructions:
-            "Read-only access to the user's orgs, groups, projects, and tickets."
+            "Access the user's organizations, projects, groups, and tickets. Create and update tickets, comments, and sprints. Upload ticket attachments using prepare_ticket_attachment, then POST the file bytes to its uploadUrl from your file environment. The upload response contains committed attachment metadata; use update_ticket to place the permanent URL in the description."
         }
       )
       registerAllTools(server, runtime, handlers)

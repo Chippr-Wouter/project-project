@@ -908,7 +908,7 @@ const TicketsGroup = HttpApiGroup.make("tickets")
       {
         params: ProjectPath,
         payload: QuickCreateTicketInput,
-        success: Ticket,
+        success: TicketDetail,
         error: [Unauthorized, NotFound, Validation]
       }
     )

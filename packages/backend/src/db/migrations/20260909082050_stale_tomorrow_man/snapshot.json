@@ -1,9 +1,9 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "e09e7617-d0ca-4d8d-be7b-73f64bbfb0ce",
+  "id": "6014c13d-ad7f-49e9-bd6f-3b8e96bc22bd",
   "prevIds": [
-    "34bb8137-d669-40ba-b590-b9283bd2223f"
+    "325a6eba-0fb9-4fb5-b552-596bbb55e683"
   ],
   "ddl": [
     {
@@ -427,7 +427,7 @@
       "table": "attachment_index"
     },
     {
-      "type": "timestamp with time zone",
+      "type": "timestamp(3) with time zone",
       "typeSchema": null,
       "notNull": true,
       "dimensions": 0,
@@ -440,7 +440,7 @@
       "table": "attachment_index"
     },
     {
-      "type": "timestamp with time zone",
+      "type": "timestamp(3) with time zone",
       "typeSchema": null,
       "notNull": false,
       "dimensions": 0,
@@ -453,7 +453,7 @@
       "table": "attachment_index"
     },
     {
-      "type": "timestamp with time zone",
+      "type": "timestamp(3) with time zone",
       "typeSchema": null,
       "notNull": false,
       "dimensions": 0,
@@ -518,7 +518,7 @@
       "table": "attachment_reference"
     },
     {
-      "type": "timestamp with time zone",
+      "type": "timestamp(3) with time zone",
       "typeSchema": null,
       "notNull": true,
       "dimensions": 0,
@@ -1072,6 +1072,19 @@
       "generated": null,
       "identity": null,
       "name": "org_slug",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "figma_link_index"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "project_slug",
       "entityType": "columns",
       "schema": "public",
       "table": "figma_link_index"
@@ -2242,6 +2255,19 @@
       "generated": null,
       "identity": null,
       "name": "color",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "project_index"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "1",
+      "generated": null,
+      "identity": null,
+      "name": "next_ticket_number",
       "entityType": "columns",
       "schema": "public",
       "table": "project_index"
@@ -6427,7 +6453,7 @@
       "nameExplicit": true,
       "columns": [
         {
-          "value": "org_slug",
+          "value": "project_slug",
           "isExpression": false,
           "asc": true,
           "nullsFirst": false,
@@ -7703,6 +7729,23 @@
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "figma_link_index_organization_id_organization_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "figma_link_index"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "project_slug"
+      ],
+      "schemaTo": "public",
+      "tableTo": "project_index",
+      "columnsTo": [
+        "slug"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "figma_link_index_project_slug_project_index_slug_fkey",
       "entityType": "fks",
       "schema": "public",
       "table": "figma_link_index"
@@ -9098,7 +9141,7 @@
     {
       "nameExplicit": true,
       "columns": [
-        "org_slug",
+        "project_slug",
         "file_key",
         "node_id"
       ],
