@@ -1,7 +1,6 @@
 import * as Atom from "effect/unstable/reactivity/Atom"
 import * as Registry from "effect/unstable/reactivity/AtomRegistry"
 import * as Effect from "effect/Effect"
-import * as Schema from "effect/Schema"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 const requests = vi.hoisted(() => ({ started: [] as string[] }))
@@ -42,21 +41,11 @@ vi.mock("@/atoms/tickets", async () => {
     await vi.importActual<typeof import("@/atoms/tickets")>("@/atoms/tickets")
   return {
     ...actual,
-    ticketsCountAtom: Atom.family(() =>
-      Atom.make(
-        Effect.gen(function* () {
-          requests.started.push("counts")
-          yield* Effect.sleep("100 millis")
-          requests.started.push("counts:done")
-          return { total: 2, byStatus: { todo: 1, done: 1 } }
-        })
-      )
-    ),
-    ticketsListAtom: Atom.family((key: string) =>
+    ticketsSectionsAtom: Atom.family((key: string) =>
       Atom.make(
         Effect.sync(() => {
-          requests.started.push(`rows:${key}`)
-          return { items: [], nextCursor: null }
+          requests.started.push(`sections:${key}`)
+          return { counts: { total: 0, byStatus: {} }, sections: {} }
         })
       )
     ),
@@ -72,14 +61,16 @@ vi.mock("@/atoms/tickets", async () => {
 })
 
 import { Route } from "@/routes/_authed/orgs/$orgSlug/projects/$slug/sprints/$groupId"
-import { ticketsListKeyForStatus } from "@/atoms/tickets"
-import { StatusSlug, ticketListQueryFromSearch } from "@projectproject/shared"
+import { ticketsSectionsKey } from "@/atoms/tickets"
+import { ticketListQueryFromSearch } from "@projectproject/shared"
 
 const registries: Registry.AtomRegistry[] = []
 
 function load(deps: {
   view: "list" | "board" | "description"
   status?: string[]
+  q?: string
+  groupId?: string[]
 }) {
   const registry = Registry.make()
   registries.push(registry)
@@ -99,37 +90,42 @@ afterEach(() => {
 })
 
 describe("sprint route loading", () => {
-  it("starts scoped rows before detail and counts finish", async () => {
-    await load({ view: "list" })
-    const query = ticketListQueryFromSearch({ groupId: ["G-1"] })
-    for (const status of ["todo", "done"] as const) {
-      const row = `rows:${ticketsListKeyForStatus("test", "project", query, Schema.decodeSync(StatusSlug)(status))}`
-      expect(requests.started).toContain(row)
-      expect(requests.started.indexOf(row)).toBeLessThan(
+  it.each(["needle", undefined])(
+    "preloads the shared sections query within the sprint when searching or clearing (%s)",
+    async (q) => {
+      await load({ view: "list", q, groupId: ["G-2"] })
+      const query = ticketListQueryFromSearch({ q, groupId: ["G-1"] })
+      const request = `sections:${ticketsSectionsKey("test", "project", query)}`
+      expect(requests.started).toContain(request)
+      expect(requests.started.indexOf(request)).toBeLessThan(
         requests.started.indexOf("detail:done")
       )
-      expect(requests.started.indexOf(row)).toBeLessThan(
-        requests.started.indexOf("counts:done")
+      expect(
+        requests.started.filter((item) => item.startsWith("sections:"))
+      ).toEqual([request])
+      expect(requests.started.some((item) => item.startsWith("board:"))).toBe(
+        false
       )
     }
-    expect(
-      requests.started.some((request) => request.startsWith("board:"))
-    ).toBe(false)
-  })
+  )
 
-  it("only loads the requested status", async () => {
-    await load({ view: "list", status: ["todo"] })
+  it("uses the same sections cache for a status-filtered sprint search", async () => {
+    await load({ view: "list", status: ["todo"], q: "needle" })
+    const query = ticketListQueryFromSearch({
+      q: "needle",
+      status: ["todo"],
+      groupId: ["G-1"]
+    })
     expect(
-      requests.started.filter((request) => request.startsWith("rows:"))
-    ).toHaveLength(1)
+      requests.started.filter((item) => item.startsWith("sections:"))
+    ).toEqual([`sections:${ticketsSectionsKey("test", "project", query)}`])
   })
 
   it("loads board tickets without list requests", async () => {
     await load({ view: "board" })
     expect(requests.started).toContain("board:test/project/G-1")
-    expect(requests.started).not.toContain("counts")
     expect(
-      requests.started.some((request) => request.startsWith("rows:"))
+      requests.started.some((request) => request.startsWith("sections:"))
     ).toBe(false)
   })
 
