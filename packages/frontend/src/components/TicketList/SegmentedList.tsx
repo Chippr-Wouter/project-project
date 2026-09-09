@@ -30,7 +30,6 @@ import type {
   TicketListQuery,
   TicketStatus
 } from "@projectproject/shared"
-import { cn } from "@/lib/utils"
 import { queryHasActiveFilter, useResetTicketSearch } from "./url"
 import { SectionList } from "./SectionList"
 
@@ -174,34 +173,30 @@ export function SegmentedList({
   return (
     <div
       key="sections"
-      className={cn(
-        "flex flex-col gap-1 has-[[data-creating]]:[&>:not([data-creating])]:opacity-35"
-      )}
+      className="flex flex-col gap-1 has-[[data-creating]]:[&>:not([data-creating])]:opacity-35"
     >
-      {filteredStatuses.map((status) => {
-        return (
-          <SectionList
-            key={status}
-            orgSlug={orgSlug}
-            slug={slug}
-            status={status}
-            statuses={statuses}
-            query={query}
-            count={byStatus[status] ?? 0}
-            page={sections[status] ?? { items: [], nextCursor: null }}
-            collapsed={collapsedSet.has(status)}
-            onToggleCollapsed={() => toggleCollapsed(status)}
-            members={members}
-            sprintMembership={sprintMembership}
-            extraRowActions={extraRowActions}
-            showSprintCol={showSprintCol}
-            showExtraActionsCol={showExtraActionsCol}
-            activePreviewId={activePreviewId}
-            onPreviewPointerEnter={handlePreviewPointerEnter}
-            onPreviewOpenChange={handlePreviewOpenChange}
-          />
-        )
-      })}
+      {filteredStatuses.map((status) => (
+        <SectionList
+          key={status}
+          orgSlug={orgSlug}
+          slug={slug}
+          status={status}
+          statuses={statuses}
+          query={query}
+          count={byStatus[status] ?? 0}
+          page={sections[status] ?? { items: [], nextCursor: null }}
+          collapsed={collapsedSet.has(status)}
+          onToggleCollapsed={() => toggleCollapsed(status)}
+          members={members}
+          sprintMembership={sprintMembership}
+          extraRowActions={extraRowActions}
+          showSprintCol={showSprintCol}
+          showExtraActionsCol={showExtraActionsCol}
+          activePreviewId={activePreviewId}
+          onPreviewPointerEnter={handlePreviewPointerEnter}
+          onPreviewOpenChange={handlePreviewOpenChange}
+        />
+      ))}
     </div>
   )
 }

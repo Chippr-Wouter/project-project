@@ -88,11 +88,8 @@ export function SectionList({
 
   const shellRef = useRef<HTMLDivElement>(null)
 
-  const toggleCollapsed = () => {
-    onToggleCollapsed()
-  }
   const onStartCreate = () => {
-    if (collapsed) toggleCollapsed()
+    if (collapsed) onToggleCollapsed()
     setCreating(true)
   }
   const onDismissCreate = () => setCreating(false)
@@ -110,7 +107,7 @@ export function SectionList({
         count={count}
         collapsed={collapsed}
         creating={creating}
-        onToggleCollapsed={toggleCollapsed}
+        onToggleCollapsed={onToggleCollapsed}
         onStartCreate={onStartCreate}
         onDismissCreate={onDismissCreate}
         creator={
@@ -152,44 +149,41 @@ export function SectionList({
                   }}
                 >
                   <AnimatePresence initial={false}>
-                    {items.map(({ ticket, key, pending }) => {
-                      return (
-                        <motion.li
-                          key={key}
-                          inert={pending}
-                          aria-busy={pending}
-                          initial={
-                            pending && !reducedMotion ? { opacity: 0 } : false
+                    {items.map(({ ticket, key, pending }) => (
+                      <motion.li
+                        key={key}
+                        inert={pending}
+                        aria-busy={pending}
+                        initial={
+                          pending && !reducedMotion ? { opacity: 0 } : false
+                        }
+                        animate={{ opacity: 1 }}
+                        transition={transitions.presence}
+                        className={cn(
+                          "col-span-full grid grid-cols-subgrid",
+                          pending && "pointer-events-none animate-pulse",
+                          pendingStatusChanges.has(ticket.id) && "animate-pulse"
+                        )}
+                      >
+                        <Row
+                          orgSlug={orgSlug}
+                          slug={slug}
+                          ticket={ticket}
+                          query={query}
+                          members={members}
+                          showSprintCol={showSprintCol}
+                          showExtraActionsCol={showExtraActionsCol}
+                          sprintMembership={
+                            sprintMembership?.get(ticket.id) ?? null
                           }
-                          animate={{ opacity: 1 }}
-                          transition={transitions.presence}
-                          className={cn(
-                            "col-span-full grid grid-cols-subgrid",
-                            pending && "pointer-events-none animate-pulse",
-                            pendingStatusChanges.has(ticket.id) &&
-                              "animate-pulse"
-                          )}
-                        >
-                          <Row
-                            orgSlug={orgSlug}
-                            slug={slug}
-                            ticket={ticket}
-                            query={query}
-                            members={members}
-                            showSprintCol={showSprintCol}
-                            showExtraActionsCol={showExtraActionsCol}
-                            sprintMembership={
-                              sprintMembership?.get(ticket.id) ?? null
-                            }
-                            extraRowActions={extraRowActions}
-                            pending={pending}
-                            previewOpen={activePreviewId === ticket.id}
-                            onPreviewPointerEnter={onPreviewPointerEnter}
-                            onPreviewOpenChange={onPreviewOpenChange}
-                          />
-                        </motion.li>
-                      )
-                    })}
+                          extraRowActions={extraRowActions}
+                          pending={pending}
+                          previewOpen={activePreviewId === ticket.id}
+                          onPreviewPointerEnter={onPreviewPointerEnter}
+                          onPreviewOpenChange={onPreviewOpenChange}
+                        />
+                      </motion.li>
+                    ))}
                   </AnimatePresence>
                 </ul>
               )}
