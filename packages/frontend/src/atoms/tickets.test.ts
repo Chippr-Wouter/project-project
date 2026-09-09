@@ -4,7 +4,12 @@ import * as Result from "effect/unstable/reactivity/AsyncResult"
 import { afterEach, describe, expect, it, vi } from "vite-plus/test"
 import * as DateTime from "effect/DateTime"
 import * as Schema from "effect/Schema"
-import { TicketId, TicketStatus, TicketDetail } from "@projectproject/shared"
+import {
+  TicketId,
+  TicketStatus,
+  TicketDetail,
+  TagName
+} from "@projectproject/shared"
 import {
   applyOptimisticTicketPreview,
   applyOptimisticTicketUpdate,
@@ -12,6 +17,7 @@ import {
   ticketAtom,
   ticketKey,
   ticketsCountKey,
+  ticketsCountAtom,
   ticketsSectionsAtom,
   ticketsSectionsKey,
   ticketsListKeyForStatus,
@@ -466,3 +472,89 @@ it("refreshes one edited detail and its project lists without refetching unrelat
     registry.dispose()
   }
 })
+
+it.each(["title", "body"] as const)(
+  "bounds %s edit reads while retaining search invalidation",
+  async (field) => {
+    const registry = AtomRegistry.make()
+    const requests: string[] = []
+    let current: TicketDetail = ticket
+    const encode = Schema.encodeSync(TicketDetail)
+    vi.stubGlobal(
+      "fetch",
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(
+          input instanceof Request ? input.url : String(input),
+          "http://localhost"
+        )
+        if (init?.method === "PATCH") {
+          current = { ...ticket, [field]: "After" }
+          return Response.json(encode(current))
+        }
+        requests.push(url.pathname + url.search)
+        if (url.pathname.endsWith("/count"))
+          return Response.json({ total: 1, byStatus: { todo: 1 } })
+        if (url.pathname.endsWith("/sections")) {
+          const row = url.searchParams.has("tags")
+            ? { ...ticket, id: Schema.decodeSync(TicketId)("T-2") }
+            : current
+          return Response.json({
+            counts: { total: 1, byStatus: { todo: 1 } },
+            sections: { todo: { items: [encode(row)], nextCursor: null } }
+          })
+        }
+        return Response.json(encode(current))
+      }
+    )
+    const query = { sort: { key: "id", dir: "asc" } } as const
+    const detail = ticketAtom(ticketKey("org", "project", ticket.id))
+    const own = ticketsSectionsAtom(ticketsSectionsKey("org", "project", query))
+    const unrelated = ticketsSectionsAtom(
+      ticketsSectionsKey("org", "project", {
+        ...query,
+        filter: { tags: [Schema.decodeSync(TagName)("other")] }
+      })
+    )
+    const counts = ticketsCountAtom(ticketsCountKey("org", "project", {}))
+    const searchedCounts = ticketsCountAtom(
+      ticketsCountKey("org", "project", { q: "After" })
+    )
+    const update = updateTicketAtom(ticketKey("org", "project", ticket.id))
+    registry.mount(detail)
+    registry.mount(own)
+    registry.mount(unrelated)
+    registry.mount(counts)
+    registry.mount(searchedCounts)
+    registry.mount(update)
+    try {
+      await vi.waitFor(() => {
+        expect(registry.get(detail)).toMatchObject({ _tag: "Success" })
+        expect(registry.get(own)).toMatchObject({ _tag: "Success" })
+        expect(registry.get(unrelated)).toMatchObject({ _tag: "Success" })
+        expect(registry.get(counts)).toMatchObject({ _tag: "Success" })
+        expect(registry.get(searchedCounts)).toMatchObject({ _tag: "Success" })
+      })
+      requests.length = 0
+      registry.set(update, { [field]: "After" })
+      await vi.waitFor(() =>
+        expect(registry.get(update)).toMatchObject({
+          _tag: "Success",
+          waiting: false
+        })
+      )
+      expect(requests.filter((path) => path.includes("tags="))).toEqual([])
+      expect(requests.filter((path) => path.endsWith("/count"))).toEqual([])
+      expect(
+        requests.filter((path) => path.includes("/sections"))
+      ).toHaveLength(field === "title" ? 1 : 0)
+      expect(
+        requests.filter((path) => path.includes("/count?q=After"))
+      ).toHaveLength(field === "title" ? 1 : 0)
+      expect(
+        requests.filter((path) => path.endsWith("/tickets/T-1"))
+      ).toHaveLength(1)
+    } finally {
+      registry.dispose()
+    }
+  }
+)

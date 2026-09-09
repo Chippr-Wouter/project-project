@@ -1,5 +1,5 @@
-import { useAtomRefresh } from "@effect/atom-react"
-import { useEffect } from "react"
+import { RegistryContext, useAtomRefresh } from "@effect/atom-react"
+import { useContext, useEffect } from "react"
 import { projectGitStatesBaseAtom } from "@/atoms/github"
 import { projectKey } from "@/atoms/projects"
 
@@ -10,15 +10,25 @@ export function useProjectGitStatePolling(
   slug: string,
   enabled: boolean
 ) {
-  const refresh = useAtomRefresh(
-    projectGitStatesBaseAtom(projectKey(orgSlug, slug))
-  )
+  const registry = useContext(RegistryContext)
+  const atom = projectGitStatesBaseAtom(projectKey(orgSlug, slug))
+  const refresh = useAtomRefresh(atom)
 
   useEffect(() => {
     if (!enabled || typeof document === "undefined") return
 
+    let scheduled: number | undefined
     const refreshIfVisible = () => {
-      if (document.visibilityState === "visible") refresh()
+      if (document.visibilityState !== "visible" || scheduled !== undefined)
+        return
+      scheduled = window.setTimeout(() => {
+        scheduled = undefined
+        if (
+          document.visibilityState === "visible" &&
+          !registry.get(atom).waiting
+        )
+          refresh()
+      }, 50)
     }
 
     const interval = window.setInterval(refreshIfVisible, POLL_INTERVAL_MS)
@@ -27,8 +37,9 @@ export function useProjectGitStatePolling(
 
     return () => {
       window.clearInterval(interval)
+      window.clearTimeout(scheduled)
       document.removeEventListener("visibilitychange", refreshIfVisible)
       window.removeEventListener("focus", refreshIfVisible)
     }
-  }, [enabled, refresh])
+  }, [enabled, refresh, registry, atom])
 }
