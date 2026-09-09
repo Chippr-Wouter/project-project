@@ -1,9 +1,10 @@
 import { useState, type ReactNode } from "react"
-import { useAtomValue } from "@effect/atom-react"
+import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
 import * as Result from "effect/unstable/reactivity/AsyncResult"
 import {
   ticketsListKey,
   ticketsSectionsAtom,
+  ticketsSectionsBaseAtom,
   ticketsSectionsKey,
   type TicketSectionsValue
 } from "@/atoms/tickets"
@@ -42,6 +43,9 @@ export function TicketList({
   const result = useAtomValue(
     ticketsSectionsAtom(ticketsSectionsKey(orgSlug, slug, query))
   )
+  const refresh = useAtomRefresh(
+    ticketsSectionsBaseAtom(ticketsSectionsKey(orgSlug, slug, query))
+  )
   const [previous, setPrevious] = useState<{
     key: string
     query: TicketListQuery
@@ -55,7 +59,9 @@ export function TicketList({
   }
   const active = Result.isSuccess(result)
     ? { key, query, value: result.value }
-    : previous
+    : Result.isFailure(result) && previous?.key !== key
+      ? null
+      : previous
   const renderSections = () =>
     active ? (
       <SegmentedList
@@ -75,6 +81,13 @@ export function TicketList({
       />
     )
 
+  const renderFailure = (error: unknown) => (
+    <>
+      <ErrorPage error={error} reset={refresh} contained />
+      {active && renderSections()}
+    </>
+  )
+
   return (
     <div className="group/list flex flex-col gap-3">
       {creator ?? (
@@ -91,11 +104,18 @@ export function TicketList({
           ticketCounts={active?.value.counts}
         />
 
-        <div aria-busy={result.waiting || Result.isInitial(result)}>
+        <div
+          aria-busy={result.waiting || Result.isInitial(result)}
+          className={
+            !Result.isFailure(result) && result.waiting && active
+              ? "animate-pulse motion-reduce:animate-none"
+              : undefined
+          }
+        >
           {Result.matchWithError(result, {
             onInitial: renderSections,
-            onError: (error) => <ErrorPage error={error} contained />,
-            onDefect: (defect) => <ErrorPage error={defect} contained />,
+            onError: renderFailure,
+            onDefect: renderFailure,
             onSuccess: renderSections
           })}
         </div>

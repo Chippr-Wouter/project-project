@@ -99,6 +99,8 @@ export const uploadAttachmentAtom = Atom.family((key: string) => {
         params: { orgSlug, slug, id, attachmentId: prepared.id }
       })
 
+      yield* Reactivity.invalidate(attachmentsReactivityKey(orgSlug))
+
       return {
         id: committed.id,
         url: committed.url,
