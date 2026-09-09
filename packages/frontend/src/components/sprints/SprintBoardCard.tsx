@@ -1,6 +1,6 @@
-import { memo, useCallback } from "react"
+import { memo, type HTMLAttributes } from "react"
 import { DeferredDropdownMenus } from "@/components/ui/dropdown-menu"
-import { useNavigate } from "@tanstack/react-router"
+import { useLinkProps, useNavigate } from "@tanstack/react-router"
 import { useAtomValue } from "@effect/atom-react"
 import {
   applyOptimisticTicketPreview,
@@ -9,8 +9,6 @@ import {
 } from "@/atoms/tickets"
 import { TicketGitChip } from "@/components/TicketGit"
 import { cn } from "@/lib/utils"
-import { ticketPrefetchAtoms } from "@/lib/prefetch"
-import { usePrefetch } from "@/hooks/usePrefetch"
 import type { Member, Ticket } from "@projectproject/shared"
 import { AssigneeRowTrigger } from "@/components/TicketList/AssigneeField"
 import { PriorityButton } from "@/components/TicketList/PriorityField"
@@ -35,12 +33,19 @@ function SprintBoardCardImpl({
     updatePreview.input
   )
   const navigate = useNavigate()
-  const prefetch = usePrefetch(
-    useCallback(
-      () => ticketPrefetchAtoms(orgSlug, slug, visibleTicket.id),
-      [orgSlug, slug, visibleTicket.id]
-    )
-  )
+  const { onMouseEnter, onMouseLeave, onFocus, onBlur, onTouchStart } =
+    useLinkProps({
+      to: "/orgs/$orgSlug/projects/$slug/tickets/$id",
+      params: { orgSlug, slug, id: visibleTicket.id },
+      preload: "intent"
+    })
+  const preload: HTMLAttributes<HTMLElement> = {
+    onMouseEnter,
+    onMouseLeave,
+    onFocus,
+    onBlur,
+    onTouchStart
+  }
   const open = () => {
     void navigate({
       to: "/orgs/$orgSlug/projects/$slug/tickets/$id",
@@ -51,7 +56,7 @@ function SprintBoardCardImpl({
   return (
     <DeferredDropdownMenus>
       <div
-        {...prefetch}
+        {...preload}
         role="button"
         tabIndex={0}
         onClick={open}

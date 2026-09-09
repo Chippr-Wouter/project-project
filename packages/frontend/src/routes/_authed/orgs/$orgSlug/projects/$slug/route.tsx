@@ -83,21 +83,29 @@ import type {
 
 export const Route = createFileRoute("/_authed/orgs/$orgSlug/projects/$slug")({
   component: ProjectLayout,
-  loader: ({ params }) => ({
-    crumb: [
-      {
-        type: "static" as const,
-        label: m.chrome_sidebar_projects(),
-        to: "/orgs/$orgSlug/projects",
-        params: { orgSlug: params.orgSlug }
-      },
-      {
-        type: "project" as const,
-        orgSlug: params.orgSlug,
-        slug: params.slug
-      }
-    ]
-  })
+  loader: ({ context, params }) => {
+    const { orgSlug, slug } = params
+    const { registry } = context
+    registry.mount(projectAtom(projectKey(orgSlug, slug)))()
+    registry.mount(ticketsCountAtom(ticketsCountKey(orgSlug, slug, {})))()
+    registry.mount(sprintsListAtom(sprintsProjectKey(orgSlug, slug)))()
+    registry.mount(projectStatusesAtom(projectStatusKey(orgSlug, slug)))()
+    return {
+      crumb: [
+        {
+          type: "static" as const,
+          label: m.chrome_sidebar_projects(),
+          to: "/orgs/$orgSlug/projects",
+          params: { orgSlug }
+        },
+        {
+          type: "project" as const,
+          orgSlug,
+          slug
+        }
+      ]
+    }
+  }
 })
 
 function ProjectLayout() {
