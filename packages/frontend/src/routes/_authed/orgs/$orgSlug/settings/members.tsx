@@ -12,9 +12,12 @@ import type { OrgDetail } from "@projectproject/shared"
 export const Route = createFileRoute("/_authed/orgs/$orgSlug/settings/members")(
   {
     component: MembersSettings,
-    loader: () => ({
-      crumb: { type: "static" as const, label: m.org_settings_members_tab() }
-    })
+    loader: ({ context: { registry }, params: { orgSlug } }) => {
+      registry.mount(orgMembersAtom(orgSlug))()
+      return {
+        crumb: { type: "static" as const, label: m.org_settings_members_tab() }
+      }
+    }
   }
 )
 
