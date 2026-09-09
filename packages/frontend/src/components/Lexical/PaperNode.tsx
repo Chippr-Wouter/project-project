@@ -331,7 +331,7 @@ function PaperSelectable({
   )
 }
 
-function PaperGlyph({ className }: { className?: string }) {
+export function PaperGlyph({ className }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 16 16"

@@ -3,6 +3,24 @@ import { describe, expect, it } from "vite-plus/test"
 import { Button, type ButtonProps } from "./button"
 
 describe("Button", () => {
+  it("uses the metadata control inset for sidebar links", () => {
+    const { getByRole } = render(
+      <Button variant="sidebar-link" size="sm">
+        Design
+      </Button>
+    )
+
+    const button = getByRole("button", { name: "Design" })
+
+    expect(button.classList.contains("px-1.5")).toBe(true)
+    expect(button.classList.contains("px-3")).toBe(false)
+    expect(button.classList.contains("w-fit")).toBe(true)
+    expect(button.classList.contains("max-w-full")).toBe(true)
+    expect(button.classList.contains("w-full")).toBe(false)
+    expect(button.classList.contains("gap-2")).toBe(true)
+    expect(button.classList.contains("gap-1")).toBe(false)
+  })
+
   it.each([
     ["xs", "size-3"],
     ["sm", "size-4"],

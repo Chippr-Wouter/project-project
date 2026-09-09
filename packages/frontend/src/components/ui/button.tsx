@@ -39,6 +39,8 @@ const buttonVariants = cva(
           "border border-border text-foreground bg-transparent hover:bg-muted active:bg-muted/60",
         ghost:
           "text-muted-foreground bg-transparent hover:bg-muted hover:text-foreground active:bg-muted/60",
+        "sidebar-link":
+          "w-fit max-w-full justify-start bg-transparent text-muted-foreground hover:bg-accent/60 hover:text-foreground active:bg-accent",
         "inline-help":
           "ml-1 bg-transparent align-middle text-[11px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground active:bg-muted/60",
         chip: "text-foreground bg-transparent hover:bg-accent hover:text-foreground active:bg-accent/80",
@@ -62,6 +64,7 @@ const buttonVariants = cva(
       iconRight: { true: "" }
     },
     compoundVariants: [
+      { variant: "sidebar-link", className: "gap-2 px-1.5" },
       { size: "xs", iconLeft: true, className: "pl-1" },
       { size: "sm", iconLeft: true, className: "pl-[6px]" },
       { size: "md", iconLeft: true, className: "pl-[10px]" },
