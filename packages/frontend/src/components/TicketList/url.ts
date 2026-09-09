@@ -1,5 +1,8 @@
 import { useNavigate, useRouter } from "@tanstack/react-router"
-import type { TicketListQuery } from "@projectproject/shared"
+import {
+  ticketListQueryToSearch,
+  type TicketListQuery
+} from "@projectproject/shared"
 
 export function queryHasActiveFilter(q: TicketListQuery): boolean {
   if (q.q !== undefined && q.q.length > 0) return true
@@ -47,6 +50,24 @@ export function useResetTicketSearch() {
         return cleared
       },
       replace: true
+    })
+  }
+}
+
+export function useUpdateTicketQuery() {
+  const router = useRouter()
+  const navigate = useNavigate()
+  return (query: TicketListQuery) => {
+    const nextSearch = ticketListQueryToSearch({ ...query, cursor: undefined })
+    void navigate({
+      to: router.state.location.pathname,
+      search: (prev: SearchRecord): SearchRecord => {
+        const cleared: { [k: string]: SearchValue } = { ...prev }
+        for (const k of TICKET_SEARCH_KEYS) cleared[k] = undefined
+        return { ...cleared, ...nextSearch }
+      },
+      replace: true,
+      resetScroll: false
     })
   }
 }

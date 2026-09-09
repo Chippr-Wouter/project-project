@@ -1,3 +1,4 @@
+import { useUpdateTicketQuery } from "@/components/TicketList/url"
 import { projectAtom } from "@/atoms/projects"
 import { projectStatusesAtom } from "@/atoms/projectStatuses"
 import { sprintsListAtom } from "@/atoms/sprints"
@@ -38,6 +39,7 @@ export const Route = createFileRoute("/_authed/orgs/$orgSlug/projects/$slug/")({
 
 function TicketsTab() {
   const { orgSlug, slug } = Route.useParams()
+  const updateQuery = useUpdateTicketQuery()
   const search = Route.useSearch({ structuralSharing: true })
   const project = useProject()
   const query = useMemo(() => ticketListQueryFromSearch(search), [search])
@@ -54,6 +56,7 @@ function TicketsTab() {
         sprintMembership={sprintMembership}
         toolbar={
           <BacklogToolbar
+            onQueryChange={updateQuery}
             orgSlug={orgSlug}
             slug={slug}
             query={query}

@@ -28,13 +28,17 @@ import {
 import { TYPE_LABELS, TYPE_META } from "@/lib/ticket-meta"
 import { cn } from "@/lib/utils"
 import { m } from "@/paraglide/messages"
-import { sprintState, type TicketType } from "@projectproject/shared"
+import {
+  sprintState,
+  type TicketType,
+  type TicketFilter,
+  type Member
+} from "@projectproject/shared"
 import {
   activeFilterCount as countActiveFilters,
-  useToolbar,
+  type FilterDimension,
   type SprintFilterValue
-} from "./context"
-import { useControlsLayout } from "./shared"
+} from "./model"
 import {
   ControlSlot,
   FilterSection,
@@ -42,11 +46,24 @@ import {
   TOOLBAR_BUTTON_CLASS
 } from "./shared"
 
-export function Filters() {
-  const { query, filters } = useToolbar()
-  const activeFilterCount = countActiveFilters(query, filters)
-  const { compact, layout } = useControlsLayout()
-  const stretch = layout === "fill"
+export function Filters({
+  value,
+  onChange,
+  filters,
+  members,
+  orgSlug,
+  slug,
+  compact
+}: {
+  value: TicketFilter | undefined
+  onChange: (patch: Partial<TicketFilter>) => void
+  filters: ReadonlyArray<FilterDimension>
+  members: ReadonlyArray<Member>
+  orgSlug: string
+  slug: string
+  compact: boolean
+}) {
+  const activeFilterCount = countActiveFilters(value, filters)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const [anchor, setAnchor] =
     useState<ComponentProps<typeof DropdownMenuContent>["anchor"]>()
@@ -72,7 +89,6 @@ export function Filters() {
               type="button"
               className={cn(
                 TOOLBAR_BUTTON_CLASS,
-                stretch && "w-full",
                 active && "bg-accent text-foreground hover:text-foreground"
               )}
               aria-label={
@@ -93,10 +109,7 @@ export function Filters() {
                   {activeFilterCount}
                 </span>
               )}
-              <ChevronDown
-                className={cn("size-3.5 opacity-60", stretch && "ml-auto")}
-                strokeWidth={1.75}
-              />
+              <ChevronDown className="size-3.5 opacity-60" strokeWidth={1.75} />
             </button>
           }
         />
@@ -108,8 +121,54 @@ export function Filters() {
           finalFocus={false}
         >
           {filters.map((dimension) => {
-            const Part = FILTER_PARTS[dimension]
-            return <Part key={dimension} />
+            switch (dimension) {
+              case "archived":
+                return (
+                  <FilterArchived
+                    key={dimension}
+                    value={value?.archived}
+                    onChange={(archived) => onChange({ archived })}
+                  />
+                )
+              case "type":
+                return (
+                  <FilterType
+                    key={dimension}
+                    value={value?.type}
+                    onChange={(type) => onChange({ type })}
+                  />
+                )
+              case "assignee":
+                return (
+                  <FilterAssignee
+                    key={dimension}
+                    value={value?.assignee}
+                    onChange={(assignee) => onChange({ assignee })}
+                    members={members}
+                  />
+                )
+              case "sprint":
+                return (
+                  <FilterSprint
+                    key={dimension}
+                    value={value?.groupId}
+                    onChange={(groupId) => onChange({ groupId })}
+                    orgSlug={orgSlug}
+                    slug={slug}
+                  />
+                )
+              case "tags":
+                return (
+                  <FilterTags
+                    key={dimension}
+                    value={value?.tags}
+                    onChange={(tags) => onChange({ tags })}
+                    orgSlug={orgSlug}
+                    slug={slug}
+                  />
+                )
+            }
+            return null
           })}
         </DropdownMenuContent>
       </DropdownMenu>
@@ -117,11 +176,15 @@ export function Filters() {
   )
 }
 
-export function FilterArchived() {
-  const { query, patchFilter } = useToolbar()
-  const archivedFilter = query.filter?.archived === true
-  const setArchivedFilter = (on: boolean) =>
-    patchFilter({ archived: on ? true : undefined })
+function FilterArchived({
+  value,
+  onChange
+}: {
+  value: TicketFilter["archived"]
+  onChange: (value: TicketFilter["archived"]) => void
+}) {
+  const archivedFilter = value === true
+  const setArchivedFilter = (on: boolean) => onChange(on ? true : undefined)
   return (
     <FilterSection>
       <SectionLabel>{m.tickets_filters_section_archived()}</SectionLabel>
@@ -140,12 +203,17 @@ export function FilterArchived() {
   )
 }
 
-export function FilterType() {
-  const { query, patchFilter } = useToolbar()
-  const types = query.filter?.type
+function FilterType({
+  value,
+  onChange
+}: {
+  value: TicketFilter["type"]
+  onChange: (value: TicketFilter["type"]) => void
+}) {
+  const types = value
   const typeFilter = types?.length === 1 ? types[0] : "all"
   const setTypeFilter = (type: TicketType | "all") =>
-    patchFilter({ type: type === "all" ? undefined : [type] })
+    onChange(type === "all" ? undefined : [type])
   return (
     <FilterSection>
       <SectionLabel>{m.tickets_filters_section_type()}</SectionLabel>
@@ -180,20 +248,26 @@ export function FilterType() {
   )
 }
 
-export function FilterAssignee() {
-  const { query, patchFilter, members } = useToolbar()
+function FilterAssignee({
+  value,
+  onChange,
+  members
+}: {
+  value: TicketFilter["assignee"]
+  onChange: (value: TicketFilter["assignee"]) => void
+  members: ReadonlyArray<Member>
+}) {
   const me = useAtomValue(meAtom)
   const viewerId = Result.isSuccess(me) ? me.value.id : null
-  const assignees = query.filter?.assignee
+  const assignees = value
   const assigneeFilter =
     assignees?.length === 1 ? (assignees[0] ?? "unassigned") : "all"
   const setAssigneeFilter = (assignee: string) =>
-    patchFilter({
-      assignee:
-        assignee === "all"
-          ? undefined
-          : [assignee === "unassigned" ? null : assignee]
-    })
+    onChange(
+      assignee === "all"
+        ? undefined
+        : [assignee === "unassigned" ? null : assignee]
+    )
   return (
     <FilterSection>
       <SectionLabel>{m.tickets_filters_section_assignee()}</SectionLabel>
@@ -249,16 +323,24 @@ export function FilterAssignee() {
   )
 }
 
-export function FilterSprint() {
-  const { query, patchFilter, orgSlug, slug } = useToolbar()
-  const groups = query.filter?.groupId
+function FilterSprint({
+  value,
+  onChange,
+  orgSlug,
+  slug
+}: {
+  value: TicketFilter["groupId"]
+  onChange: (value: TicketFilter["groupId"]) => void
+  orgSlug: string
+  slug: string
+}) {
+  const groups = value
   const sprintFilter =
     groups?.length === 1 ? (groups[0] ?? "unassigned") : "all"
   const setSprintFilter = (sprint: SprintFilterValue) =>
-    patchFilter({
-      groupId:
-        sprint === "all" ? undefined : [sprint === "unassigned" ? null : sprint]
-    })
+    onChange(
+      sprint === "all" ? undefined : [sprint === "unassigned" ? null : sprint]
+    )
   const sprintsList = useAtomValue(
     sprintsListAtom(sprintsProjectKey(orgSlug, slug))
   )
@@ -317,11 +399,20 @@ export function FilterSprint() {
   )
 }
 
-export function FilterTags() {
-  const { query, patchFilter, orgSlug, slug } = useToolbar()
-  const selectedTags = query.filter?.tags ?? []
+function FilterTags({
+  value,
+  onChange,
+  orgSlug,
+  slug
+}: {
+  value: TicketFilter["tags"]
+  onChange: (value: TicketFilter["tags"]) => void
+  orgSlug: string
+  slug: string
+}) {
+  const selectedTags = value ?? []
   const setSelectedTags = (tags: typeof selectedTags) =>
-    patchFilter({ tags: tags.length ? tags : undefined })
+    onChange(tags.length ? tags : undefined)
   const tags = useAtomValue(tagsAtom(tagsKey(orgSlug, slug)))
   const tagList = Result.isSuccess(tags) ? tags.value : []
   if (tagList.length === 0) return null
@@ -359,12 +450,4 @@ export function FilterTags() {
       </div>
     </FilterSection>
   )
-}
-
-const FILTER_PARTS = {
-  archived: FilterArchived,
-  type: FilterType,
-  assignee: FilterAssignee,
-  sprint: FilterSprint,
-  tags: FilterTags
 }

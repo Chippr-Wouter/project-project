@@ -5,6 +5,7 @@ type ToolbarVariantProps = {
   orgSlug: string
   slug: string
   query: TicketListQuery
+  onQueryChange: (query: TicketListQuery) => void
   members: ReadonlyArray<Member>
 }
 
@@ -12,28 +13,21 @@ export function BacklogToolbar({
   orgSlug,
   slug,
   query,
+  onQueryChange,
   members
 }: ToolbarVariantProps) {
   const counts = useServerTicketCounts(orgSlug, slug, query)
   return (
-    <TicketToolbar.Provider
+    <TicketToolbar
       orgSlug={orgSlug}
       slug={slug}
       query={query}
+      onQueryChange={onQueryChange}
       members={members}
       counts={counts}
       filters={["archived", "type", "assignee", "sprint", "tags"]}
-    >
-      <TicketToolbar.Root>
-        <TicketToolbar.Search />
-        <TicketToolbar.Controls>
-          <TicketToolbar.Status />
-          <TicketToolbar.Filters />
-          <TicketToolbar.Sort />
-          <TicketToolbar.ClearAll />
-        </TicketToolbar.Controls>
-      </TicketToolbar.Root>
-    </TicketToolbar.Provider>
+      showSort
+    />
   )
 }
 
@@ -41,27 +35,20 @@ export function SprintListToolbar({
   orgSlug,
   slug,
   query,
+  onQueryChange,
   members
 }: ToolbarVariantProps) {
   const counts = useServerTicketCounts(orgSlug, slug, query)
   return (
-    <TicketToolbar.Provider
+    <TicketToolbar
       orgSlug={orgSlug}
       slug={slug}
       query={query}
+      onQueryChange={onQueryChange}
       members={members}
       counts={counts}
       filters={["archived", "type", "assignee", "tags"]}
-    >
-      <TicketToolbar.Root>
-        <TicketToolbar.Search />
-        <TicketToolbar.Controls>
-          <TicketToolbar.Status />
-          <TicketToolbar.Filters />
-          <TicketToolbar.Sort />
-          <TicketToolbar.ClearAll />
-        </TicketToolbar.Controls>
-      </TicketToolbar.Root>
-    </TicketToolbar.Provider>
+      showSort
+    />
   )
 }

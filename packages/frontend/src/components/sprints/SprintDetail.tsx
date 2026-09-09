@@ -38,13 +38,15 @@ export function SprintDetail({
   slug,
   groupId,
   view,
-  listQuery
+  listQuery,
+  onQueryChange
 }: {
   orgSlug: string
   slug: string
   groupId: GroupId
   view: "list" | "board" | "description"
   listQuery: TicketListQuery
+  onQueryChange: (query: TicketListQuery) => void
 }) {
   const project = useProject()
   const sprint = useAtomValue(sprintAtom(sprintKey(orgSlug, slug, groupId)))
@@ -217,6 +219,7 @@ export function SprintDetail({
               aria-hidden={reorderMode}
             >
               <SprintBoardToolbar
+                onQueryChange={onQueryChange}
                 orgSlug={orgSlug}
                 slug={slug}
                 groupId={display.id}
@@ -244,6 +247,7 @@ export function SprintDetail({
       ) : (
         <PageContainer>
           <SprintTicketList
+            onQueryChange={onQueryChange}
             orgSlug={orgSlug}
             slug={slug}
             query={listQuery}

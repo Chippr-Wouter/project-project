@@ -7,11 +7,11 @@ import {
   Search as SearchIcon,
   X
 } from "lucide-react"
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import { useRef } from "react"
 import { useAtomValue } from "@effect/atom-react"
 import * as Result from "effect/unstable/reactivity/AsyncResult"
 import { projectStatusesAtom, projectKey } from "@/atoms/projectStatuses"
-import { MIN_SEARCH_CHARS, useTicketSearch } from "../search"
+import { MIN_SEARCH_CHARS } from "../search"
 import { CollapsingLabel } from "@/components/SegmentedTabs"
 import {
   InputGroup,
@@ -33,101 +33,32 @@ import { cn } from "@/lib/utils"
 import { transitions } from "@/lib/springs"
 import { m } from "@/paraglide/messages"
 import {
-  NATURAL_SORT_DIR,
   type SortKey,
+  type TicketFilter,
+  type TicketListQuery,
   type TicketStatus
 } from "@projectproject/shared"
 import { SORT_LABELS } from "../sort"
-import { activeFilterCount, useToolbar } from "./context"
-import {
-  ControlSlot,
-  TOOLBAR_BUTTON_CLASS,
-  ControlsLayoutContext,
-  useControlsLayout
-} from "./shared"
+import { ControlSlot, TOOLBAR_BUTTON_CLASS } from "./shared"
 
-export function Root({ children }: { children: ReactNode }) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [width, setWidth] = useState(0)
-  const [compact, setSearchActive] = useState(false)
-  useLayoutEffect(() => {
-    const element = containerRef.current
-    if (!element) return
-    setWidth(Math.round(element.getBoundingClientRect().width))
-    const observer = new ResizeObserver(([entry]) => {
-      if (entry) setWidth(Math.round(entry.contentRect.width))
-    })
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [])
-  const measured = width > 0
-  const controlsCompact =
-    measured && (width >= 460 ? compact || width < 720 : width < 360)
-  return (
-    <ControlsLayoutContext
-      value={{
-        layout: "hug",
-        measured,
-        compact,
-        controlsCompact,
-        setSearchActive
-      }}
-    >
-      <div
-        ref={containerRef}
-        className="flex flex-wrap items-center gap-x-2 gap-y-2"
-      >
-        {children}
-      </div>
-    </ControlsLayoutContext>
-  )
-}
-
-export function Controls({
-  layout = "hug",
-  children
+export function SearchInput({
+  value: searchInput,
+  onChange: setSearchQuery,
+  onFocus,
+  onBlur,
+  onClear: clearSearch,
+  active: compact
 }: {
-  layout?: "hug" | "fill"
-  children: ReactNode
+  value: string
+  onChange: (value: string) => void
+  onFocus: () => void
+  onBlur: () => void
+  onClear: () => void
+  active: boolean
 }) {
-  const context = useControlsLayout()
-  const { measured } = context
-  if (!measured) return null
-  return (
-    <ControlsLayoutContext value={{ ...context, layout }}>
-      <div
-        className={cn(
-          "relative flex flex-wrap items-center gap-2",
-          layout === "fill" && "flex-1 basis-[220px]"
-        )}
-      >
-        {children}
-      </div>
-    </ControlsLayoutContext>
-  )
-}
-
-export function Search() {
-  const { searchRevision } = useToolbar()
-  return <SearchInput key={searchRevision} />
-}
-
-function SearchInput() {
-  const { query, updateQuery } = useToolbar()
-  const { setSearchActive } = useControlsLayout()
-  const search = useTicketSearch(query.q, (q) => updateQuery({ ...query, q }))
-  const searchInput = search.draft
-  const setSearchQuery = search.change
-  const flushSearch = search.flush
-  const clearSearch = search.clear
   const searchRef = useRef<HTMLInputElement>(null)
-  const [focused, setSearchFocused] = useState(false)
-  const compact = focused || searchInput.length > 0
   const searchBelowMinChars =
     searchInput.length > 0 && searchInput.length < MIN_SEARCH_CHARS
-  useLayoutEffect(() => {
-    setSearchActive(compact)
-  }, [compact, setSearchActive])
   useGlobalShortcut("/", searchRef)
   return (
     <InputGroup className="min-w-0 flex-1 basis-[220px]">
@@ -138,11 +69,8 @@ function SearchInput() {
         ref={searchRef}
         value={searchInput}
         onChange={(e) => setSearchQuery(e.target.value)}
-        onFocus={() => setSearchFocused(true)}
-        onBlur={() => {
-          setSearchFocused(false)
-          flushSearch()
-        }}
+        onFocus={onFocus}
+        onBlur={onBlur}
         placeholder={m.tickets_search_placeholder()}
         aria-label={m.tickets_search_aria_label()}
       />
@@ -169,16 +97,26 @@ function SearchInput() {
   )
 }
 
-export function Status() {
-  const { query, counts, patchFilter, orgSlug, slug } = useToolbar()
-  const selected = query.filter?.status
+export function Status({
+  value: selected,
+  onChange,
+  counts,
+  orgSlug,
+  slug,
+  compact: controlsCompact
+}: {
+  value: TicketFilter["status"]
+  onChange: (value: TicketFilter["status"]) => void
+  counts: Record<string, number>
+  orgSlug: string
+  slug: string
+  compact: boolean
+}) {
   const status = selected?.length === 1 ? selected[0] : "all"
   const setStatus = (status: TicketStatus | "all") =>
-    patchFilter({ status: status === "all" ? undefined : [status] })
+    onChange(status === "all" ? undefined : [status])
   const result = useAtomValue(projectStatusesAtom(projectKey(orgSlug, slug)))
   const statuses = Result.isSuccess(result) ? result.value : []
-  const { layout, controlsCompact } = useControlsLayout()
-  const stretch = layout === "fill"
   const slugs = boardStatusesFor(statuses)
   const active = status !== "all"
   const currentMeta = active ? statusMetaFor(status, statuses) : null
@@ -196,7 +134,6 @@ export function Status() {
               type="button"
               className={cn(
                 TOOLBAR_BUTTON_CLASS,
-                stretch && "w-full",
                 active && "bg-accent text-foreground hover:text-foreground"
               )}
               aria-label={m.tickets_status_aria_label({ label: currentLabel })}
@@ -222,10 +159,7 @@ export function Status() {
               >
                 {counts[status] ?? 0}
               </span>
-              <ChevronDown
-                className={cn("size-3.5 opacity-60", stretch && "ml-auto")}
-                strokeWidth={1.75}
-              />
+              <ChevronDown className="size-3.5 opacity-60" strokeWidth={1.75} />
             </button>
           }
         />
@@ -286,12 +220,16 @@ export function Status() {
   )
 }
 
-export function Sort() {
-  const { query, updateQuery } = useToolbar()
-  const { controlsCompact } = useControlsLayout()
-  const sortKey = query.sort.key
-  const setSortKey = (key: SortKey) =>
-    updateQuery({ ...query, sort: { key, dir: NATURAL_SORT_DIR[key] } })
+export function Sort({
+  value,
+  onChange: setSortKey,
+  compact: controlsCompact
+}: {
+  value: TicketListQuery["sort"]
+  onChange: (key: SortKey) => void
+  compact: boolean
+}) {
+  const sortKey = value.key
   return (
     <motion.div layout="position" transition={transitions.layout}>
       <DropdownMenu>
@@ -331,12 +269,13 @@ export function Sort() {
   )
 }
 
-export function ClearAll() {
-  const { query, filters, clearAll } = useToolbar()
-  const hasActiveFilters =
-    !!query.filter?.status?.length ||
-    activeFilterCount(query, filters) > 0 ||
-    !!query.q
+export function ClearAll({
+  visible: hasActiveFilters,
+  onClick: clearAll
+}: {
+  visible: boolean
+  onClick: () => void
+}) {
   return (
     <AnimatePresence initial={false} mode="popLayout">
       {hasActiveFilters && (

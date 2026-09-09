@@ -7,12 +7,14 @@ export function SprintTicketList({
   orgSlug,
   slug,
   query,
+  onQueryChange,
   members,
   creator
 }: {
   orgSlug: string
   slug: string
   query: TicketListQuery
+  onQueryChange: (query: TicketListQuery) => void
   members: ReadonlyArray<Member>
   creator: ReactNode
 }) {
@@ -28,6 +30,7 @@ export function SprintTicketList({
           orgSlug={orgSlug}
           slug={slug}
           query={query}
+          onQueryChange={onQueryChange}
           members={members}
         />
       }

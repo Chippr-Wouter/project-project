@@ -13,6 +13,7 @@ export function SprintBoardToolbar({
   groupId,
   ticketIds,
   query,
+  onQueryChange,
   members
 }: {
   orgSlug: string
@@ -20,26 +21,19 @@ export function SprintBoardToolbar({
   groupId: GroupId
   ticketIds: ReadonlyArray<TicketId>
   query: TicketListQuery
+  onQueryChange: (query: TicketListQuery) => void
   members: ReadonlyArray<Member>
 }) {
   const { counts } = useBoardTickets(orgSlug, slug, groupId, ticketIds, query)
   return (
-    <TicketToolbar.Provider
+    <TicketToolbar
       orgSlug={orgSlug}
       slug={slug}
       query={query}
+      onQueryChange={onQueryChange}
       members={members}
       counts={counts}
       filters={["type", "assignee", "tags"]}
-    >
-      <TicketToolbar.Root>
-        <TicketToolbar.Search />
-        <TicketToolbar.Controls>
-          <TicketToolbar.Status />
-          <TicketToolbar.Filters />
-          <TicketToolbar.ClearAll />
-        </TicketToolbar.Controls>
-      </TicketToolbar.Root>
-    </TicketToolbar.Provider>
+    />
   )
 }
