@@ -138,9 +138,9 @@ export function SprintBoardColumn({
           headerHoldable ? longPressHandlers.onPointerLeave : undefined
         }
         className={cn(
-          "relative flex touch-none items-center justify-between px-6 pt-3 pb-2 select-none",
-          headerHoldable && "cursor-grab active:cursor-grabbing",
-          reorderMode && "cursor-grab active:cursor-grabbing"
+          "relative flex items-center justify-between px-6 pt-3 pb-2 select-none",
+          (headerHoldable || reorderMode) &&
+            "touch-none cursor-grab active:cursor-grabbing"
         )}
       >
         <span className="inline-flex items-center gap-2 text-sm font-medium">
