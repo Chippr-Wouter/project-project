@@ -271,6 +271,11 @@ const makeFakeTicketIndex = (
           .filter((document) => wanted === null || wanted.has(document.id))
           .map(entryFromDocument)
       }),
+    query: () => Effect.succeed([]),
+    count: () => Effect.succeed({ total: 0, byStatus: {} }),
+    existingIds: () => Effect.succeed(new Set<string>()),
+    reserveTicketNumber: () => Effect.succeed(1),
+    getBranchDeletedAt: () => Effect.succeed(null),
     listIds: () => Effect.sync(() => [...documents.keys()]),
     tagUsageCounts: () =>
       Effect.sync(() => {
