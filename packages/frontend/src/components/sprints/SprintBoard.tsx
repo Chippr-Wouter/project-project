@@ -233,6 +233,7 @@ export function SprintBoard({
             key={status}
             orgSlug={orgSlug}
             slug={slug}
+            sprintTicketsKey={key}
             status={status}
             statuses={statuses}
             tickets={grouped[status] ?? []}

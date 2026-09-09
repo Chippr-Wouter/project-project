@@ -29,6 +29,7 @@ const REORDER_EASE = [0.32, 0.72, 0, 1] as const
 export function SprintBoardColumn({
   orgSlug,
   slug,
+  sprintTicketsKey,
   status,
   statuses,
   tickets,
@@ -41,6 +42,7 @@ export function SprintBoardColumn({
 }: {
   orgSlug: string
   slug: string
+  sprintTicketsKey: string
   status: string
   statuses: ReadonlyArray<ProjectStatus>
   tickets: ReadonlyArray<Ticket>
@@ -138,17 +140,19 @@ export function SprintBoardColumn({
           headerHoldable ? longPressHandlers.onPointerLeave : undefined
         }
         className={cn(
-          "relative flex items-center justify-between px-6 pt-3 pb-2 select-none",
+          "relative flex items-center justify-between px-3.5 pt-3 pb-2 select-none",
           (headerHoldable || reorderMode) &&
             "touch-none cursor-grab active:cursor-grabbing"
         )}
       >
-        <span className="inline-flex items-center gap-2 text-sm font-medium">
-          <Icon
-            className={cn("size-4", meta.className)}
-            style={meta.color ? { color: meta.color } : undefined}
-            strokeWidth={1.75}
-          />
+        <span className="inline-flex items-center gap-1.5 text-[13px] font-medium">
+          <span className="grid size-6 shrink-0 place-items-center">
+            <Icon
+              className={cn("size-4", meta.className)}
+              style={meta.color ? { color: meta.color } : undefined}
+              strokeWidth={1.75}
+            />
+          </span>
           {meta.label}
         </span>
         <span className="grid shrink-0 place-items-center">
@@ -200,13 +204,14 @@ export function SprintBoardColumn({
         />
         <div
           ref={listRef}
-          className="relative z-10 flex min-h-0 flex-col overflow-y-auto py-2"
+          className="relative z-10 flex min-h-0 flex-col overflow-y-auto pb-2"
         >
           {tickets.map((t) => (
             <CardSlot
               key={t.id}
               orgSlug={orgSlug}
               slug={slug}
+              sprintTicketsKey={sprintTicketsKey}
               ticket={t}
               status={status}
               members={members}
@@ -224,6 +229,7 @@ export function SprintBoardColumn({
 function CardSlot({
   orgSlug,
   slug,
+  sprintTicketsKey,
   ticket,
   status,
   members,
@@ -233,6 +239,7 @@ function CardSlot({
 }: {
   orgSlug: string
   slug: string
+  sprintTicketsKey: string
   ticket: Ticket
   status: string
   members: ReadonlyArray<Member>
@@ -327,6 +334,7 @@ function CardSlot({
           <SprintBoardCard
             orgSlug={orgSlug}
             slug={slug}
+            sprintTicketsKey={sprintTicketsKey}
             ticket={ticket}
             members={members}
           />

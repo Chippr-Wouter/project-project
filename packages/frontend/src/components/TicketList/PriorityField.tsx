@@ -22,12 +22,14 @@ export function PriorityButton({
   orgSlug,
   slug,
   ticket,
-  stopPropagation
+  stopPropagation,
+  sprintTicketsKey
 }: {
   orgSlug: string
   slug: string
   ticket: { id: TicketId; priority: TicketPriority }
   stopPropagation?: boolean
+  sprintTicketsKey?: string
 }) {
   const update = useAtomSet(
     updateTicketAtom(ticketKey(orgSlug, slug, ticket.id))
@@ -71,7 +73,7 @@ export function PriorityButton({
               key={p}
               onClick={() => {
                 if (p === ticket.priority) return
-                update({ priority: p })
+                update({ priority: p, sprintTicketsKey })
               }}
               className="cursor-pointer"
             >
