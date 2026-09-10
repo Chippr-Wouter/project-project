@@ -149,6 +149,8 @@ export function SectionList({
                   const { ticket, pending } = items[index]
                   return (
                     <div
+                      inert={pending}
+                      aria-busy={pending}
                       className={cn(
                         "col-span-full grid grid-cols-subgrid",
                         pending && "pointer-events-none animate-pulse",

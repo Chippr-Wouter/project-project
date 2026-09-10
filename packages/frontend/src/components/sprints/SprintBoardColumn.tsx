@@ -197,7 +197,7 @@ export function SprintBoardColumn({
         <div
           aria-hidden
           className={cn(
-            "pointer-events-none absolute inset-x-2 inset-y-3 z-0 rounded-md border border-dashed border-transparent transition-colors duration-150",
+            "pointer-events-none absolute inset-x-2 top-0 bottom-2 z-0 rounded-md border border-dashed border-transparent transition-colors duration-150",
             dragOver && "border-border bg-accent/40"
           )}
         />
@@ -300,7 +300,7 @@ function CardSlot({
   }, [ticketId, status, isDraggable])
 
   return (
-    <div ref={ref} className="relative px-2 py-1">
+    <div ref={ref} className="relative px-3 py-1">
       <div
         ref={cardRef}
         className={cn(
