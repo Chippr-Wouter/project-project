@@ -28,6 +28,7 @@ export function SegmentedIndicator({
     if (!(target instanceof HTMLElement)) {
       animation.current?.cancel()
       node.style.visibility = "hidden"
+      previous.current = null
       return undefined
     }
     const update = () => {

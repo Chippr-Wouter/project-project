@@ -57,7 +57,6 @@ export function Toolbar({
     <div className="flex flex-wrap items-center gap-3">
       <SegmentedTabs
         items={STATUS_ITEMS}
-        layoutId="attachments-status"
         isActive={(key) => key === status}
         renderItem={(item, content, { active }) => (
           <button

@@ -1,7 +1,7 @@
-import { AnimatePresence, LayoutGroup, motion } from "motion/react"
+import { AnimatePresence, motion } from "motion/react"
 import type { ComponentType, ReactNode } from "react"
 import { Fragment, useLayoutEffect, useRef, useState } from "react"
-import { springs, transitions } from "@/lib/springs"
+import { transitions } from "@/lib/springs"
 import { cn } from "@/lib/utils"
 import { SegmentedIndicator } from "./SegmentedIndicator"
 
@@ -50,7 +50,6 @@ const VARIANTS: Record<SegmentedVariant, VariantTokens> = {
 
 export interface SegmentedTabsProps<K extends string> {
   items: ReadonlyArray<SegmentedItem<K>>
-  layoutId: string
   isActive: (key: K) => boolean
   renderItem: (
     item: SegmentedItem<K>,
@@ -60,85 +59,66 @@ export interface SegmentedTabsProps<K extends string> {
   compact?: boolean
   variant?: SegmentedVariant
   className?: string
-  nativeIndicator?: boolean
 }
 
 export function SegmentedTabs<K extends string>({
   items,
-  layoutId,
   isActive,
   renderItem,
   compact = false,
   variant = "default",
-  className,
-  nativeIndicator = false
+  className
 }: SegmentedTabsProps<K>) {
   const v = VARIANTS[variant]
   return (
-    <LayoutGroup id={layoutId}>
-      <div
-        className={cn(v.container, className, nativeIndicator && "relative")}
-      >
-        {nativeIndicator && (
-          <SegmentedIndicator
-            activeIndex={items.findIndex((item) => isActive(item.key))}
-            className={cn("bg-accent", v.pillRounding)}
-          />
-        )}
-        {items.map((it) => {
-          const active = isActive(it.key)
-          const Icon = it.icon
-          const content = (
-            <>
-              {active && !nativeIndicator && (
-                <motion.span
-                  layoutId={`${layoutId}-active`}
-                  transition={springs.moderate}
-                  className={cn(
-                    "absolute inset-0 -z-0 bg-accent",
-                    v.pillRounding
-                  )}
+    <div className={cn("relative", v.container, className)}>
+      <SegmentedIndicator
+        activeIndex={items.findIndex((item) => isActive(item.key))}
+        className={cn("bg-accent", v.pillRounding)}
+      />
+      {items.map((it) => {
+        const active = isActive(it.key)
+        const Icon = it.icon
+        const content = (
+          <>
+            <span
+              className={cn(
+                "relative z-10 inline-flex items-center",
+                v.innerGap
+              )}
+            >
+              {Icon && (
+                <Icon
+                  className={cn(v.iconSize, it.iconClassName)}
+                  strokeWidth={1.75}
                 />
               )}
-              <span
-                className={cn(
-                  "relative z-10 inline-flex items-center",
-                  v.innerGap
-                )}
-              >
-                {Icon && (
-                  <Icon
-                    className={cn(v.iconSize, it.iconClassName)}
-                    strokeWidth={1.75}
-                  />
-                )}
-                <CollapsingLabel show={!compact} gap={v.innerGapPx}>
-                  {it.label}
-                </CollapsingLabel>
-                {it.badgeNode ??
-                  (it.badge !== undefined && it.badge !== null && (
-                    <span
-                      className={cn(
-                        "rounded-full px-1.5 font-mono text-[10px] tabular-nums",
-                        active
-                          ? "bg-foreground/10 text-foreground"
-                          : "bg-muted text-muted-foreground"
-                      )}
-                    >
-                      {it.badge}
-                    </span>
-                  ))}
-              </span>
-            </>
-          )
-          return (
-            <Fragment key={it.key}>
-              {renderItem(it, content, { active })}
-            </Fragment>
-          )
-        })}
-      </div>
-    </LayoutGroup>
+              <CollapsingLabel show={!compact} gap={v.innerGapPx}>
+                {it.label}
+              </CollapsingLabel>
+              {it.badgeNode ??
+                (it.badge !== undefined && it.badge !== null && (
+                  <span
+                    className={cn(
+                      "rounded-full px-1.5 font-mono text-[10px] tabular-nums",
+                      active
+                        ? "bg-foreground/10 text-foreground"
+                        : "bg-muted text-muted-foreground"
+                    )}
+                  >
+                    {it.badge}
+                  </span>
+                ))}
+            </span>
+          </>
+        )
+        return (
+          <Fragment key={it.key}>
+            {renderItem(it, content, { active })}
+          </Fragment>
+        )
+      })}
+    </div>
   )
 }
 

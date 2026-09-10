@@ -450,9 +450,7 @@ function TabsNav({
     <div className="flex flex-wrap items-center gap-3">
       <SegmentedTabs
         items={items}
-        layoutId={`project-tabs-${slug}`}
         className="project-tabs"
-        nativeIndicator
         isActive={isActive}
         renderItem={(item, content, { active }) => {
           const def = TABS.find((t) => t.key === item.key)!
@@ -621,7 +619,6 @@ function SprintViewSwitcher({
     >
       <SegmentedTabs
         items={items}
-        layoutId={`sprint-view-${groupId}`}
         isActive={(k) => k === view}
         renderItem={(item, content, { active }) => (
           <button
