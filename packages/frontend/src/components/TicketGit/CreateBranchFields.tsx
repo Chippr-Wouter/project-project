@@ -284,7 +284,6 @@ function StatusInlinePills({
   return (
     <SegmentedTabs
       items={items}
-      layoutId="create-branch-status"
       variant="inline"
       isActive={(k) => k === value}
       renderItem={(item, content, { active }) => (

@@ -211,7 +211,10 @@ function SprintBoardContent({
   useEffect(() => {
     const el = ref.current
     if (!el || isCompleted || reorderMode) return
-    const cleanupAutoScroll = autoScrollForElements({ element: el })
+    const cleanupAutoScroll = autoScrollForElements({
+      element: el,
+      getAllowedAxis: () => "horizontal"
+    })
     const cleanupMonitor = monitorForElements({
       onDrop({ source, location }) {
         const target = location.current.dropTargets[0]
@@ -258,7 +261,7 @@ function SprintBoardContent({
       ref={ref}
       layoutScroll
       aria-busy={waiting}
-      style={{ height: height ? `${height}px` : undefined }}
+      style={{ height: height ?? 240 }}
       className={cn(
         "overflow-x-auto",
         waiting && "animate-pulse motion-reduce:animate-none",

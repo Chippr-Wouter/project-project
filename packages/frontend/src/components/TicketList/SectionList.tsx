@@ -1,7 +1,6 @@
 import * as Result from "effect/unstable/reactivity/AsyncResult"
 import { ErrorPage } from "@/components/ErrorPage"
 import { useAtomSet, useAtomValue } from "@effect/atom-react"
-import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import { Loader2 } from "lucide-react"
 import { useRef, useState, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
@@ -13,7 +12,6 @@ import {
 } from "@/atoms/tickets"
 import { projectKey } from "@/atoms/projects"
 import { cn } from "@/lib/utils"
-import { transitions } from "@/lib/springs"
 import { m } from "@/paraglide/messages"
 import type {
   Group,
@@ -25,6 +23,7 @@ import type {
   TicketStatus
 } from "@projectproject/shared"
 import { Row } from "./Row"
+import { AutoLoad, VirtualRows } from "./VirtualRows"
 import { SectionHeader } from "./SectionHeader"
 import { SectionTicketCreator } from "./SectionTicketCreator"
 
@@ -69,7 +68,6 @@ export function SectionList({
   const pendingStatusChanges = useAtomValue(
     pendingTicketStatusChangesAtom(projectKey(orgSlug, slug))
   )
-  const reducedMotion = useReducedMotion()
   const loadMore = useAtomSet(loadMoreTicketsAtom(sectionKey))
   const loadMoreState = useAtomValue(loadMoreTicketsAtom(sectionKey))
   const loadingMore = loadMoreState.waiting
@@ -139,24 +137,20 @@ export function SectionList({
                 —
               </div>
             ) : (
-              <ul
+              <VirtualRows
+                key={sectionKey}
                 className={gridCols}
-                style={{
-                  contentVisibility: "auto",
-                  containIntrinsicBlockSize: `auto ${Math.max(0, items.length * 56 - 4)}px`
-                }}
+                rowKeys={items.map((row) => row.key)}
+                activeIndex={items.findIndex(
+                  ({ ticket }) => ticket.id === activePreviewId
+                )}
               >
-                <AnimatePresence initial={false}>
-                  {items.map(({ ticket, key, pending }) => (
-                    <motion.li
-                      key={key}
+                {(index) => {
+                  const { ticket, pending } = items[index]
+                  return (
+                    <div
                       inert={pending}
                       aria-busy={pending}
-                      initial={
-                        pending && !reducedMotion ? { opacity: 0 } : false
-                      }
-                      animate={{ opacity: 1 }}
-                      transition={transitions.presence}
                       className={cn(
                         "col-span-full grid grid-cols-subgrid",
                         pending && "pointer-events-none animate-pulse",
@@ -180,10 +174,10 @@ export function SectionList({
                         onPreviewPointerEnter={onPreviewPointerEnter}
                         onPreviewOpenChange={onPreviewOpenChange}
                       />
-                    </motion.li>
-                  ))}
-                </AnimatePresence>
-              </ul>
+                    </div>
+                  )
+                }}
+              </VirtualRows>
             )}
 
             {Result.matchWithError(loadMoreState, {
@@ -197,27 +191,39 @@ export function SectionList({
               onSuccess: () => null
             })}
             {nextCursor !== null && (
-              <div className="flex justify-center py-2">
-                <Button
-                  type="button"
-                  variant="tertiary"
-                  size="sm"
-                  onClick={() => loadMore()}
-                  disabled={loadingMore}
-                >
-                  {loadingMore ? (
-                    <>
-                      <Loader2
-                        className="size-4 animate-spin"
-                        strokeWidth={1.75}
-                      />
-                      {m.tickets_load_more_loading()}
-                    </>
-                  ) : (
-                    m.tickets_section_load_more_button({ remaining })
-                  )}
-                </Button>
-              </div>
+              <AutoLoad
+                key={sectionKey}
+                cursor={nextCursor}
+                enabled={
+                  !collapsed && !loadingMore && !Result.isFailure(loadMoreState)
+                }
+                loadMore={() => loadMore()}
+              >
+                {Result.isFailure(loadMoreState) ? (
+                  <Button
+                    type="button"
+                    variant="tertiary"
+                    size="sm"
+                    onClick={() => loadMore()}
+                  >
+                    {m.tickets_section_load_more_button({ remaining })}
+                  </Button>
+                ) : (
+                  <div
+                    role="status"
+                    className={cn(
+                      "flex h-7 items-center gap-2 text-xs text-muted-foreground",
+                      !loadingMore && "invisible"
+                    )}
+                  >
+                    <Loader2
+                      className="size-4 animate-spin motion-reduce:animate-none"
+                      strokeWidth={1.75}
+                    />
+                    {m.tickets_load_more_loading()}
+                  </div>
+                )}
+              </AutoLoad>
             )}
           </div>
         </div>

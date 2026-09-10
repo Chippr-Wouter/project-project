@@ -181,6 +181,7 @@ export function SegmentedList({
   return (
     <div
       key="sections"
+      style={{ overflowAnchor: "none" }}
       className="flex flex-col gap-1 has-[[data-creating]]:[&>:not([data-creating])]:opacity-35"
     >
       {filteredStatuses.map((status) => (

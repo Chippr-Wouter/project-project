@@ -489,7 +489,6 @@ function EditorPreferenceCard({
             key,
             label: label()
           }))}
-          layoutId="editor-preference"
           isActive={(key) => key === selected}
           renderItem={(item, content, { active }) => (
             <button
