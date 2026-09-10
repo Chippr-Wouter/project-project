@@ -1,26 +1,9 @@
-// Shared segmented-tabs primitive.
-//
-// One component, two callsites: the project-level Tickets/About/Members tabs
-// in `routes/_authed/orgs/$orgSlug/projects/$slug/route.tsx` and the All/Todo/In progress/
-// Done chips in `components/TicketList.tsx`. Same chrome (rounded-xl border
-// container, padded with inner pills), same active-state animation
-// (LayoutGroup + a single `motion.span` shared via `layoutId` slides
-// between selections with `springs.moderate`), same compact label-collapse
-// behaviour.
-//
-// The two callsites differ in *what each item is wrapped in*: nav links for
-// URL-driven tabs, plain buttons for state-driven chips. We expose that as
-// a `renderItem` render prop — the component owns chrome + animation +
-// content, the callsite owns navigation/state.
-//
-// `CollapsingLabel` is exported alongside so other toolbar controls
-// (TypeFilter / SortMenu) can collapse labels with the same easing.
-
 import { AnimatePresence, LayoutGroup, motion } from "motion/react"
 import type { ComponentType, ReactNode } from "react"
 import { Fragment, useLayoutEffect, useRef, useState } from "react"
 import { springs, transitions } from "@/lib/springs"
 import { cn } from "@/lib/utils"
+import { SegmentedIndicatorPrototype } from "./SegmentedIndicatorPrototype"
 
 type IconCmp = ComponentType<{ className?: string; strokeWidth?: number }>
 
@@ -77,6 +60,7 @@ export interface SegmentedTabsProps<K extends string> {
   compact?: boolean
   variant?: SegmentedVariant
   className?: string
+  nativeIndicatorPrototype?: boolean
 }
 
 export function SegmentedTabs<K extends string>({
@@ -86,18 +70,31 @@ export function SegmentedTabs<K extends string>({
   renderItem,
   compact = false,
   variant = "default",
-  className
+  className,
+  nativeIndicatorPrototype = false
 }: SegmentedTabsProps<K>) {
   const v = VARIANTS[variant]
   return (
     <LayoutGroup id={layoutId}>
-      <div className={cn(v.container, className)}>
+      <div
+        className={cn(
+          v.container,
+          className,
+          nativeIndicatorPrototype && "relative"
+        )}
+      >
+        {nativeIndicatorPrototype && (
+          <SegmentedIndicatorPrototype
+            activeIndex={items.findIndex((item) => isActive(item.key))}
+            className={cn("bg-accent", v.pillRounding)}
+          />
+        )}
         {items.map((it) => {
           const active = isActive(it.key)
           const Icon = it.icon
           const content = (
             <>
-              {active && (
+              {active && !nativeIndicatorPrototype && (
                 <motion.span
                   layoutId={`${layoutId}-active`}
                   transition={springs.moderate}

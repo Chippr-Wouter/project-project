@@ -48,6 +48,7 @@ function SprintBoardCardImpl({
             to="/orgs/$orgSlug/projects/$slug/tickets/$id"
             params={{ orgSlug, slug, id: visibleTicket.id }}
             preload="intent"
+            draggable={false}
             data-row-link
             className="min-w-0 font-medium outline-none after:absolute after:inset-0 after:z-10 after:rounded-sm after:content-[''] focus-visible:after:ring-1 focus-visible:after:ring-ring focus-visible:after:ring-inset"
           >

@@ -1,5 +1,3 @@
-import { useUpdateTicketQuery } from "@/components/TicketList/url"
-import { useMemo } from "react"
 import { createFileRoute } from "@tanstack/react-router"
 import * as Schema from "effect/Schema"
 import { projectStatusesAtom } from "@/atoms/projectStatuses"
@@ -15,7 +13,6 @@ import {
   ticketsInSprintAtom,
   ticketsInSprintKey
 } from "@/atoms/tickets"
-import { SprintDetail } from "@/components/sprints/SprintDetail"
 import {
   GroupId,
   ticketListQueryFromSearch,
@@ -32,7 +29,7 @@ type SprintRouteSearch = ReturnType<typeof ticketListQueryToSearch> & {
 export const Route = createFileRoute(
   "/_authed/orgs/$orgSlug/projects/$slug/sprints/$groupId"
 )({
-  component: SprintDetailRoute,
+  component: () => null,
   validateSearch: (search: Record<string, unknown>): SprintRouteSearch => {
     const { groupId: _groupId, ...sanitized } = ticketListQueryToSearch(
       ticketListQueryFromSearch(search)
@@ -73,24 +70,6 @@ export const Route = createFileRoute(
     }
   }
 })
-
-function SprintDetailRoute() {
-  const { orgSlug, slug, groupId } = Route.useParams()
-  const updateQuery = useUpdateTicketQuery()
-  const search = Route.useSearch({ structuralSharing: true })
-  const id = decodeGroupId(groupId)
-  const scopedQuery = useMemo(() => sprintListQuery(search, id), [search, id])
-  return (
-    <SprintDetail
-      onQueryChange={updateQuery}
-      orgSlug={orgSlug}
-      slug={slug}
-      groupId={id}
-      view={search.view ?? "board"}
-      listQuery={scopedQuery}
-    />
-  )
-}
 
 function sprintListQuery(
   search: SprintRouteSearch,

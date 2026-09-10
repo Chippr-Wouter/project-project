@@ -59,12 +59,11 @@ import {
   sprintState
 } from "@projectproject/shared"
 import { SPRINT_STATE_META } from "@/components/sprints/SprintChip"
-import { motion } from "motion/react"
 import { ProjectBanner } from "@/components/ProjectBanner"
 import { ProjectHeader } from "@/components/ProjectHeader"
+import { ProjectViewsPrototype } from "@/components/ProjectViewsPrototype"
 import { useSidebarSection } from "@/components/SidebarSlot"
 import { cn } from "@/lib/utils"
-import { springs } from "@/lib/springs"
 import {
   SEGMENTED_ITEM_CLASS,
   SegmentedTabs,
@@ -184,6 +183,11 @@ function ProjectLayout() {
                 <TabsNav orgSlug={orgSlug} slug={slug} project={value} />
               </PageContainer>
             )}
+            <ProjectViewsPrototype
+              key={`${orgSlug}/${slug}`}
+              orgSlug={orgSlug}
+              slug={slug}
+            />
             <Outlet />
           </div>
         </TagRenamesProvider>
@@ -448,6 +452,7 @@ function TabsNav({
         items={items}
         layoutId={`project-tabs-${slug}`}
         className="project-tabs"
+        nativeIndicatorPrototype
         isActive={isActive}
         renderItem={(item, content, { active }) => {
           const def = TABS.find((t) => t.key === item.key)!
@@ -471,12 +476,7 @@ function TabsNav({
             event.preventDefault()
             startTransition(async () => {
               flushSync(() => selectTab(item.key))
-              await new Promise<void>((resolve) => {
-                requestAnimationFrame(() => {
-                  requestAnimationFrame(() => window.setTimeout(resolve, 0))
-                })
-              })
-              await navigate(destination)
+              await navigate({ ...destination, viewTransition: false })
             })
           }
 
@@ -487,13 +487,6 @@ function TabsNav({
                 {...destination}
                 className={SEGMENTED_ITEM_CLASS(active)}
               >
-                {active && (
-                  <motion.span
-                    layoutId={`project-tabs-${slug}-active`}
-                    transition={springs.moderate}
-                    className="absolute inset-0 z-0 rounded-lg bg-accent"
-                  />
-                )}
                 <span className="relative z-10 inline-flex items-center gap-1.5 transition-opacity group-hover/seg-item:opacity-0 group-hover/seg-item:duration-0">
                   <ListChecks className="size-3.5" strokeWidth={1.75} />
                   <span>{m.project_detail_tab_backlog()}</span>
@@ -522,13 +515,6 @@ function TabsNav({
           if (item.key === "sprints" && sprintsCount !== null) {
             const children = (
               <>
-                {active && (
-                  <motion.span
-                    layoutId={`project-tabs-${slug}-active`}
-                    transition={springs.moderate}
-                    className="absolute inset-0 z-0 rounded-lg bg-accent"
-                  />
-                )}
                 <span className="relative z-10 inline-flex items-center gap-1.5 transition-opacity group-hover/seg-item:opacity-0 group-hover/seg-item:duration-0">
                   <CalendarRange className="size-3.5" strokeWidth={1.75} />
                   <span>{m.project_detail_tab_sprints()}</span>

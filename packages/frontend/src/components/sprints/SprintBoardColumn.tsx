@@ -1,5 +1,4 @@
 import NumberFlow from "@number-flow/react"
-import { useAutoAnimate } from "@formkit/auto-animate/react"
 import { motion, Reorder, useDragControls } from "motion/react"
 import { GripVertical } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
@@ -18,6 +17,7 @@ import type {
   Ticket,
   TicketId
 } from "@projectproject/shared"
+import { VirtualSprintCardsPrototype } from "./VirtualSprintCardsPrototype"
 import { SprintBoardCard } from "./SprintBoardCard"
 import { useLongPress } from "./BoardReorderMode"
 import type { CardDropData, ColumnDropData, DragData } from "./board-utils"
@@ -53,7 +53,6 @@ export function SprintBoardColumn({
   reorderMode: boolean
   onActivateReorder: () => void
 }) {
-  const [listRef] = useAutoAnimate({ duration: 180, easing: "ease-out" })
   const meta = statusMetaFor(status, statuses)
   const Icon = meta.icon
   const [columnEl, setColumnEl] = useState<HTMLElement | null>(null)
@@ -202,25 +201,27 @@ export function SprintBoardColumn({
             dragOver && "border-border bg-accent/40"
           )}
         />
-        <div
-          ref={listRef}
-          className="relative z-10 flex min-h-0 flex-col overflow-y-auto pb-2"
+        <VirtualSprintCardsPrototype
+          tickets={tickets}
+          isDraggable={isDraggable && !reorderMode}
+          status={status}
         >
-          {tickets.map((t) => (
+          {(ticket) => (
             <CardSlot
-              key={t.id}
               orgSlug={orgSlug}
               slug={slug}
               sprintTicketsKey={sprintTicketsKey}
-              ticket={t}
+              ticket={ticket}
               status={status}
               members={members}
               isDraggable={isDraggable && !reorderMode}
-              pending={overlay.has(t.id)}
-              flashKey={lastFlash?.id === t.id ? lastFlash.tick : undefined}
+              pending={overlay.has(ticket.id)}
+              flashKey={
+                lastFlash?.id === ticket.id ? lastFlash.tick : undefined
+              }
             />
-          ))}
-        </div>
+          )}
+        </VirtualSprintCardsPrototype>
       </motion.div>
     </Reorder.Item>
   )
@@ -251,7 +252,6 @@ function CardSlot({
   const ref = useRef<HTMLDivElement>(null)
   const cardRef = useRef<HTMLDivElement>(null)
   const [dragging, setDragging] = useState(false)
-  const [edge, setEdge] = useState<"top" | "bottom" | null>(null)
 
   useEffect(() => {
     if (!isDraggable) return
@@ -285,26 +285,13 @@ function CardSlot({
       onDrop: () => setDragging(false)
     })
     const cleanupDrop = dropTargetForElements({
-      element: el,
+      element: el.closest<HTMLElement>("[data-ticket-id]") ?? el,
       getData: ({ input, element }): CardDropData => {
         const rect = element.getBoundingClientRect()
         const e: "top" | "bottom" =
           input.clientY < rect.top + rect.height / 2 ? "top" : "bottom"
         return { type: "card", id: ticketId, status, edge: e }
-      },
-      onDragEnter: ({ self, source }) => {
-        const data = source.data as unknown as DragData
-        if (data.id === ticketId) return
-        setEdge((self.data as unknown as CardDropData).edge)
-      },
-      onDrag: ({ self, source }) => {
-        const data = source.data as unknown as DragData
-        if (data.id === ticketId) return
-        const next = (self.data as unknown as CardDropData).edge
-        setEdge((prev) => (prev === next ? prev : next))
-      },
-      onDragLeave: () => setEdge(null),
-      onDrop: () => setEdge(null)
+      }
     })
     return () => {
       cleanupDrag()
@@ -340,17 +327,6 @@ function CardSlot({
           />
         </motion.div>
       </div>
-      {edge && (
-        <div
-          aria-hidden
-          className={cn(
-            "pointer-events-none absolute inset-x-3 z-10 h-0.5 rounded-full bg-foreground/70",
-            edge === "top"
-              ? "top-0 -translate-y-1/2"
-              : "bottom-0 translate-y-1/2"
-          )}
-        />
-      )}
     </div>
   )
 }
