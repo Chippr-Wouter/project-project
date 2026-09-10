@@ -1,5 +1,5 @@
 import { defaultRangeExtractor, useVirtualizer } from "@tanstack/react-virtual"
-import { useDeferredOverscanPrototype } from "./useDeferredOverscanPrototype"
+import { useDeferredOverscan } from "./useDeferredOverscan"
 import {
   useCallback,
   useEffect,
@@ -9,7 +9,7 @@ import {
   type ReactNode
 } from "react"
 
-export function VirtualRowsPrototype({
+export function VirtualRows({
   rowKeys,
   className,
   activeIndex,
@@ -31,7 +31,7 @@ export function VirtualRowsPrototype({
     []
   )
   const getItemKey = useCallback((index: number) => rowKeys[index], [rowKeys])
-  const overscan = useDeferredOverscanPrototype(getScrollElement, 6)
+  const overscan = useDeferredOverscan(getScrollElement, 6)
   // oxlint-disable-next-line react/incompatible-library -- This component opts out of React Compiler.
   const virtualizer = useVirtualizer<HTMLElement, HTMLLIElement>({
     count: rowKeys.length,
@@ -95,7 +95,7 @@ export function VirtualRowsPrototype({
     <ul
       ref={listRef}
       className={className}
-      data-virtual-prototype
+      data-virtual-rows
       data-loaded-rows={rowKeys.length}
       data-mounted-rows={rows.length}
       style={{ gridTemplateRows: `repeat(${rowKeys.length}, 52px)` }}
@@ -116,7 +116,7 @@ export function VirtualRowsPrototype({
   )
 }
 
-export function AutoLoadPrototype({
+export function AutoLoad({
   cursor,
   enabled,
   loadMore,

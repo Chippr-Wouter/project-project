@@ -23,7 +23,7 @@ import type {
   TicketStatus
 } from "@projectproject/shared"
 import { Row } from "./Row"
-import { AutoLoadPrototype, VirtualRowsPrototype } from "./VirtualRowsPrototype"
+import { AutoLoad, VirtualRows } from "./VirtualRows"
 import { SectionHeader } from "./SectionHeader"
 import { SectionTicketCreator } from "./SectionTicketCreator"
 
@@ -137,7 +137,7 @@ export function SectionList({
                 —
               </div>
             ) : (
-              <VirtualRowsPrototype
+              <VirtualRows
                 key={sectionKey}
                 className={gridCols}
                 rowKeys={items.map((row) => row.key)}
@@ -177,7 +177,7 @@ export function SectionList({
                     </div>
                   )
                 }}
-              </VirtualRowsPrototype>
+              </VirtualRows>
             )}
 
             {Result.matchWithError(loadMoreState, {
@@ -191,7 +191,7 @@ export function SectionList({
               onSuccess: () => null
             })}
             {nextCursor !== null && (
-              <AutoLoadPrototype
+              <AutoLoad
                 key={sectionKey}
                 cursor={nextCursor}
                 enabled={
@@ -223,7 +223,7 @@ export function SectionList({
                     {m.tickets_load_more_loading()}
                   </div>
                 )}
-              </AutoLoadPrototype>
+              </AutoLoad>
             )}
           </div>
         </div>

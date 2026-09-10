@@ -1,13 +1,20 @@
 import { defaultRangeExtractor, useVirtualizer } from "@tanstack/react-virtual"
 import { monitorForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter"
 import { useReducedMotion } from "motion/react"
-import { useSprintEdgeScrollPrototype } from "./useSprintEdgeScrollPrototype"
-import { useDeferredOverscanPrototype } from "../TicketList/useDeferredOverscanPrototype"
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
-import { SprintCardMotionPrototype } from "./SprintCardMotionPrototype"
+import { useSprintEdgeScroll } from "./useSprintEdgeScroll"
+import { useDeferredOverscan } from "../TicketList/useDeferredOverscan"
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode
+} from "react"
+import { SprintCardMotion } from "./SprintCardMotion"
 import type { Ticket } from "@projectproject/shared"
 
-export function VirtualSprintCardsPrototype({
+export function VirtualSprintCards({
   tickets,
   isDraggable,
   status,
@@ -28,7 +35,7 @@ export function VirtualSprintCardsPrototype({
   } | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const getScrollElement = useCallback(() => scrollRef.current, [])
-  const overscan = useDeferredOverscanPrototype(getScrollElement, 4)
+  const overscan = useDeferredOverscan(getScrollElement, 4)
   const [focusedId, setFocusedId] = useState<string | null>(null)
   const focusedIndex = tickets.findIndex((ticket) => ticket.id === focusedId)
   const getItemKey = useCallback(
@@ -53,7 +60,12 @@ export function VirtualSprintCardsPrototype({
     )
   })
 
-  useSprintEdgeScrollPrototype(scrollRef, isDraggable)
+  useSprintEdgeScroll(scrollRef, isDraggable)
+
+  const ticketsRef = useRef(tickets)
+  useLayoutEffect(() => {
+    ticketsRef.current = tickets
+  }, [tickets])
 
   useEffect(() => {
     if (!isDraggable) return undefined
@@ -63,6 +75,7 @@ export function VirtualSprintCardsPrototype({
     }) => {
       if (source.data.type !== "card" || typeof source.data.id !== "string")
         return
+      const items = ticketsRef.current
       const target = location.current.dropTargets.find(
         ({ data }) => data.type === "card" || data.type === "column"
       )
@@ -70,10 +83,10 @@ export function VirtualSprintCardsPrototype({
         target?.data.status !== status
           ? null
           : target.data.type === "column"
-            ? tickets.length
+            ? items.length
             : target.data.id === source.data.id
-              ? tickets.findIndex((ticket) => ticket.id === source.data.id)
-              : tickets.findIndex((ticket) => ticket.id === target.data.id) +
+              ? items.findIndex((ticket) => ticket.id === source.data.id)
+              : items.findIndex((ticket) => ticket.id === target.data.id) +
                 (target.data.edge === "bottom" ? 1 : 0)
       const height =
         source.element.closest("[data-ticket-id]")?.getBoundingClientRect()
@@ -93,7 +106,7 @@ export function VirtualSprintCardsPrototype({
       onDropTargetChange: update,
       onDrop: () => setDrag(null)
     })
-  }, [isDraggable, status, tickets])
+  }, [isDraggable, status])
 
   const sourceIndex = drag
     ? tickets.findIndex((ticket) => ticket.id === drag.id)
@@ -150,7 +163,7 @@ export function VirtualSprintCardsPrototype({
             }}
             onFocusCapture={() => setFocusedId(tickets[row.index].id)}
           >
-            <SprintCardMotionPrototype
+            <SprintCardMotion
               start={row.start}
               offset={
                 drag && row.index !== sourceIndex
@@ -166,7 +179,7 @@ export function VirtualSprintCardsPrototype({
               reducedMotion={Boolean(reducedMotion) || virtualizer.isScrolling}
             >
               {children(tickets[row.index])}
-            </SprintCardMotionPrototype>
+            </SprintCardMotion>
           </div>
         ))}
       </div>

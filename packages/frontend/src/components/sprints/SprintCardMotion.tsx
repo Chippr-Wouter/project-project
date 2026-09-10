@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, type ReactNode } from "react"
 
-export function SprintCardMotionPrototype({
+export function SprintCardMotion({
   start,
   offset,
   hidden,

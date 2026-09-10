@@ -1,6 +1,6 @@
 import { startTransition, useEffect, useState } from "react"
 
-export function useDeferredOverscanPrototype(
+export function useDeferredOverscan(
   getScrollElement: () => HTMLElement | null,
   overscan: number
 ) {

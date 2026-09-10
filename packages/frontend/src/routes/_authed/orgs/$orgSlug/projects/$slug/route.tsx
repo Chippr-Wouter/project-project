@@ -61,7 +61,7 @@ import {
 import { SPRINT_STATE_META } from "@/components/sprints/SprintChip"
 import { ProjectBanner } from "@/components/ProjectBanner"
 import { ProjectHeader } from "@/components/ProjectHeader"
-import { ProjectViewsPrototype } from "@/components/ProjectViewsPrototype"
+import { RetainedProjectViews } from "@/components/RetainedProjectViews"
 import { useSidebarSection } from "@/components/SidebarSlot"
 import { cn } from "@/lib/utils"
 import {
@@ -183,7 +183,7 @@ function ProjectLayout() {
                 <TabsNav orgSlug={orgSlug} slug={slug} project={value} />
               </PageContainer>
             )}
-            <ProjectViewsPrototype
+            <RetainedProjectViews
               key={`${orgSlug}/${slug}`}
               orgSlug={orgSlug}
               slug={slug}
@@ -452,7 +452,7 @@ function TabsNav({
         items={items}
         layoutId={`project-tabs-${slug}`}
         className="project-tabs"
-        nativeIndicatorPrototype
+        nativeIndicator
         isActive={isActive}
         renderItem={(item, content, { active }) => {
           const def = TABS.find((t) => t.key === item.key)!

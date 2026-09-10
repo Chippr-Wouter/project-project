@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef } from "react"
 import { useReducedMotion } from "motion/react"
 
-export function SegmentedIndicatorPrototype({
+export function SegmentedIndicator({
   activeIndex,
   className
 }: {

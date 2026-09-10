@@ -17,7 +17,7 @@ import type {
   Ticket,
   TicketId
 } from "@projectproject/shared"
-import { VirtualSprintCardsPrototype } from "./VirtualSprintCardsPrototype"
+import { VirtualSprintCards } from "./VirtualSprintCards"
 import { SprintBoardCard } from "./SprintBoardCard"
 import { useLongPress } from "./BoardReorderMode"
 import type { CardDropData, ColumnDropData, DragData } from "./board-utils"
@@ -201,7 +201,7 @@ export function SprintBoardColumn({
             dragOver && "border-border bg-accent/40"
           )}
         />
-        <VirtualSprintCardsPrototype
+        <VirtualSprintCards
           tickets={tickets}
           isDraggable={isDraggable && !reorderMode}
           status={status}
@@ -221,7 +221,7 @@ export function SprintBoardColumn({
               }
             />
           )}
-        </VirtualSprintCardsPrototype>
+        </VirtualSprintCards>
       </motion.div>
     </Reorder.Item>
   )

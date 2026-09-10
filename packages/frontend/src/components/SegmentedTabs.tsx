@@ -3,7 +3,7 @@ import type { ComponentType, ReactNode } from "react"
 import { Fragment, useLayoutEffect, useRef, useState } from "react"
 import { springs, transitions } from "@/lib/springs"
 import { cn } from "@/lib/utils"
-import { SegmentedIndicatorPrototype } from "./SegmentedIndicatorPrototype"
+import { SegmentedIndicator } from "./SegmentedIndicator"
 
 type IconCmp = ComponentType<{ className?: string; strokeWidth?: number }>
 
@@ -60,7 +60,7 @@ export interface SegmentedTabsProps<K extends string> {
   compact?: boolean
   variant?: SegmentedVariant
   className?: string
-  nativeIndicatorPrototype?: boolean
+  nativeIndicator?: boolean
 }
 
 export function SegmentedTabs<K extends string>({
@@ -71,20 +71,16 @@ export function SegmentedTabs<K extends string>({
   compact = false,
   variant = "default",
   className,
-  nativeIndicatorPrototype = false
+  nativeIndicator = false
 }: SegmentedTabsProps<K>) {
   const v = VARIANTS[variant]
   return (
     <LayoutGroup id={layoutId}>
       <div
-        className={cn(
-          v.container,
-          className,
-          nativeIndicatorPrototype && "relative"
-        )}
+        className={cn(v.container, className, nativeIndicator && "relative")}
       >
-        {nativeIndicatorPrototype && (
-          <SegmentedIndicatorPrototype
+        {nativeIndicator && (
+          <SegmentedIndicator
             activeIndex={items.findIndex((item) => isActive(item.key))}
             className={cn("bg-accent", v.pillRounding)}
           />
@@ -94,7 +90,7 @@ export function SegmentedTabs<K extends string>({
           const Icon = it.icon
           const content = (
             <>
-              {active && !nativeIndicatorPrototype && (
+              {active && !nativeIndicator && (
                 <motion.span
                   layoutId={`${layoutId}-active`}
                   transition={springs.moderate}

@@ -3,7 +3,7 @@ import { monitorForElements } from "@atlaskit/pragmatic-drag-and-drop/element/ad
 
 const edgeZone = 120
 
-export function useSprintEdgeScrollPrototype(
+export function useSprintEdgeScroll(
   ref: RefObject<HTMLDivElement | null>,
   enabled: boolean
 ) {

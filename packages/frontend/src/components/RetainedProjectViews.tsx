@@ -8,7 +8,7 @@ import { SprintDetail } from "./sprints/SprintDetail"
 
 const decodeGroupId = Schema.decodeUnknownSync(GroupId)
 
-export function ProjectViewsPrototype({
+export function RetainedProjectViews({
   orgSlug,
   slug
 }: {
