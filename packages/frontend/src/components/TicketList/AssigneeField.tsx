@@ -185,11 +185,9 @@ export function AssigneeField({
         variant={variant}
         label={label}
         className={cn(
-          variant === "card" && [
-            "transition-opacity",
+          variant === "card" &&
             resolved.length === 0 &&
-              "opacity-0 group-hover/card:opacity-100 group-focus-within/card:opacity-100"
-          ],
+            "opacity-0 group-hover/reveal:opacity-100 group-focus-within/reveal:opacity-100",
           className
         )}
       >
